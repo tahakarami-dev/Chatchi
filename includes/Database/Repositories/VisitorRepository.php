@@ -139,16 +139,6 @@ final class VisitorRepository extends Repository {
 	}
 
 	/**
-	 * Links the visitor to a WordPress user.
-	 *
-	 * @param int $id      Visitor ID.
-	 * @param int $user_id WordPress user ID.
-	 */
-	public function link_user( int $id, int $user_id ): bool {
-		return $this->update_row( $id, array( 'user_id' => max( 0, $user_id ) ) );
-	}
-
-	/**
 	 * Records that the visitor was just active.
 	 *
 	 * @param int $id Visitor ID.

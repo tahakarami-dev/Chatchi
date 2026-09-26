@@ -37,6 +37,19 @@ final class VisitorToken {
 	}
 
 	/**
+	 * Returns the fixed hash that identifies a logged-in user's visitor row.
+	 *
+	 * Being deterministic, the unique token_hash index allows only one row per
+	 * account, which makes concurrent first requests safe. The preimage is
+	 * not a valid token, so no guest cookie can ever hash to it.
+	 *
+	 * @param int $user_id WordPress user ID.
+	 */
+	public static function hash_for_user( int $user_id ): string {
+		return hash( 'sha256', 'chatchi-user:' . $user_id );
+	}
+
+	/**
 	 * Checks the token format.
 	 *
 	 * @param string $token Candidate token.
