@@ -63,6 +63,9 @@ function chatchi_requirements_notice() {
 		return;
 	}
 
+	// The I18n module never boots when requirements are unmet.
+	load_plugin_textdomain( 'chatchi', false, dirname( CHATCHI_BASENAME ) . '/languages' );
+
 	$unmet    = chatchi_unmet_requirements();
 	$messages = array();
 

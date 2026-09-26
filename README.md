@@ -41,7 +41,7 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
 └── Visitors/            Identity (cookie token), start-form fields and validation
-languages/               Translation files (text domain: chatchi)
+languages/               chatchi.pot + Persian (fa_IR) translation, text domain: chatchi
 docs/                    Design and architecture documents
 ```
 

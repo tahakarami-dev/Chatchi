@@ -22,7 +22,8 @@ final class I18n implements Module {
 	 * {@inheritDoc}
 	 */
 	public function register(): void {
-		add_action( 'init', array( $this, 'load_textdomain' ) );
+		// Early on init, so other init callbacks that use ChatChi get translated strings.
+		add_action( 'init', array( $this, 'load_textdomain' ), 1 );
 	}
 
 	/**

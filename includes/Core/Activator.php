@@ -31,6 +31,9 @@ final class Activator {
 		try {
 			chatchi()->container()->get( Installer::class )->install();
 		} catch ( \Throwable $e ) {
+			// Modules do not boot during activation, so load translations here.
+			( new I18n() )->load_textdomain();
+
 			// Stops activation and shows the reason on the Plugins screen.
 			wp_die(
 				esc_html(
