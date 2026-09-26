@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 0.9.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
+"Project-Id-Version: ChatChi | چت‌چی 0.11.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T13:34:26+00:00\n"
+"POT-Creation-Date: 2026-09-26T16:43:21+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -57,12 +57,12 @@ msgid "Sorry, you are not allowed to access this page."
 msgstr ""
 
 #. translators: %s: site name.
-#: includes/Admin/PanelPage.php:73
+#: includes/Admin/PanelPage.php:145
 #, php-format
 msgid "ChatChi — %s"
 msgstr ""
 
-#: includes/Admin/PanelPage.php:94
+#: includes/Admin/PanelPage.php:166
 msgid "The ChatChi panel needs JavaScript."
 msgstr ""
 
@@ -351,7 +351,7 @@ msgstr ""
 #. translators: %s: maximum file size.
 #. translators: %s: maximum file size, e.g. "2 MB".
 #: includes/Admin/PanelStrings.php:92
-#: includes/Agents/AvatarUploader.php:63
+#: includes/Agents/AvatarUploader.php:65
 #, php-format
 msgid "The image must be smaller than %s."
 msgstr ""
@@ -392,6 +392,165 @@ msgstr ""
 msgid "WordPress account"
 msgstr ""
 
+#: includes/Admin/PanelStrings.php:103
+msgid "Settings"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:104
+msgid "How the chat widget greets visitors and where it appears."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:105
+msgid "Could not load settings."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:106
+msgid "Welcome message"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:107
+msgid "Visitors see it as the first message when they open the chat. It is not saved in conversations."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:108
+msgid "Show a welcome message"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:109
+msgid "Message"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:110
+msgid "Leave empty to use the default message."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:111
+msgid "Where the widget appears"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:112
+msgid "On every page"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:113
+msgid "Only on the pages I choose"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:114
+msgid "On every page except the ones I choose"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:115
+msgid "Show on"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:116
+msgid "Hide on"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:117
+msgid "Home page"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:118
+msgid "All pages"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:119
+msgid "All blog posts"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:120
+msgid "All products and the shop"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:121
+msgid "Specific pages, posts or products"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:122
+msgid "Search by title"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:123
+msgid "Nothing found."
+msgstr ""
+
+#. translators: %s: page or post title.
+#: includes/Admin/PanelStrings.php:125
+#, php-format
+msgid "Remove %s"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:126
+msgid "Nothing is chosen yet, so the widget will only appear on pages that contain the shortcode."
+msgstr ""
+
+#. translators: %d: maximum number of items.
+#: includes/Admin/PanelStrings.php:128
+#: includes/Settings/SettingsValidator.php:271
+#, php-format
+msgid "You can choose at most %d items."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:129
+msgid "Shortcode"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:130
+msgid "Put this shortcode in any page, post or widget area to show the chat widget there, even where the rules above hide it."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:131
+msgid "Copy"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:132
+msgid "Copied."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:133
+msgid "Visitor IP addresses"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:134
+msgid "Used to limit how often the same visitor can start chats and send messages. Change this only if your site is behind a CDN or proxy."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:135
+msgid "Visitors connect to my server directly"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:136
+msgid "My site is behind Cloudflare"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:137
+msgid "My site is behind another CDN or proxy (such as ArvanCloud)"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:138
+msgid "Header that carries the visitor address"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:139
+msgid "Addresses of your CDN or proxy (one IP or range per line)"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:140
+msgid "The header is only believed on requests from these addresses. Your CDN publishes this list."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:141
+msgid "Without this list, anyone who can reach your server directly can fake their address and get around the per-address limits."
+msgstr ""
+
+#. translators: %s: IP address.
+#: includes/Admin/PanelStrings.php:143
+#, php-format
+msgid "Your address as ChatChi sees it now: %s"
+msgstr ""
+
 #: includes/Agents/AgentService.php:83
 msgid "This user does not exist."
 msgstr ""
@@ -421,21 +580,21 @@ msgstr ""
 #: includes/Agents/AgentService.php:312
 #: includes/Conversations/ConversationService.php:381
 #: includes/Messages/MessageService.php:304
-#: includes/Rest/ConversationController.php:322
+#: includes/Rest/ConversationController.php:338
 #: includes/Visitors/VisitorService.php:115
 msgid "Something went wrong. Please try again."
 msgstr ""
 
-#: includes/Agents/AvatarUploader.php:52
+#: includes/Agents/AvatarUploader.php:55
 msgid "Choose an image to upload."
 msgstr ""
 
-#: includes/Agents/AvatarUploader.php:56
-#: includes/Agents/AvatarUploader.php:102
+#: includes/Agents/AvatarUploader.php:70
+#: includes/Agents/AvatarUploader.php:108
 msgid "The image could not be uploaded."
 msgstr ""
 
-#: includes/Agents/AvatarUploader.php:74
+#: includes/Agents/AvatarUploader.php:80
 msgid "Use a JPG, PNG, GIF or WebP image."
 msgstr ""
 
@@ -448,8 +607,7 @@ msgid "Conversation not found."
 msgstr ""
 
 #: includes/Conversations/ConversationService.php:365
-#: includes/Rest/AgentManagementController.php:148
-#: includes/Rest/AgentManagementController.php:163
+#: includes/Rest/AdminPermission.php:41
 msgid "You are not allowed to do this."
 msgstr ""
 
@@ -545,12 +703,24 @@ msgstr ""
 msgid "%d characters left"
 msgstr ""
 
-#: includes/Messages/MessageBody.php:62
+#. translators: %d: number of seconds.
+#: includes/Frontend/WidgetStrings.php:59
+#, php-format
+msgid "Too many messages. Try again in %d seconds."
+msgstr ""
+
+#. translators: %d: number of minutes.
+#: includes/Frontend/WidgetStrings.php:61
+#, php-format
+msgid "Too many attempts. Try again in %d minutes."
+msgstr ""
+
+#: includes/Messages/MessageBody.php:53
 msgid "Type a message first."
 msgstr ""
 
 #. translators: %d: maximum number of characters.
-#: includes/Messages/MessageBody.php:73
+#: includes/Messages/MessageBody.php:64
 #, php-format
 msgid "Messages can be at most %d characters."
 msgstr ""
@@ -563,8 +733,8 @@ msgstr ""
 msgid "This conversation has been closed."
 msgstr ""
 
+#: includes/Rest/AdminPermission.php:27
 #: includes/Rest/AgentController.php:206
-#: includes/Rest/AgentManagementController.php:144
 msgid "Please log in to continue."
 msgstr ""
 
@@ -580,8 +750,95 @@ msgstr ""
 msgid "This request was rejected."
 msgstr ""
 
-#: includes/Rest/WidgetController.php:233
+#: includes/Rest/SettingsController.php:202
+msgid "(no title)"
+msgstr ""
+
+#: includes/Rest/WidgetController.php:284
 msgid "Start a conversation first."
+msgstr ""
+
+#: includes/Security/RateLimiter.php:154
+msgid "Too many requests. Please wait a moment and try again."
+msgstr ""
+
+#: includes/Security/SpamGuard.php:89
+msgid "We could not start the chat. Please try again."
+msgstr ""
+
+#: includes/Security/SpamGuard.php:109
+msgid "Please take a moment before starting the chat."
+msgstr ""
+
+#: includes/Security/SpamGuard.php:123
+msgid "The chat form expired. Please try again."
+msgstr ""
+
+#: includes/Settings/Settings.php:110
+msgid "Hi! 👋 How can we help you today?"
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:97
+msgid "Some settings need your attention."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:113
+msgid "Enter the header your proxy puts the visitor address in."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:192
+msgid "Choose where the widget appears."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:203
+msgid "Choose how visitors reach your site."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:212
+msgid "Unknown setting."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:221
+msgid "Enter the message as text."
+msgstr ""
+
+#. translators: %d: maximum number of characters.
+#: includes/Settings/SettingsValidator.php:230
+#, php-format
+msgid "The welcome message can be at most %d characters."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:243
+msgid "Choose page types from the list."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:256
+#: includes/Settings/SettingsValidator.php:261
+msgid "Choose items from the search results."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:276
+msgid "Some of the chosen items no longer exist or are not published."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:290
+msgid "Use a header name made of letters, digits and dashes, like X-Real-IP."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:302
+msgid "Enter one address or range per line."
+msgstr ""
+
+#. translators: %s: the invalid entry.
+#: includes/Settings/SettingsValidator.php:320
+#, php-format
+msgid "“%s” is not an IP address or range."
+msgstr ""
+
+#. translators: %d: maximum number of entries.
+#: includes/Settings/SettingsValidator.php:331
+#, php-format
+msgid "Enter at most %d addresses or ranges."
 msgstr ""
 
 #: includes/Visitors/ProfileValidator.php:90

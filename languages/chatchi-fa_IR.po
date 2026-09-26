@@ -2,8 +2,8 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 0.9.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
+"Project-Id-Version: ChatChi | چت‌چی 0.11.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Persian\n"
 "Language: fa_IR\n"
@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T13:34:26+00:00\n"
+"POT-Creation-Date: 2026-09-26T16:43:21+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -59,12 +59,12 @@ msgid "Sorry, you are not allowed to access this page."
 msgstr "متأسفیم، اجازه‌ی دسترسی به این صفحه را نداری."
 
 #. translators: %s: site name.
-#: includes/Admin/PanelPage.php:73
+#: includes/Admin/PanelPage.php:145
 #, php-format
 msgid "ChatChi — %s"
 msgstr "چت‌چی — %s"
 
-#: includes/Admin/PanelPage.php:94
+#: includes/Admin/PanelPage.php:166
 msgid "The ChatChi panel needs JavaScript."
 msgstr "پنل چت‌چی برای کار کردن به JavaScript نیاز دارد."
 
@@ -353,7 +353,7 @@ msgstr "تصویر مربعی با فرمت JPG، PNG، GIF یا WebP."
 #. translators: %s: maximum file size.
 #. translators: %s: maximum file size, e.g. "2 MB".
 #: includes/Admin/PanelStrings.php:92
-#: includes/Agents/AvatarUploader.php:63
+#: includes/Agents/AvatarUploader.php:65
 #, php-format
 msgid "The image must be smaller than %s."
 msgstr "حجم تصویر باید کمتر از %s باشد."
@@ -394,6 +394,165 @@ msgstr "در حال بارگذاری…"
 msgid "WordPress account"
 msgstr "حساب وردپرس"
 
+#: includes/Admin/PanelStrings.php:103
+msgid "Settings"
+msgstr "تنظیمات"
+
+#: includes/Admin/PanelStrings.php:104
+msgid "How the chat widget greets visitors and where it appears."
+msgstr "ویجت گفتگو چطور به بازدیدکننده‌ها خوش‌آمد بگوید و کجا نمایش داده شود."
+
+#: includes/Admin/PanelStrings.php:105
+msgid "Could not load settings."
+msgstr "تنظیمات بارگذاری نشد."
+
+#: includes/Admin/PanelStrings.php:106
+msgid "Welcome message"
+msgstr "پیام خوش‌آمد"
+
+#: includes/Admin/PanelStrings.php:107
+msgid "Visitors see it as the first message when they open the chat. It is not saved in conversations."
+msgstr "بازدیدکننده‌ها با باز کردن گفتگو آن را به‌عنوان اولین پیام می‌بینند. در گفتگوها ذخیره نمی‌شود."
+
+#: includes/Admin/PanelStrings.php:108
+msgid "Show a welcome message"
+msgstr "نمایش پیام خوش‌آمد"
+
+#: includes/Admin/PanelStrings.php:109
+msgid "Message"
+msgstr "متن پیام"
+
+#: includes/Admin/PanelStrings.php:110
+msgid "Leave empty to use the default message."
+msgstr "اگر خالی بماند، پیام پیش‌فرض نمایش داده می‌شود."
+
+#: includes/Admin/PanelStrings.php:111
+msgid "Where the widget appears"
+msgstr "محل نمایش ویجت"
+
+#: includes/Admin/PanelStrings.php:112
+msgid "On every page"
+msgstr "در همه‌ی صفحه‌ها"
+
+#: includes/Admin/PanelStrings.php:113
+msgid "Only on the pages I choose"
+msgstr "فقط در صفحه‌هایی که انتخاب می‌کنم"
+
+#: includes/Admin/PanelStrings.php:114
+msgid "On every page except the ones I choose"
+msgstr "در همه‌ی صفحه‌ها به‌جز صفحه‌هایی که انتخاب می‌کنم"
+
+#: includes/Admin/PanelStrings.php:115
+msgid "Show on"
+msgstr "نمایش در"
+
+#: includes/Admin/PanelStrings.php:116
+msgid "Hide on"
+msgstr "عدم نمایش در"
+
+#: includes/Admin/PanelStrings.php:117
+msgid "Home page"
+msgstr "صفحه‌ی اصلی"
+
+#: includes/Admin/PanelStrings.php:118
+msgid "All pages"
+msgstr "همه‌ی برگه‌ها"
+
+#: includes/Admin/PanelStrings.php:119
+msgid "All blog posts"
+msgstr "همه‌ی نوشته‌های وبلاگ"
+
+#: includes/Admin/PanelStrings.php:120
+msgid "All products and the shop"
+msgstr "همه‌ی محصولات و فروشگاه"
+
+#: includes/Admin/PanelStrings.php:121
+msgid "Specific pages, posts or products"
+msgstr "برگه، نوشته یا محصول خاص"
+
+#: includes/Admin/PanelStrings.php:122
+msgid "Search by title"
+msgstr "جست‌وجو با عنوان"
+
+#: includes/Admin/PanelStrings.php:123
+msgid "Nothing found."
+msgstr "چیزی پیدا نشد."
+
+#. translators: %s: page or post title.
+#: includes/Admin/PanelStrings.php:125
+#, php-format
+msgid "Remove %s"
+msgstr "حذف %s"
+
+#: includes/Admin/PanelStrings.php:126
+msgid "Nothing is chosen yet, so the widget will only appear on pages that contain the shortcode."
+msgstr "هنوز چیزی انتخاب نشده؛ پس ویجت فقط در صفحه‌هایی که شورت‌کد دارند نمایش داده می‌شود."
+
+#. translators: %d: maximum number of items.
+#: includes/Admin/PanelStrings.php:128
+#: includes/Settings/SettingsValidator.php:271
+#, php-format
+msgid "You can choose at most %d items."
+msgstr "حداکثر %d مورد می‌توانی انتخاب کنی."
+
+#: includes/Admin/PanelStrings.php:129
+msgid "Shortcode"
+msgstr "شورت‌کد"
+
+#: includes/Admin/PanelStrings.php:130
+msgid "Put this shortcode in any page, post or widget area to show the chat widget there, even where the rules above hide it."
+msgstr "این شورت‌کد را در هر برگه، نوشته یا ابزارکی بگذار تا ویجت گفتگو همان‌جا نمایش داده شود؛ حتی اگر قوانین بالا آن‌جا را پنهان کرده باشند."
+
+#: includes/Admin/PanelStrings.php:131
+msgid "Copy"
+msgstr "کپی"
+
+#: includes/Admin/PanelStrings.php:132
+msgid "Copied."
+msgstr "کپی شد."
+
+#: includes/Admin/PanelStrings.php:133
+msgid "Visitor IP addresses"
+msgstr "آدرس IP بازدیدکننده‌ها"
+
+#: includes/Admin/PanelStrings.php:134
+msgid "Used to limit how often the same visitor can start chats and send messages. Change this only if your site is behind a CDN or proxy."
+msgstr "برای محدود کردن تعداد گفتگو و پیامی که یک بازدیدکننده می‌تواند بفرستد استفاده می‌شود. فقط اگر سایتت پشت CDN یا پراکسی است تغییرش بده."
+
+#: includes/Admin/PanelStrings.php:135
+msgid "Visitors connect to my server directly"
+msgstr "بازدیدکننده‌ها مستقیم به سرورم وصل می‌شوند"
+
+#: includes/Admin/PanelStrings.php:136
+msgid "My site is behind Cloudflare"
+msgstr "سایتم پشت کلادفلر است"
+
+#: includes/Admin/PanelStrings.php:137
+msgid "My site is behind another CDN or proxy (such as ArvanCloud)"
+msgstr "سایتم پشت CDN یا پراکسی دیگری است (مثل ابرآروان)"
+
+#: includes/Admin/PanelStrings.php:138
+msgid "Header that carries the visitor address"
+msgstr "هدری که آدرس بازدیدکننده در آن است"
+
+#: includes/Admin/PanelStrings.php:139
+msgid "Addresses of your CDN or proxy (one IP or range per line)"
+msgstr "آدرس‌های CDN یا پراکسی (در هر خط یک IP یا بازه)"
+
+#: includes/Admin/PanelStrings.php:140
+msgid "The header is only believed on requests from these addresses. Your CDN publishes this list."
+msgstr "هدر فقط در درخواست‌هایی که از این آدرس‌ها می‌آیند پذیرفته می‌شود. CDN تو این فهرست را منتشر می‌کند."
+
+#: includes/Admin/PanelStrings.php:141
+msgid "Without this list, anyone who can reach your server directly can fake their address and get around the per-address limits."
+msgstr "بدون این فهرست، هر کسی که مستقیم به سرورت دسترسی داشته باشد می‌تواند آدرسش را جعل کند و محدودیت‌های هر IP را دور بزند."
+
+#. translators: %s: IP address.
+#: includes/Admin/PanelStrings.php:143
+#, php-format
+msgid "Your address as ChatChi sees it now: %s"
+msgstr "آدرس تو از نگاه چت‌چی: %s"
+
 #: includes/Agents/AgentService.php:83
 msgid "This user does not exist."
 msgstr "این کاربر وجود ندارد."
@@ -423,21 +582,21 @@ msgstr "این کاربر از قبل اپراتور است."
 #: includes/Agents/AgentService.php:312
 #: includes/Conversations/ConversationService.php:381
 #: includes/Messages/MessageService.php:304
-#: includes/Rest/ConversationController.php:322
+#: includes/Rest/ConversationController.php:338
 #: includes/Visitors/VisitorService.php:115
 msgid "Something went wrong. Please try again."
 msgstr "مشکلی پیش آمد. لطفاً دوباره امتحان کن."
 
-#: includes/Agents/AvatarUploader.php:52
+#: includes/Agents/AvatarUploader.php:55
 msgid "Choose an image to upload."
 msgstr "یک تصویر برای بارگذاری انتخاب کن."
 
-#: includes/Agents/AvatarUploader.php:56
-#: includes/Agents/AvatarUploader.php:102
+#: includes/Agents/AvatarUploader.php:70
+#: includes/Agents/AvatarUploader.php:108
 msgid "The image could not be uploaded."
 msgstr "تصویر بارگذاری نشد."
 
-#: includes/Agents/AvatarUploader.php:74
+#: includes/Agents/AvatarUploader.php:80
 msgid "Use a JPG, PNG, GIF or WebP image."
 msgstr "یک تصویر JPG، PNG، GIF یا WebP انتخاب کن."
 
@@ -450,8 +609,7 @@ msgid "Conversation not found."
 msgstr "گفتگو پیدا نشد."
 
 #: includes/Conversations/ConversationService.php:365
-#: includes/Rest/AgentManagementController.php:148
-#: includes/Rest/AgentManagementController.php:163
+#: includes/Rest/AdminPermission.php:41
 msgid "You are not allowed to do this."
 msgstr "اجازه‌ی انجام این کار را نداری."
 
@@ -547,12 +705,24 @@ msgstr "شروع گفتگوی جدید"
 msgid "%d characters left"
 msgstr "%d حرف باقی مانده"
 
-#: includes/Messages/MessageBody.php:62
+#. translators: %d: number of seconds.
+#: includes/Frontend/WidgetStrings.php:59
+#, php-format
+msgid "Too many messages. Try again in %d seconds."
+msgstr "پیام‌ها زیاد شد. %d ثانیه دیگر دوباره بفرست."
+
+#. translators: %d: number of minutes.
+#: includes/Frontend/WidgetStrings.php:61
+#, php-format
+msgid "Too many attempts. Try again in %d minutes."
+msgstr "تلاش‌ها زیاد شد. %d دقیقه دیگر دوباره امتحان کن."
+
+#: includes/Messages/MessageBody.php:53
 msgid "Type a message first."
 msgstr "اول پیامت را بنویس."
 
 #. translators: %d: maximum number of characters.
-#: includes/Messages/MessageBody.php:73
+#: includes/Messages/MessageBody.php:64
 #, php-format
 msgid "Messages can be at most %d characters."
 msgstr "پیام حداکثر می‌تواند %d حرف باشد."
@@ -565,8 +735,8 @@ msgstr "شناسه‌ی پیام نامعتبر است."
 msgid "This conversation has been closed."
 msgstr "این گفتگو بسته شده است."
 
+#: includes/Rest/AdminPermission.php:27
 #: includes/Rest/AgentController.php:206
-#: includes/Rest/AgentManagementController.php:144
 msgid "Please log in to continue."
 msgstr "برای ادامه وارد حساب کاربری‌ات شو."
 
@@ -582,9 +752,96 @@ msgstr "حساب اپراتوری‌ات غیرفعال است."
 msgid "This request was rejected."
 msgstr "این درخواست پذیرفته نشد."
 
-#: includes/Rest/WidgetController.php:233
+#: includes/Rest/SettingsController.php:202
+msgid "(no title)"
+msgstr "(بدون عنوان)"
+
+#: includes/Rest/WidgetController.php:284
 msgid "Start a conversation first."
 msgstr "اول یک گفتگو شروع کن."
+
+#: includes/Security/RateLimiter.php:154
+msgid "Too many requests. Please wait a moment and try again."
+msgstr "درخواست‌ها زیاد است. کمی صبر کن و دوباره امتحان کن."
+
+#: includes/Security/SpamGuard.php:89
+msgid "We could not start the chat. Please try again."
+msgstr "گفتگو شروع نشد. لطفاً دوباره امتحان کن."
+
+#: includes/Security/SpamGuard.php:109
+msgid "Please take a moment before starting the chat."
+msgstr "کمی صبر کن و بعد گفتگو را شروع کن."
+
+#: includes/Security/SpamGuard.php:123
+msgid "The chat form expired. Please try again."
+msgstr "فرم گفتگو منقضی شده. لطفاً دوباره امتحان کن."
+
+#: includes/Settings/Settings.php:110
+msgid "Hi! 👋 How can we help you today?"
+msgstr "سلام! 👋 امروز چطور می‌تونیم کمکت کنیم؟"
+
+#: includes/Settings/SettingsValidator.php:97
+msgid "Some settings need your attention."
+msgstr "چند مورد از تنظیمات نیاز به اصلاح دارد."
+
+#: includes/Settings/SettingsValidator.php:113
+msgid "Enter the header your proxy puts the visitor address in."
+msgstr "نام هدری را که پراکسی آدرس بازدیدکننده را در آن می‌گذارد وارد کن."
+
+#: includes/Settings/SettingsValidator.php:192
+msgid "Choose where the widget appears."
+msgstr "محل نمایش ویجت را انتخاب کن."
+
+#: includes/Settings/SettingsValidator.php:203
+msgid "Choose how visitors reach your site."
+msgstr "مشخص کن بازدیدکننده‌ها چطور به سایتت وصل می‌شوند."
+
+#: includes/Settings/SettingsValidator.php:212
+msgid "Unknown setting."
+msgstr "تنظیم ناشناخته."
+
+#: includes/Settings/SettingsValidator.php:221
+msgid "Enter the message as text."
+msgstr "پیام را به‌صورت متن وارد کن."
+
+#. translators: %d: maximum number of characters.
+#: includes/Settings/SettingsValidator.php:230
+#, php-format
+msgid "The welcome message can be at most %d characters."
+msgstr "پیام خوش‌آمد حداکثر می‌تواند %d نویسه باشد."
+
+#: includes/Settings/SettingsValidator.php:243
+msgid "Choose page types from the list."
+msgstr "نوع صفحه را از فهرست انتخاب کن."
+
+#: includes/Settings/SettingsValidator.php:256
+#: includes/Settings/SettingsValidator.php:261
+msgid "Choose items from the search results."
+msgstr "موردها را از نتایج جست‌وجو انتخاب کن."
+
+#: includes/Settings/SettingsValidator.php:276
+msgid "Some of the chosen items no longer exist or are not published."
+msgstr "بعضی از موردهای انتخاب‌شده دیگر وجود ندارند یا منتشر نشده‌اند."
+
+#: includes/Settings/SettingsValidator.php:290
+msgid "Use a header name made of letters, digits and dashes, like X-Real-IP."
+msgstr "نام هدر فقط می‌تواند حرف انگلیسی، عدد و خط تیره باشد؛ مثل X-Real-IP."
+
+#: includes/Settings/SettingsValidator.php:302
+msgid "Enter one address or range per line."
+msgstr "در هر خط یک آدرس یا بازه وارد کن."
+
+#. translators: %s: the invalid entry.
+#: includes/Settings/SettingsValidator.php:320
+#, php-format
+msgid "“%s” is not an IP address or range."
+msgstr "«%s» آدرس یا بازه‌ی IP معتبر نیست."
+
+#. translators: %d: maximum number of entries.
+#: includes/Settings/SettingsValidator.php:331
+#, php-format
+msgid "Enter at most %d addresses or ranges."
+msgstr "حداکثر %d آدرس یا بازه وارد کن."
 
 #: includes/Visitors/ProfileValidator.php:90
 msgid "Please check the highlighted fields."

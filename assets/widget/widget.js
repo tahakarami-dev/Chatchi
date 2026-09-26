@@ -24,6 +24,7 @@
 	var POLL_MAX = 60000;
 	var SESSION_EVERY = 5;
 	var GROUP_GAP_MS = 2 * 60 * 1000;
+	var TRAP_FIELD = 'website';
 	var PAGE_SIZE = 30;
 
 	var Core = window.ChatChiCore;
@@ -390,7 +391,8 @@
 				return;
 			}
 			pending.failed = true;
-			pending.error = error.message;
+			pending.limited = error.code === 'chatchi_rate_limited';
+			pending.error = pending.limited ? self.waitMessage( error ) : error.message;
 			self.render();
 		} );
 	};
@@ -407,7 +409,7 @@
 
 		if ( ! this.startPromise ) {
 			var visitor = this.state.visitor || {};
-			this.startPromise = api.start( { name: visitor.name, email: visitor.email, phone: visitor.phone } ).then( function ( result ) {
+			this.startPromise = this.startConversation( { name: visitor.name, email: visitor.email, phone: visitor.phone } ).then( function ( result ) {
 				self.state.visitor = result.visitor;
 				self.state.conversation = result.conversation;
 				self.state.closed = false;
@@ -424,6 +426,61 @@
 		return this.startPromise;
 	};
 
+	/**
+	 * Starts (or resumes) a conversation, with the bot checks' form token.
+	 *
+	 * A start sent sooner than a person could fill in the form, or with a
+	 * token from a page left open for a day, is refused by the server; both
+	 * are retried here, so real visitors never see those errors. A renewed
+	 * token is itself brand new, so an expired token can need two retries:
+	 * renew, then wait.
+	 */
+	Widget.prototype.startConversation = function ( profile, trap, attempt ) {
+		var self = this;
+		var session = this.state.session || {};
+		var body = Object.assign( { form_token: session.form_token || '' }, profile );
+
+		body[ TRAP_FIELD ] = trap || '';
+
+		attempt = attempt || 0;
+
+		return api.start( body ).catch( function ( error ) {
+			if ( attempt >= 2 ) {
+				throw error;
+			}
+			if ( error.code === 'chatchi_too_fast' ) {
+				var wait = Math.max( 1, ( error.data && error.data.retry_after ) || 1 ) * 1000;
+				return new Promise( function ( resolve ) {
+					window.setTimeout( resolve, wait );
+				} ).then( function () {
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			if ( error.code === 'chatchi_form_expired' ) {
+				return api.session().then( function ( fresh ) {
+					if ( self.state.session ) {
+						self.state.session.form_token = fresh.form_token;
+					}
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			throw error;
+		} );
+	};
+
+	/**
+	 * Turns a rate-limit error into "try again in N seconds/minutes".
+	 */
+	Widget.prototype.waitMessage = function ( error ) {
+		var seconds = Math.max( 1, Math.ceil( ( error.data && error.data.retry_after ) || 1 ) );
+
+		if ( seconds >= 90 ) {
+			return fmt.format( S.waitMinutes, Math.ceil( seconds / 60 ) );
+		}
+
+		return fmt.format( S.waitSeconds, seconds );
+	};
+
 	Widget.prototype.submitForm = function ( form ) {
 		var self = this;
 		var data = {};
@@ -437,7 +494,9 @@
 		this.state.formValues = data;
 		this.set( { submitting: true, formErrors: {}, formAlert: '' } );
 
-		api.start( data ).then( function ( result ) {
+		var trap = form.elements[ TRAP_FIELD ] ? form.elements[ TRAP_FIELD ].value : '';
+
+		this.startConversation( data, trap ).then( function ( result ) {
 			self.state.visitor = result.visitor;
 			self.state.conversation = result.conversation;
 			self.state.closed = false;
@@ -449,7 +508,8 @@
 			self.schedulePoll();
 		} ).catch( function ( error ) {
 			var fields = ( error.data && error.data.fields ) || {};
-			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : error.message } );
+			var alert = error.code === 'chatchi_rate_limited' ? self.waitMessage( error ) : error.message;
+			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : alert } );
 			var invalid = self.panel.querySelector( '[aria-invalid="true"]' );
 			if ( invalid ) {
 				invalid.focus();
@@ -794,7 +854,10 @@
 				event.preventDefault();
 				self.submitForm( form );
 			}
-		}, [ h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } ) ] );
+		}, [
+			config.welcome ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
+		] );
 
 		Object.keys( specs ).forEach( function ( name ) {
 			var field = fields[ name ];
@@ -826,6 +889,12 @@
 				error ? h( 'p', { id: inputId + '-error', className: 'chatchi-field-error', text: error } ) : null
 			] ) );
 		} );
+
+		// Honeypot: invisible to people and screen readers; bots fill it in.
+		form.appendChild( h( 'div', { className: 'chatchi-trap', 'aria-hidden': 'true' }, [
+			h( 'label', { for: 'chatchi-field-' + TRAP_FIELD, text: 'Website' } ),
+			h( 'input', { id: 'chatchi-field-' + TRAP_FIELD, name: TRAP_FIELD, type: 'text', tabindex: '-1', autocomplete: 'off' } )
+		] ) );
 
 		if ( state.formAlert ) {
 			form.appendChild( h( 'p', { className: 'chatchi-alert', role: 'alert', text: state.formAlert } ) );
@@ -868,6 +937,12 @@
 			return { key: p.clientId, mine: true, type: 'visitor', body: p.body, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: true };
 		} ) );
 
+		// The welcome message opens the conversation once its start is loaded.
+		if ( config.welcome && ! state.hasMore ) {
+			var started = state.conversation && state.conversation.created_at ? new Date( state.conversation.created_at ) : null;
+			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
+		}
+
 		if ( ! entries.length ) {
 			log.appendChild( h( 'div', { className: 'chatchi-state' }, [ h( 'p', { text: S.empty } ) ] ) );
 			return log;
@@ -894,6 +969,21 @@
 		return log;
 	};
 
+	/**
+	 * The configured welcome message, shown as the first bubble from support.
+	 * It exists only in the widget and is never stored as a message.
+	 */
+	Widget.prototype.welcomeEntry = function ( date ) {
+		return {
+			key: 'welcome',
+			mine: false,
+			type: 'welcome',
+			sender: { name: S.support, avatar_url: null },
+			body: config.welcome,
+			date: date
+		};
+	};
+
 	Widget.prototype.sameGroup = function ( a, b ) {
 		return a.mine === b.mine &&
 			a.type === b.type &&
@@ -910,6 +1000,9 @@
 		}
 
 		var classes = [ 'chatchi-row', entry.mine ? 'chatchi-row--mine' : 'chatchi-row--theirs' ];
+		if ( entry.type === 'welcome' ) {
+			classes.push( 'chatchi-row--welcome' );
+		}
 		if ( groupStart ) {
 			classes.push( 'is-group-start' );
 		}
@@ -940,13 +1033,13 @@
 			stack.appendChild( h( 'button', {
 				type: 'button',
 				className: 'chatchi-retry',
-				text: S.sendFailed,
+				text: entry.ref.limited ? entry.ref.error : S.sendFailed,
 				onClick: function () {
 					self.deliver( entry.ref );
 					self.focusDefault();
 				}
 			} ) );
-		} else if ( groupEnd ) {
+		} else if ( groupEnd && entry.type !== 'welcome' ) {
 			stack.appendChild( this.renderMeta( entry ) );
 		}
 

@@ -15,9 +15,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * /chatchi/v1/agent/agents… and /chatchi/v1/agent/users
  *
- * Site administrators only (manage_options), with the standard REST nonce.
- * An agent record is not required, so an administrator whose own record was
- * deactivated can still manage agents.
+ * Site administrators only; see AdminPermission.
  */
 final class AgentManagementController implements RouteProvider {
 
@@ -140,15 +138,7 @@ final class AgentManagementController implements RouteProvider {
 	 * @return true|\WP_Error
 	 */
 	public function permit() {
-		if ( ! is_user_logged_in() ) {
-			return new \WP_Error( 'chatchi_not_logged_in', __( 'Please log in to continue.', 'chatchi' ), array( 'status' => 401 ) );
-		}
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return new \WP_Error( 'chatchi_forbidden', __( 'You are not allowed to do this.', 'chatchi' ), array( 'status' => 403 ) );
-		}
-
-		return true;
+		return AdminPermission::check();
 	}
 
 	/**
@@ -160,7 +150,7 @@ final class AgentManagementController implements RouteProvider {
 		$allowed = $this->permit();
 
 		if ( true === $allowed && ! current_user_can( 'upload_files' ) ) {
-			return new \WP_Error( 'chatchi_forbidden', __( 'You are not allowed to do this.', 'chatchi' ), array( 'status' => 403 ) );
+			return AdminPermission::forbidden();
 		}
 
 		return $allowed;

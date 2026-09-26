@@ -21,6 +21,7 @@ final class Table {
 	public const AGENTS        = 'chatchi_agents';
 	public const CONVERSATIONS = 'chatchi_conversations';
 	public const MESSAGES      = 'chatchi_messages';
+	public const RATE_LIMITS   = 'chatchi_rate_limits';
 
 	/**
 	 * Returns every table name, unprefixed.
@@ -33,6 +34,7 @@ final class Table {
 			self::AGENTS,
 			self::CONVERSATIONS,
 			self::MESSAGES,
+			self::RATE_LIMITS,
 		);
 	}
 }

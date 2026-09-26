@@ -55,6 +55,10 @@ final class WidgetStrings {
 			'unread'         => __( '%d unread messages', 'chatchi' ),
 			/* translators: %d: number of characters left. */
 			'charactersLeft' => __( '%d characters left', 'chatchi' ),
+			/* translators: %d: number of seconds. */
+			'waitSeconds'    => __( 'Too many messages. Try again in %d seconds.', 'chatchi' ),
+			/* translators: %d: number of minutes. */
+			'waitMinutes'    => __( 'Too many attempts. Try again in %d minutes.', 'chatchi' ),
 		);
 	}
 }
