@@ -21,9 +21,7 @@ defined( 'ABSPATH' ) || exit;
  * routes. Access to the conversation itself is always enforced by the
  * services, never by the controller alone.
  */
-abstract class ConversationController {
-
-	public const NAMESPACE = 'chatchi/v1';
+abstract class ConversationController implements RouteProvider {
 
 	protected ConversationService $conversations;
 

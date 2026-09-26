@@ -74,6 +74,44 @@ final class Presenter {
 	}
 
 	/**
+	 * An agent with its WordPress account, for the management screen.
+	 *
+	 * @param Agent         $agent      Agent.
+	 * @param \WP_User|null $user       Its WordPress user.
+	 * @param int           $viewer_id  Current user ID, to flag the viewer's own record.
+	 * @return array<string, mixed>
+	 */
+	public function agent_for_admin( Agent $agent, ?\WP_User $user, int $viewer_id ): array {
+		return $this->agent( $agent ) + array(
+			'user_id'    => $agent->user_id,
+			'avatar_id'  => $agent->avatar_id,
+			'is_active'  => $agent->is_active,
+			'is_me'      => $agent->user_id === $viewer_id,
+			'user'       => $user ? array(
+				'login'        => $user->user_login,
+				'email'        => $user->user_email,
+				'display_name' => $user->display_name,
+			) : null,
+			'created_at' => $this->date( $agent->created_at ),
+		);
+	}
+
+	/**
+	 * A WordPress user who can be made an agent.
+	 *
+	 * @param \WP_User $user User.
+	 * @return array<string, mixed>
+	 */
+	public function user_candidate( \WP_User $user ): array {
+		return array(
+			'id'           => $user->ID,
+			'login'        => $user->user_login,
+			'email'        => $user->user_email,
+			'display_name' => $user->display_name,
+		);
+	}
+
+	/**
 	 * The visitor's own details, for the widget.
 	 *
 	 * @param Visitor $visitor Visitor.

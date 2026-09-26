@@ -75,6 +75,31 @@ final class PanelStrings {
 			'networkError'       => __( 'Connection problem. Check your internet and try again.', 'chatchi' ),
 			/* translators: %d: number of unread messages. */
 			'unread'             => __( '%d unread messages', 'chatchi' ),
+			'agents'             => __( 'Agents', 'chatchi' ),
+			'agentsIntro'        => __( 'People who answer chats. Visitors see their name and picture.', 'chatchi' ),
+			'addAgent'           => __( 'Add agent', 'chatchi' ),
+			'noAgents'           => __( 'Add your first agent', 'chatchi' ),
+			'noAgentsHint'       => __( 'Choose a WordPress user who will answer chats.', 'chatchi' ),
+			'agentsError'        => __( 'Could not load agents.', 'chatchi' ),
+			'findUser'           => __( 'Search users by name, username or email', 'chatchi' ),
+			'noUsers'            => __( 'No users found who are not agents yet.', 'chatchi' ),
+			'displayName'        => __( 'Name shown to visitors', 'chatchi' ),
+			'picture'            => __( 'Profile picture', 'chatchi' ),
+			'uploadPicture'      => __( 'Upload picture', 'chatchi' ),
+			'removePicture'      => __( 'Remove picture', 'chatchi' ),
+			'pictureHint'        => __( 'Square JPG, PNG, GIF or WebP.', 'chatchi' ),
+			/* translators: %s: maximum file size. */
+			'pictureTooLarge'    => __( 'The image must be smaller than %s.', 'chatchi' ),
+			'active'             => __( 'Active', 'chatchi' ),
+			'inactive'           => __( 'Inactive', 'chatchi' ),
+			'cannotDeactivateMe' => __( 'You cannot deactivate yourself.', 'chatchi' ),
+			'edit'               => __( 'Edit', 'chatchi' ),
+			'save'               => __( 'Save', 'chatchi' ),
+			'saved'              => __( 'Saved.', 'chatchi' ),
+			'create'             => __( 'Add', 'chatchi' ),
+			'saving'             => __( 'Saving…', 'chatchi' ),
+			'uploading'          => __( 'Uploading…', 'chatchi' ),
+			'wpAccount'          => __( 'WordPress account', 'chatchi' ),
 		);
 	}
 }
