@@ -10,7 +10,13 @@ namespace ChatChi;
 use ChatChi\Core\Container;
 use ChatChi\Core\Contracts\Module;
 use ChatChi\Core\I18n;
+use ChatChi\Core\InstallNotice;
 use ChatChi\Core\Installer;
+use ChatChi\Database\Repositories\AgentRepository;
+use ChatChi\Database\Repositories\ConversationRepository;
+use ChatChi\Database\Repositories\MessageRepository;
+use ChatChi\Database\Repositories\VisitorRepository;
+use ChatChi\Database\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -100,16 +106,54 @@ final class Plugin {
 	 */
 	private function register_services(): void {
 		$this->container->singleton(
-			Installer::class,
-			static function (): Installer {
-				return new Installer();
+			\wpdb::class,
+			static function (): \wpdb {
+				global $wpdb;
+				return $wpdb;
 			}
 		);
+
+		$this->container->singleton(
+			Schema::class,
+			static function ( Container $c ): Schema {
+				return new Schema( $c->get( \wpdb::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			Installer::class,
+			static function ( Container $c ): Installer {
+				return new Installer( $c->get( Schema::class ) );
+			}
+		);
+
+		$repositories = array(
+			VisitorRepository::class,
+			AgentRepository::class,
+			ConversationRepository::class,
+			MessageRepository::class,
+		);
+
+		foreach ( $repositories as $repository ) {
+			$this->container->singleton(
+				$repository,
+				static function ( Container $c ) use ( $repository ) {
+					return new $repository( $c->get( \wpdb::class ) );
+				}
+			);
+		}
 
 		$this->container->singleton(
 			I18n::class,
 			static function (): I18n {
 				return new I18n();
+			}
+		);
+
+		$this->container->singleton(
+			InstallNotice::class,
+			static function ( Container $c ): InstallNotice {
+				return new InstallNotice( $c->get( Installer::class ) );
 			}
 		);
 	}
@@ -122,6 +166,7 @@ final class Plugin {
 	private function modules(): array {
 		$modules = array(
 			I18n::class,
+			InstallNotice::class,
 		);
 
 		/**

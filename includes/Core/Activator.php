@@ -28,7 +28,22 @@ final class Activator {
 			return;
 		}
 
-		( new Installer() )->install();
+		try {
+			chatchi()->container()->get( Installer::class )->install();
+		} catch ( \Throwable $e ) {
+			// Stops activation and shows the reason on the Plugins screen.
+			wp_die(
+				esc_html(
+					sprintf(
+						/* translators: %s: technical error message. */
+						__( 'ChatChi could not be activated because its database tables could not be created: %s', 'chatchi' ),
+						$e->getMessage()
+					)
+				),
+				esc_html__( 'ChatChi activation failed', 'chatchi' ),
+				array( 'back_link' => true )
+			);
+		}
 
 		/**
 		 * Fires after ChatChi is activated on a single site.

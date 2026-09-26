@@ -7,6 +7,8 @@
 
 namespace ChatChi\Core;
 
+use ChatChi\Database\Schema;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -21,6 +23,8 @@ final class Installer {
 	public const VERSION_OPTION      = 'chatchi_version';
 	public const INSTALLED_AT_OPTION = 'chatchi_installed_at';
 	public const LOCK_OPTION         = 'chatchi_install_lock';
+	public const ERROR_OPTION        = 'chatchi_install_error';
+	public const BACKOFF_TRANSIENT   = 'chatchi_install_backoff';
 
 	/**
 	 * Seconds after which an abandoned lock is ignored.
@@ -28,14 +32,40 @@ final class Installer {
 	private const LOCK_TTL = 60;
 
 	/**
+	 * Seconds to wait before retrying a failed automatic install.
+	 */
+	private const BACKOFF_TTL = 300;
+
+	private Schema $schema;
+
+	/**
+	 * @param Schema $schema Table installer.
+	 */
+	public function __construct( Schema $schema ) {
+		$this->schema = $schema;
+	}
+
+	/**
 	 * Runs the installer if the stored version is outdated.
+	 *
+	 * Never throws: a failure is recorded, shown to admins, and retried
+	 * after a back-off so a broken database cannot slow down every request.
 	 */
 	public function maybe_upgrade(): void {
 		if ( get_option( self::VERSION_OPTION ) === CHATCHI_VERSION ) {
 			return;
 		}
 
-		$this->install();
+		if ( get_transient( self::BACKOFF_TRANSIENT ) ) {
+			return;
+		}
+
+		try {
+			$this->install();
+		} catch ( \Throwable $e ) {
+			// Already recorded by install(); the back-off schedules the retry.
+			return;
+		}
 	}
 
 	/**
@@ -44,6 +74,8 @@ final class Installer {
 	 * Steps must be idempotent: they can run again on every upgrade.
 	 *
 	 * @return bool False when another request is already installing.
+	 *
+	 * @throws \Throwable When a step fails; the error is recorded first.
 	 */
 	public function install(): bool {
 		if ( ! $this->acquire_lock() ) {
@@ -53,9 +85,17 @@ final class Installer {
 		try {
 			$previous_version = (string) get_option( self::VERSION_OPTION, '' );
 
+			$this->schema->install();
+
 			add_option( self::INSTALLED_AT_OPTION, time(), '', false );
 
 			update_option( self::VERSION_OPTION, CHATCHI_VERSION, true );
+
+			delete_option( self::ERROR_OPTION );
+			delete_transient( self::BACKOFF_TRANSIENT );
+		} catch ( \Throwable $e ) {
+			$this->record_failure( $e );
+			throw $e;
 		} finally {
 			$this->release_lock();
 		}
@@ -69,6 +109,26 @@ final class Installer {
 		do_action( 'chatchi_installed', $previous_version, CHATCHI_VERSION );
 
 		return true;
+	}
+
+	/**
+	 * Returns the message of the last failed install, or an empty string.
+	 */
+	public function last_error(): string {
+		return (string) get_option( self::ERROR_OPTION, '' );
+	}
+
+	/**
+	 * Stores the failure for the admin notice and starts the back-off.
+	 *
+	 * @param \Throwable $error Failure.
+	 */
+	private function record_failure( \Throwable $error ): void {
+		update_option( self::ERROR_OPTION, $error->getMessage(), false );
+		set_transient( self::BACKOFF_TRANSIENT, 1, self::BACKOFF_TTL );
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Install failures must reach the server log.
+		error_log( '[ChatChi] Install failed: ' . $error->getMessage() );
 	}
 
 	/**
