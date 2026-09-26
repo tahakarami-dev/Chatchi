@@ -21,8 +21,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 5 | Message System | ✅ |
 | 6 | REST API | ✅ |
 | 7 | Frontend Chat Widget | ✅ |
-| 8 | Chat Admin Panel (standalone SaaS-style app) | ⏳ |
-| 9 | Agent Management | |
+| 8 | Chat Admin Panel (standalone SaaS-style app) | ✅ |
+| 9 | Agent Management | ⏳ |
 | 10 | Welcome Message + Widget Display Rules + Shortcode | |
 | 11 | Rate Limiting + Anti-Spam + Security Hardening | |
 | 12 | Plugin Settings | |
@@ -38,7 +38,8 @@ includes/                PSR-4 root for the ChatChi\ namespace
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries
 ├── Messages/            Message service, text rules, paging
 ├── Rest/                chatchi/v1 controllers (widget, agent), presenter, CSRF guard
-├── Frontend/            Widget loader, color tokens, interface strings
+├── Frontend/            Widget loader, color tokens, font face, interface strings
+├── Admin/               Standalone agent panel page, access capability, menu entry
 ├── Core/
 │   ├── Container.php    Lazy service container
 │   ├── Contracts/       Interfaces (Module)
@@ -54,7 +55,9 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
 └── Visitors/            Identity (cookie token), start-form fields and validation
+assets/shared/           Core JS (DOM, API client, dates) and design tokens shared by widget and panel
 assets/widget/           Chat widget (vanilla JS in Shadow DOM, CSS)
+assets/admin/            Agent panel single-page app
 assets/fonts/vazirmatn/  Bundled Vazirmatn variable font (OFL)
 languages/               chatchi.pot + Persian (fa_IR) translation, text domain: chatchi
 docs/                    Design and architecture documents
@@ -124,3 +127,7 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
 | POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
 | POST | `/agent/conversations/{id}/close` | Close |
+
+## Agent panel
+
+`wp-admin/admin.php?page=chatchi` serves a standalone, full-screen app (no WordPress admin chrome). Access requires the virtual `chatchi_access_panel` capability, granted to site administrators and active agents. Administrators get an agent record automatically on their first visit.

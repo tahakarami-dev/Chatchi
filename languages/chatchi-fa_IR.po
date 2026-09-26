@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 0.7.0\n"
+"Project-Id-Version: ChatChi | چت‌چی 0.8.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Persian\n"
@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T12:54:10+00:00\n"
+"POT-Creation-Date: 2026-09-26T13:14:55+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -47,6 +47,255 @@ msgstr "چت‌چی به PHP نسخه‌ی %1$s یا بالاتر نیاز دا�
 #, php-format
 msgid "ChatChi requires WordPress %1$s or higher. You are running WordPress %2$s."
 msgstr "چت‌چی به وردپرس نسخه‌ی %1$s یا بالاتر نیاز دارد. نسخه‌ی وردپرس شما %2$s است."
+
+#: includes/Admin/AdminModule.php:58
+#: includes/Admin/AdminModule.php:59
+#: includes/Admin/PanelStrings.php:22
+msgid "ChatChi"
+msgstr "چت‌چی"
+
+#: includes/Admin/AdminModule.php:77
+msgid "Sorry, you are not allowed to access this page."
+msgstr "متأسفیم، اجازه‌ی دسترسی به این صفحه را نداری."
+
+#. translators: %s: site name.
+#: includes/Admin/PanelPage.php:66
+#, php-format
+msgid "ChatChi — %s"
+msgstr "چت‌چی — %s"
+
+#: includes/Admin/PanelPage.php:87
+msgid "The ChatChi panel needs JavaScript."
+msgstr "پنل چت‌چی برای کار کردن به JavaScript نیاز دارد."
+
+#: includes/Admin/PanelStrings.php:23
+msgid "Conversations"
+msgstr "گفتگوها"
+
+#: includes/Admin/PanelStrings.php:24
+msgid "Back to WordPress"
+msgstr "بازگشت به وردپرس"
+
+#: includes/Admin/PanelStrings.php:25
+msgid "Search name, email, phone or number"
+msgstr "جستجوی نام، ایمیل، موبایل یا شماره"
+
+#: includes/Admin/PanelStrings.php:26
+msgid "All"
+msgstr "همه"
+
+#: includes/Admin/PanelStrings.php:27
+msgid "New"
+msgstr "جدید"
+
+#: includes/Admin/PanelStrings.php:28
+msgid "Active"
+msgstr "فعال"
+
+#: includes/Admin/PanelStrings.php:29
+msgid "Closed"
+msgstr "بسته"
+
+#: includes/Admin/PanelStrings.php:30
+#: includes/Frontend/WidgetStrings.php:41
+msgid "Loading…"
+msgstr "در حال بارگذاری…"
+
+#: includes/Admin/PanelStrings.php:31
+msgid "Could not load conversations."
+msgstr "گفتگوها بارگذاری نشدند."
+
+#: includes/Admin/PanelStrings.php:32
+#: includes/Frontend/WidgetStrings.php:43
+msgid "Try again"
+msgstr "تلاش دوباره"
+
+#: includes/Admin/PanelStrings.php:33
+msgid "No conversations yet"
+msgstr "هنوز گفتگویی نداری"
+
+#: includes/Admin/PanelStrings.php:34
+msgid "When a visitor starts a chat on your site, it shows up here."
+msgstr "وقتی بازدیدکننده‌ای در سایتت گفتگو را شروع کند، اینجا نمایش داده می‌شود."
+
+#: includes/Admin/PanelStrings.php:35
+msgid "Nothing here"
+msgstr "اینجا چیزی نیست"
+
+#. translators: %s: search text.
+#: includes/Admin/PanelStrings.php:37
+#, php-format
+msgid "No results for “%s”"
+msgstr "نتیجه‌ای برای «%s» پیدا نشد"
+
+#: includes/Admin/PanelStrings.php:38
+msgid "Load more"
+msgstr "نمایش بیشتر"
+
+#: includes/Admin/PanelStrings.php:39
+msgid "Select a conversation"
+msgstr "یک گفتگو را انتخاب کن"
+
+#: includes/Admin/PanelStrings.php:40
+msgid "Pick a conversation from the list to read and reply."
+msgstr "از فهرست، یک گفتگو را برای خواندن و پاسخ دادن انتخاب کن."
+
+#: includes/Admin/PanelStrings.php:41
+msgid "Visitor"
+msgstr "بازدیدکننده"
+
+#. translators: %d: visitor number.
+#: includes/Admin/PanelStrings.php:43
+#, php-format
+msgid "Visitor #%d"
+msgstr "بازدیدکننده‌ی شماره‌ی %d"
+
+#: includes/Admin/PanelStrings.php:44
+msgid "Visitor details"
+msgstr "اطلاعات بازدیدکننده"
+
+#: includes/Admin/PanelStrings.php:45
+#: includes/Frontend/WidgetStrings.php:33
+msgid "Name"
+msgstr "نام"
+
+#: includes/Admin/PanelStrings.php:46
+#: includes/Frontend/WidgetStrings.php:34
+msgid "Email"
+msgstr "ایمیل"
+
+#: includes/Admin/PanelStrings.php:47
+#: includes/Frontend/WidgetStrings.php:35
+msgid "Mobile number"
+msgstr "شماره موبایل"
+
+#: includes/Admin/PanelStrings.php:48
+msgid "Started"
+msgstr "شروع گفتگو"
+
+#: includes/Admin/PanelStrings.php:49
+msgid "Last seen"
+msgstr "آخرین بازدید"
+
+#: includes/Admin/PanelStrings.php:50
+msgid "Started from"
+msgstr "صفحه‌ی شروع"
+
+#: includes/Admin/PanelStrings.php:51
+msgid "WordPress user"
+msgstr "کاربر وردپرس"
+
+#: includes/Admin/PanelStrings.php:52
+msgid "View profile"
+msgstr "مشاهده‌ی پروفایل"
+
+#: includes/Admin/PanelStrings.php:53
+msgid "Assigned to"
+msgstr "اپراتور مسئول"
+
+#: includes/Admin/PanelStrings.php:54
+msgid "Nobody yet"
+msgstr "هنوز کسی نیست"
+
+#: includes/Admin/PanelStrings.php:55
+msgid "Status"
+msgstr "وضعیت"
+
+#: includes/Admin/PanelStrings.php:56
+msgid "Not provided"
+msgstr "وارد نشده"
+
+#: includes/Admin/PanelStrings.php:57
+msgid "Close conversation"
+msgstr "بستن گفتگو"
+
+#: includes/Admin/PanelStrings.php:58
+msgid "Close this conversation? The visitor will see that it has ended."
+msgstr "این گفتگو بسته شود؟ بازدیدکننده می‌بیند که گفتگو تمام شده است."
+
+#: includes/Admin/PanelStrings.php:59
+msgid "Close"
+msgstr "بستن"
+
+#: includes/Admin/PanelStrings.php:60
+#: includes/Frontend/WidgetStrings.php:31
+msgid "Cancel"
+msgstr "انصراف"
+
+#: includes/Admin/PanelStrings.php:61
+msgid "This conversation is closed."
+msgstr "این گفتگو بسته شده است."
+
+#: includes/Admin/PanelStrings.php:62
+msgid "Write a reply…"
+msgstr "پاسخت را بنویس…"
+
+#: includes/Admin/PanelStrings.php:63
+#: includes/Frontend/WidgetStrings.php:39
+msgid "Send"
+msgstr "ارسال"
+
+#: includes/Admin/PanelStrings.php:64
+#: includes/Frontend/WidgetStrings.php:46
+msgid "Sending…"
+msgstr "در حال ارسال…"
+
+#: includes/Admin/PanelStrings.php:65
+#: includes/Frontend/WidgetStrings.php:47
+msgid "Sent"
+msgstr "ارسال شد"
+
+#: includes/Admin/PanelStrings.php:66
+#: includes/Frontend/WidgetStrings.php:48
+msgid "Read"
+msgstr "خوانده شد"
+
+#: includes/Admin/PanelStrings.php:67
+msgid "Not sent. Click to retry."
+msgstr "ارسال نشد. برای ارسال دوباره کلیک کن."
+
+#: includes/Admin/PanelStrings.php:68
+#: includes/Frontend/WidgetStrings.php:49
+msgid "Load earlier messages"
+msgstr "پیام‌های قبلی"
+
+#: includes/Admin/PanelStrings.php:69
+msgid "No messages yet."
+msgstr "هنوز پیامی نیست."
+
+#: includes/Admin/PanelStrings.php:70
+#: includes/Frontend/WidgetStrings.php:52
+msgid "Today"
+msgstr "امروز"
+
+#: includes/Admin/PanelStrings.php:71
+#: includes/Frontend/WidgetStrings.php:53
+msgid "Yesterday"
+msgstr "دیروز"
+
+#: includes/Admin/PanelStrings.php:72
+msgid "You"
+msgstr "شما"
+
+#: includes/Admin/PanelStrings.php:73
+msgid "Back"
+msgstr "بازگشت"
+
+#: includes/Admin/PanelStrings.php:74
+msgid "Details"
+msgstr "جزئیات"
+
+#: includes/Admin/PanelStrings.php:75
+#: includes/Frontend/WidgetStrings.php:44
+msgid "Connection problem. Check your internet and try again."
+msgstr "اتصال برقرار نشد. اینترنتت را چک کن و دوباره امتحان کن."
+
+#. translators: %d: number of unread messages.
+#: includes/Admin/PanelStrings.php:77
+#: includes/Frontend/WidgetStrings.php:55
+#, php-format
+msgid "%d unread messages"
+msgstr "%d پیام خوانده‌نشده"
 
 #: includes/Conversations/ConversationService.php:241
 msgid "Unknown conversation status."
@@ -117,25 +366,9 @@ msgstr "گفتگو تمام شود؟"
 msgid "End"
 msgstr "تمام شود"
 
-#: includes/Frontend/WidgetStrings.php:31
-msgid "Cancel"
-msgstr "انصراف"
-
 #: includes/Frontend/WidgetStrings.php:32
 msgid "Tell us a little about yourself so we can help you better."
 msgstr "کمی از خودت بگو تا بهتر راهنمایی‌ات کنیم."
-
-#: includes/Frontend/WidgetStrings.php:33
-msgid "Name"
-msgstr "نام"
-
-#: includes/Frontend/WidgetStrings.php:34
-msgid "Email"
-msgstr "ایمیل"
-
-#: includes/Frontend/WidgetStrings.php:35
-msgid "Mobile number"
-msgstr "شماره موبایل"
 
 #: includes/Frontend/WidgetStrings.php:36
 msgid "optional"
@@ -149,49 +382,17 @@ msgstr "شروع گفتگو"
 msgid "Write a message…"
 msgstr "پیامت را بنویس…"
 
-#: includes/Frontend/WidgetStrings.php:39
-msgid "Send"
-msgstr "ارسال"
-
 #: includes/Frontend/WidgetStrings.php:40
 msgid "Ask us anything 👋"
 msgstr "سؤالت را بپرس 👋"
-
-#: includes/Frontend/WidgetStrings.php:41
-msgid "Loading…"
-msgstr "در حال بارگذاری…"
 
 #: includes/Frontend/WidgetStrings.php:42
 msgid "We could not connect to the chat."
 msgstr "اتصال به گفتگو برقرار نشد."
 
-#: includes/Frontend/WidgetStrings.php:43
-msgid "Try again"
-msgstr "تلاش دوباره"
-
-#: includes/Frontend/WidgetStrings.php:44
-msgid "Connection problem. Check your internet and try again."
-msgstr "اتصال برقرار نشد. اینترنتت را چک کن و دوباره امتحان کن."
-
 #: includes/Frontend/WidgetStrings.php:45
 msgid "Not sent. Tap to retry."
 msgstr "ارسال نشد. برای ارسال دوباره بزن."
-
-#: includes/Frontend/WidgetStrings.php:46
-msgid "Sending…"
-msgstr "در حال ارسال…"
-
-#: includes/Frontend/WidgetStrings.php:47
-msgid "Sent"
-msgstr "ارسال شد"
-
-#: includes/Frontend/WidgetStrings.php:48
-msgid "Read"
-msgstr "خوانده شد"
-
-#: includes/Frontend/WidgetStrings.php:49
-msgid "Load earlier messages"
-msgstr "پیام‌های قبلی"
 
 #: includes/Frontend/WidgetStrings.php:50
 msgid "This conversation has ended."
@@ -200,20 +401,6 @@ msgstr "این گفتگو تمام شده است."
 #: includes/Frontend/WidgetStrings.php:51
 msgid "Start a new conversation"
 msgstr "شروع گفتگوی جدید"
-
-#: includes/Frontend/WidgetStrings.php:52
-msgid "Today"
-msgstr "امروز"
-
-#: includes/Frontend/WidgetStrings.php:53
-msgid "Yesterday"
-msgstr "دیروز"
-
-#. translators: %d: number of unread messages.
-#: includes/Frontend/WidgetStrings.php:55
-#, php-format
-msgid "%d unread messages"
-msgstr "%d پیام خوانده‌نشده"
 
 #. translators: %d: number of characters left.
 #: includes/Frontend/WidgetStrings.php:57

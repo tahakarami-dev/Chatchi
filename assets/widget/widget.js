@@ -1,21 +1,19 @@
 /**
  * ChatChi chat widget.
  *
- * Dependency-free and build-free. Renders inside a Shadow DOM so the host
- * theme cannot affect it. Talks to the chatchi/v1 REST API.
+ * Build-free; uses the shared ChatChiCore (assets/shared/core.js). Renders
+ * inside a Shadow DOM so the host theme cannot affect it. Talks to the
+ * chatchi/v1 REST API.
  *
  * Security rule for this file: user-provided text (messages, names) is only
- * ever inserted with textContent / createTextNode, never innerHTML. The only
- * innerHTML use is for the constant SVG icons below.
- *
- * Icons: Lucide (https://lucide.dev), ISC License.
+ * ever inserted with textContent / createTextNode, never innerHTML.
  */
 ( function () {
 	'use strict';
 
 	var config = window.ChatChiWidget;
 
-	if ( ! config || ! window.fetch || ! Element.prototype.attachShadow || document.getElementById( 'chatchi-widget-host' ) ) {
+	if ( ! config || ! window.ChatChiCore || ! window.fetch || ! Element.prototype.attachShadow || document.getElementById( 'chatchi-widget-host' ) ) {
 		return;
 	}
 
@@ -28,231 +26,28 @@
 	var GROUP_GAP_MS = 2 * 60 * 1000;
 	var PAGE_SIZE = 30;
 
-	var ICONS = {
-		chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
-		close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-		send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
-		check: '<path d="M20 6 9 17l-5-5"/>',
-		checks: '<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>',
-		clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-		alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>'
-	};
-
-	/* ------------------------------------------------------------------ *
-	 * Helpers
-	 * ------------------------------------------------------------------ */
-
-	function icon( name, extraClass ) {
-		var wrap = document.createElement( 'span' );
-		// Constant markup only; never user data.
-		wrap.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + ICONS[ name ] + '</svg>';
-		var svg = wrap.firstChild;
-		if ( extraClass ) {
-			svg.setAttribute( 'class', extraClass );
-		}
-		return svg;
-	}
-
-	/**
-	 * Creates an element. Children may be nodes or strings (added as text).
-	 */
-	function h( tag, props, children ) {
-		var el = document.createElement( tag );
-		Object.keys( props || {} ).forEach( function ( key ) {
-			var value = props[ key ];
-			if ( value === null || value === undefined || value === false ) {
-				return;
-			}
-			if ( key === 'className' ) {
-				el.className = value;
-			} else if ( key === 'text' ) {
-				el.textContent = value;
-			} else if ( key === 'value' ) {
-				el.value = value;
-			} else if ( key.indexOf( 'on' ) === 0 ) {
-				el.addEventListener( key.slice( 2 ).toLowerCase(), value );
-			} else if ( key in el && typeof value !== 'string' ) {
-				el[ key ] = value;
-			} else {
-				el.setAttribute( key, value === true ? '' : String( value ) );
-			}
-		} );
-		( children || [] ).forEach( function ( child ) {
-			if ( child === null || child === undefined || child === false ) {
-				return;
-			}
-			el.appendChild( typeof child === 'string' ? document.createTextNode( child ) : child );
-		} );
-		return el;
-	}
-
-	function format( template, value ) {
-		return template.replace( '%d', formatNumber( value ) );
-	}
-
-	function uuid() {
-		if ( window.crypto && window.crypto.randomUUID ) {
-			return window.crypto.randomUUID();
-		}
-		var bytes = new Uint8Array( 16 );
-		window.crypto.getRandomValues( bytes );
-		bytes[ 6 ] = ( bytes[ 6 ] & 0x0f ) | 0x40;
-		bytes[ 8 ] = ( bytes[ 8 ] & 0x3f ) | 0x80;
-		var hex = Array.prototype.map.call( bytes, function ( b ) {
-			return ( b + 0x100 ).toString( 16 ).slice( 1 );
-		} ).join( '' );
-		return hex.slice( 0, 8 ) + '-' + hex.slice( 8, 12 ) + '-' + hex.slice( 12, 16 ) + '-' + hex.slice( 16, 20 ) + '-' + hex.slice( 20 );
-	}
-
-	/**
-	 * Turns URLs in plain text into links, building DOM nodes only.
-	 */
-	function linkify( text ) {
-		var fragment = document.createDocumentFragment();
-		var pattern = /https?:\/\/[^\s<>"']+/g;
-		var last = 0;
-		var match;
-
-		while ( ( match = pattern.exec( text ) ) !== null ) {
-			var url = match[ 0 ].replace( /[.,!?;:)\]»،؛؟]+$/, '' );
-			if ( match.index > last ) {
-				fragment.appendChild( document.createTextNode( text.slice( last, match.index ) ) );
-			}
-			fragment.appendChild( h( 'a', { href: url, target: '_blank', rel: 'nofollow noopener noreferrer', dir: 'ltr', text: url } ) );
-			last = match.index + url.length;
-			pattern.lastIndex = last;
-		}
-
-		if ( last < text.length ) {
-			fragment.appendChild( document.createTextNode( text.slice( last ) ) );
-		}
-
-		return fragment;
-	}
-
-	function initials( name ) {
-		var parts = String( name || '' ).trim().split( /\s+/ ).filter( Boolean );
-		if ( ! parts.length ) {
-			return '';
-		}
-		return ( parts[ 0 ].charAt( 0 ) + ( parts.length > 1 ? parts[ parts.length - 1 ].charAt( 0 ) : '' ) ).toUpperCase();
-	}
-
-	/* ------------------------------------------------------------------ *
-	 * Dates and numbers (Persian calendar and digits for Persian locales)
-	 * ------------------------------------------------------------------ */
+	var Core = window.ChatChiCore;
+	var h = Core.h;
+	var icon = Core.icon;
+	var linkify = Core.linkify;
+	var uuid = Core.uuid;
+	var initials = Core.initials;
 
 	var locale = config.locale || 'fa-IR';
-	var intlLocale = /^fa/i.test( locale ) ? 'fa-IR-u-ca-persian' : locale;
+	var fmt = Core.createFormatter( locale, S );
+	var formatNumber = fmt.number;
+	var format = fmt.format;
+	var dayKey = fmt.dayKey;
+	var dayLabel = fmt.dayLabel;
+	var timeFormat = { format: fmt.time };
 
-	function safeFormat( options ) {
-		try {
-			return new Intl.DateTimeFormat( intlLocale, options );
-		} catch ( e ) {
-			return new Intl.DateTimeFormat( undefined, options );
-		}
-	}
-
-	var timeFormat = safeFormat( { hour: '2-digit', minute: '2-digit' } );
-	var dayFormat = safeFormat( { day: 'numeric', month: 'long' } );
-	var fullDayFormat = safeFormat( { day: 'numeric', month: 'long', year: 'numeric' } );
-	var numberFormat = ( function () {
-		try {
-			return new Intl.NumberFormat( intlLocale );
-		} catch ( e ) {
-			return new Intl.NumberFormat();
-		}
-	}() );
-
-	function formatNumber( n ) {
-		return numberFormat.format( n );
-	}
-
-	function dayKey( date ) {
-		return date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
-	}
-
-	function dayLabel( date ) {
-		var now = new Date();
-		var yesterday = new Date( now.getTime() - 86400000 );
-		if ( dayKey( date ) === dayKey( now ) ) {
-			return S.today;
-		}
-		if ( dayKey( date ) === dayKey( yesterday ) ) {
-			return S.yesterday;
-		}
-		return ( date.getFullYear() === now.getFullYear() ? dayFormat : fullDayFormat ).format( date );
-	}
-
-	/* ------------------------------------------------------------------ *
-	 * API
-	 * ------------------------------------------------------------------ */
-
-	function ApiError( status, code, message, data ) {
-		this.status = status;
-		this.code = code;
-		this.message = message;
-		this.data = data || {};
-	}
-
-	function endpoint( path, query ) {
-		var url = new URL( config.restUrl, window.location.href );
-		var route = url.searchParams.get( 'rest_route' );
-
-		if ( route !== null ) {
-			url.searchParams.set( 'rest_route', route.replace( /\/$/, '' ) + path );
-		} else {
-			url.pathname = url.pathname.replace( /\/$/, '' ) + path;
-		}
-
-		Object.keys( query || {} ).forEach( function ( key ) {
-			if ( query[ key ] !== undefined && query[ key ] !== null ) {
-				url.searchParams.set( key, query[ key ] );
-			}
-		} );
-
-		return url.toString();
-	}
-
-	function request( method, path, options, isRetry ) {
-		options = options || {};
-		var headers = { Accept: 'application/json' };
-
-		if ( options.body ) {
-			headers[ 'Content-Type' ] = 'application/json';
-		}
-		if ( config.nonce ) {
-			headers[ 'X-WP-Nonce' ] = config.nonce;
-		}
-
-		return fetch( endpoint( path, options.query ), {
-			method: method,
-			headers: headers,
-			credentials: 'same-origin',
-			cache: 'no-store',
-			body: options.body ? JSON.stringify( options.body ) : undefined
-		} ).then( function ( response ) {
-			return response.json().catch( function () {
-				return null;
-			} ).then( function ( data ) {
-				if ( response.ok ) {
-					return data;
-				}
-
-				var code = data && data.code ? data.code : 'http_' + response.status;
-
-				// An expired nonce on a long-open page: continue as a guest instead of failing.
-				if ( code === 'rest_cookie_invalid_nonce' && config.nonce && ! isRetry ) {
-					config.nonce = '';
-					return request( method, path, options, true );
-				}
-
-				throw new ApiError( response.status, code, data && data.message ? data.message : S.networkError, data && data.data );
-			} );
-		}, function () {
-			throw new ApiError( 0, 'network', S.networkError );
-		} );
-	}
+	// An expired nonce on a long-open page: continue as a guest instead of failing.
+	var request = Core.createApi( {
+		restUrl: config.restUrl,
+		nonce: config.nonce,
+		networkError: S.networkError,
+		dropExpiredNonce: true
+	} ).request;
 
 	var api = {
 		session: function () {
@@ -318,11 +113,17 @@
 		// Keep the widget hidden until its stylesheet has loaded.
 		shadow.appendChild( h( 'style', { text: ':host{all:initial}.chatchi:not(.is-ready){display:none}' } ) );
 
-		var link = h( 'link', { rel: 'stylesheet', href: config.styleUrl } );
-		link.addEventListener( 'load', function () {
-			self.root.classList.add( 'is-ready' );
+		var pendingStyles = config.styleUrls.length;
+		config.styleUrls.forEach( function ( href ) {
+			var link = h( 'link', { rel: 'stylesheet', href: href } );
+			link.addEventListener( 'load', function () {
+				pendingStyles--;
+				if ( ! pendingStyles ) {
+					self.root.classList.add( 'is-ready' );
+				}
+			} );
+			shadow.appendChild( link );
 		} );
-		shadow.appendChild( link );
 
 		this.root = h( 'div', {
 			className: 'chatchi chatchi--' + ( config.position === 'right' ? 'right' : 'left' ),

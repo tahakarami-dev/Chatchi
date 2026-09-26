@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 0.7.0\n"
+"Project-Id-Version: ChatChi | چت‌چی 0.8.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T12:54:10+00:00\n"
+"POT-Creation-Date: 2026-09-26T13:14:55+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -44,6 +44,255 @@ msgstr ""
 #: chatchi.php:84
 #, php-format
 msgid "ChatChi requires WordPress %1$s or higher. You are running WordPress %2$s."
+msgstr ""
+
+#: includes/Admin/AdminModule.php:58
+#: includes/Admin/AdminModule.php:59
+#: includes/Admin/PanelStrings.php:22
+msgid "ChatChi"
+msgstr ""
+
+#: includes/Admin/AdminModule.php:77
+msgid "Sorry, you are not allowed to access this page."
+msgstr ""
+
+#. translators: %s: site name.
+#: includes/Admin/PanelPage.php:66
+#, php-format
+msgid "ChatChi — %s"
+msgstr ""
+
+#: includes/Admin/PanelPage.php:87
+msgid "The ChatChi panel needs JavaScript."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:23
+msgid "Conversations"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:24
+msgid "Back to WordPress"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:25
+msgid "Search name, email, phone or number"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:26
+msgid "All"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:27
+msgid "New"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:28
+msgid "Active"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:29
+msgid "Closed"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:30
+#: includes/Frontend/WidgetStrings.php:41
+msgid "Loading…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:31
+msgid "Could not load conversations."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:32
+#: includes/Frontend/WidgetStrings.php:43
+msgid "Try again"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:33
+msgid "No conversations yet"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:34
+msgid "When a visitor starts a chat on your site, it shows up here."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:35
+msgid "Nothing here"
+msgstr ""
+
+#. translators: %s: search text.
+#: includes/Admin/PanelStrings.php:37
+#, php-format
+msgid "No results for “%s”"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:38
+msgid "Load more"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:39
+msgid "Select a conversation"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:40
+msgid "Pick a conversation from the list to read and reply."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:41
+msgid "Visitor"
+msgstr ""
+
+#. translators: %d: visitor number.
+#: includes/Admin/PanelStrings.php:43
+#, php-format
+msgid "Visitor #%d"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:44
+msgid "Visitor details"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:45
+#: includes/Frontend/WidgetStrings.php:33
+msgid "Name"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:46
+#: includes/Frontend/WidgetStrings.php:34
+msgid "Email"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:47
+#: includes/Frontend/WidgetStrings.php:35
+msgid "Mobile number"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:48
+msgid "Started"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:49
+msgid "Last seen"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:50
+msgid "Started from"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:51
+msgid "WordPress user"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:52
+msgid "View profile"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:53
+msgid "Assigned to"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:54
+msgid "Nobody yet"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:55
+msgid "Status"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:56
+msgid "Not provided"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:57
+msgid "Close conversation"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:58
+msgid "Close this conversation? The visitor will see that it has ended."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:59
+msgid "Close"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:60
+#: includes/Frontend/WidgetStrings.php:31
+msgid "Cancel"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:61
+msgid "This conversation is closed."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:62
+msgid "Write a reply…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:63
+#: includes/Frontend/WidgetStrings.php:39
+msgid "Send"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:64
+#: includes/Frontend/WidgetStrings.php:46
+msgid "Sending…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:65
+#: includes/Frontend/WidgetStrings.php:47
+msgid "Sent"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:66
+#: includes/Frontend/WidgetStrings.php:48
+msgid "Read"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:67
+msgid "Not sent. Click to retry."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:68
+#: includes/Frontend/WidgetStrings.php:49
+msgid "Load earlier messages"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:69
+msgid "No messages yet."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:70
+#: includes/Frontend/WidgetStrings.php:52
+msgid "Today"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:71
+#: includes/Frontend/WidgetStrings.php:53
+msgid "Yesterday"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:72
+msgid "You"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:73
+msgid "Back"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:74
+msgid "Details"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:75
+#: includes/Frontend/WidgetStrings.php:44
+msgid "Connection problem. Check your internet and try again."
+msgstr ""
+
+#. translators: %d: number of unread messages.
+#: includes/Admin/PanelStrings.php:77
+#: includes/Frontend/WidgetStrings.php:55
+#, php-format
+msgid "%d unread messages"
 msgstr ""
 
 #: includes/Conversations/ConversationService.php:241
@@ -115,24 +364,8 @@ msgstr ""
 msgid "End"
 msgstr ""
 
-#: includes/Frontend/WidgetStrings.php:31
-msgid "Cancel"
-msgstr ""
-
 #: includes/Frontend/WidgetStrings.php:32
 msgid "Tell us a little about yourself so we can help you better."
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:33
-msgid "Name"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:34
-msgid "Email"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:35
-msgid "Mobile number"
 msgstr ""
 
 #: includes/Frontend/WidgetStrings.php:36
@@ -147,48 +380,16 @@ msgstr ""
 msgid "Write a message…"
 msgstr ""
 
-#: includes/Frontend/WidgetStrings.php:39
-msgid "Send"
-msgstr ""
-
 #: includes/Frontend/WidgetStrings.php:40
 msgid "Ask us anything 👋"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:41
-msgid "Loading…"
 msgstr ""
 
 #: includes/Frontend/WidgetStrings.php:42
 msgid "We could not connect to the chat."
 msgstr ""
 
-#: includes/Frontend/WidgetStrings.php:43
-msgid "Try again"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:44
-msgid "Connection problem. Check your internet and try again."
-msgstr ""
-
 #: includes/Frontend/WidgetStrings.php:45
 msgid "Not sent. Tap to retry."
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:46
-msgid "Sending…"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:47
-msgid "Sent"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:48
-msgid "Read"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:49
-msgid "Load earlier messages"
 msgstr ""
 
 #: includes/Frontend/WidgetStrings.php:50
@@ -197,20 +398,6 @@ msgstr ""
 
 #: includes/Frontend/WidgetStrings.php:51
 msgid "Start a new conversation"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:52
-msgid "Today"
-msgstr ""
-
-#: includes/Frontend/WidgetStrings.php:53
-msgid "Yesterday"
-msgstr ""
-
-#. translators: %d: number of unread messages.
-#: includes/Frontend/WidgetStrings.php:55
-#, php-format
-msgid "%d unread messages"
 msgstr ""
 
 #. translators: %d: number of characters left.

@@ -7,6 +7,10 @@
 
 namespace ChatChi;
 
+use ChatChi\Admin\AdminModule;
+use ChatChi\Admin\PanelAccess;
+use ChatChi\Admin\PanelPage;
+use ChatChi\Admin\PanelStrings;
 use ChatChi\Conversations\ConversationPolicy;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Core\Container;
@@ -20,6 +24,7 @@ use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
 use ChatChi\Frontend\ColorPalette;
+use ChatChi\Frontend\FontFace;
 use ChatChi\Frontend\WidgetModule;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Messages\MessageBody;
@@ -165,6 +170,7 @@ final class Plugin {
 		$this->register_message_services();
 		$this->register_rest_services();
 		$this->register_frontend_services();
+		$this->register_admin_services();
 
 		$this->container->singleton(
 			I18n::class,
@@ -348,9 +354,49 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			FontFace::class,
+			static function (): FontFace {
+				return new FontFace();
+			}
+		);
+
+		$this->container->singleton(
 			WidgetModule::class,
 			static function ( Container $c ): WidgetModule {
-				return new WidgetModule( $c->get( ColorPalette::class ), $c->get( WidgetStrings::class ) );
+				return new WidgetModule( $c->get( ColorPalette::class ), $c->get( WidgetStrings::class ), $c->get( FontFace::class ) );
+			}
+		);
+	}
+
+	/**
+	 * Registers the standalone agent panel.
+	 */
+	private function register_admin_services(): void {
+		$this->container->singleton(
+			PanelAccess::class,
+			static function ( Container $c ): PanelAccess {
+				return new PanelAccess( $c->get( AgentRepository::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			PanelStrings::class,
+			static function (): PanelStrings {
+				return new PanelStrings();
+			}
+		);
+
+		$this->container->singleton(
+			PanelPage::class,
+			static function ( Container $c ): PanelPage {
+				return new PanelPage( $c->get( ColorPalette::class ), $c->get( FontFace::class ), $c->get( PanelStrings::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			AdminModule::class,
+			static function ( Container $c ): AdminModule {
+				return new AdminModule( $c->get( PanelAccess::class ), $c->get( PanelPage::class ), $c->get( ConversationRepository::class ) );
 			}
 		);
 	}
@@ -366,6 +412,7 @@ final class Plugin {
 			InstallNotice::class,
 			RestModule::class,
 			WidgetModule::class,
+			AdminModule::class,
 		);
 
 		/**
