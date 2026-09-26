@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 0.8.0\n"
+"Project-Id-Version: ChatChi | چت‌چی 0.9.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T13:14:55+00:00\n"
+"POT-Creation-Date: 2026-09-26T13:34:26+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -57,12 +57,12 @@ msgid "Sorry, you are not allowed to access this page."
 msgstr ""
 
 #. translators: %s: site name.
-#: includes/Admin/PanelPage.php:66
+#: includes/Admin/PanelPage.php:73
 #, php-format
 msgid "ChatChi — %s"
 msgstr ""
 
-#: includes/Admin/PanelPage.php:87
+#: includes/Admin/PanelPage.php:94
 msgid "The ChatChi panel needs JavaScript."
 msgstr ""
 
@@ -87,6 +87,7 @@ msgid "New"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:28
+#: includes/Admin/PanelStrings.php:93
 msgid "Active"
 msgstr ""
 
@@ -295,6 +296,149 @@ msgstr ""
 msgid "%d unread messages"
 msgstr ""
 
+#: includes/Admin/PanelStrings.php:78
+msgid "Agents"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:79
+msgid "People who answer chats. Visitors see their name and picture."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:80
+msgid "Add agent"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:81
+msgid "Add your first agent"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:82
+msgid "Choose a WordPress user who will answer chats."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:83
+msgid "Could not load agents."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:84
+msgid "Search users by name, username or email"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:85
+msgid "No users found who are not agents yet."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:86
+msgid "Name shown to visitors"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:87
+msgid "Profile picture"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:88
+msgid "Upload picture"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:89
+msgid "Remove picture"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:90
+msgid "Square JPG, PNG, GIF or WebP."
+msgstr ""
+
+#. translators: %s: maximum file size.
+#. translators: %s: maximum file size, e.g. "2 MB".
+#: includes/Admin/PanelStrings.php:92
+#: includes/Agents/AvatarUploader.php:63
+#, php-format
+msgid "The image must be smaller than %s."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:94
+msgid "Inactive"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:95
+msgid "You cannot deactivate yourself."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:96
+msgid "Edit"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:97
+msgid "Save"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:98
+msgid "Saved."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:99
+msgid "Add"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:100
+msgid "Saving…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:101
+msgid "Uploading…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:102
+msgid "WordPress account"
+msgstr ""
+
+#: includes/Agents/AgentService.php:83
+msgid "This user does not exist."
+msgstr ""
+
+#: includes/Agents/AgentService.php:136
+msgid "Choose an image from the media library."
+msgstr ""
+
+#: includes/Agents/AgentService.php:146
+msgid "You cannot deactivate your own agent account."
+msgstr ""
+
+#: includes/Agents/AgentService.php:262
+msgid "Agent not found."
+msgstr ""
+
+#. translators: 1: minimum length, 2: maximum length.
+#: includes/Agents/AgentService.php:280
+#, php-format
+msgid "The name must be between %1$d and %2$d characters."
+msgstr ""
+
+#: includes/Agents/AgentService.php:300
+msgid "This user is already an agent."
+msgstr ""
+
+#: includes/Agents/AgentService.php:312
+#: includes/Conversations/ConversationService.php:381
+#: includes/Messages/MessageService.php:304
+#: includes/Rest/ConversationController.php:322
+#: includes/Visitors/VisitorService.php:115
+msgid "Something went wrong. Please try again."
+msgstr ""
+
+#: includes/Agents/AvatarUploader.php:52
+msgid "Choose an image to upload."
+msgstr ""
+
+#: includes/Agents/AvatarUploader.php:56
+#: includes/Agents/AvatarUploader.php:102
+msgid "The image could not be uploaded."
+msgstr ""
+
+#: includes/Agents/AvatarUploader.php:74
+msgid "Use a JPG, PNG, GIF or WebP image."
+msgstr ""
+
 #: includes/Conversations/ConversationService.php:241
 msgid "Unknown conversation status."
 msgstr ""
@@ -304,14 +448,9 @@ msgid "Conversation not found."
 msgstr ""
 
 #: includes/Conversations/ConversationService.php:365
+#: includes/Rest/AgentManagementController.php:148
+#: includes/Rest/AgentManagementController.php:163
 msgid "You are not allowed to do this."
-msgstr ""
-
-#: includes/Conversations/ConversationService.php:381
-#: includes/Messages/MessageService.php:304
-#: includes/Rest/ConversationController.php:324
-#: includes/Visitors/VisitorService.php:115
-msgid "Something went wrong. Please try again."
 msgstr ""
 
 #. translators: %s: technical error message.
@@ -425,6 +564,7 @@ msgid "This conversation has been closed."
 msgstr ""
 
 #: includes/Rest/AgentController.php:206
+#: includes/Rest/AgentManagementController.php:144
 msgid "Please log in to continue."
 msgstr ""
 
@@ -444,46 +584,46 @@ msgstr ""
 msgid "Start a conversation first."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:88
+#: includes/Visitors/ProfileValidator.php:90
 msgid "Please check the highlighted fields."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:152
+#: includes/Visitors/ProfileValidator.php:154
 msgid "Please enter a valid mobile number, like 09123456789."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:155
+#: includes/Visitors/ProfileValidator.php:157
 msgid "This field is not supported."
 msgstr ""
 
 #. translators: %d: minimum number of characters.
-#: includes/Visitors/ProfileValidator.php:170
+#: includes/Visitors/ProfileValidator.php:172
 #, php-format
 msgid "Name must be at least %d characters."
 msgstr ""
 
 #. translators: %d: maximum number of characters.
-#: includes/Visitors/ProfileValidator.php:178
+#: includes/Visitors/ProfileValidator.php:180
 #, php-format
 msgid "Name must be at most %d characters."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:193
+#: includes/Visitors/ProfileValidator.php:195
 msgid "Please enter a valid email address."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:205
+#: includes/Visitors/ProfileValidator.php:207
 msgid "Please enter your name."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:208
+#: includes/Visitors/ProfileValidator.php:210
 msgid "Please enter your email address."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:211
+#: includes/Visitors/ProfileValidator.php:213
 msgid "Please enter your mobile number."
 msgstr ""
 
-#: includes/Visitors/ProfileValidator.php:214
+#: includes/Visitors/ProfileValidator.php:216
 msgid "This field is required."
 msgstr ""

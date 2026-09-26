@@ -8,6 +8,8 @@
 namespace ChatChi;
 
 use ChatChi\Admin\AdminModule;
+use ChatChi\Agents\AgentService;
+use ChatChi\Agents\AvatarUploader;
 use ChatChi\Admin\PanelAccess;
 use ChatChi\Admin\PanelPage;
 use ChatChi\Admin\PanelStrings;
@@ -30,6 +32,7 @@ use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
 use ChatChi\Rest\AgentController;
+use ChatChi\Rest\AgentManagementController;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
 use ChatChi\Rest\RestModule;
@@ -328,9 +331,34 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			AvatarUploader::class,
+			static function (): AvatarUploader {
+				return new AvatarUploader();
+			}
+		);
+
+		$this->container->singleton(
+			AgentService::class,
+			static function ( Container $c ): AgentService {
+				return new AgentService( $c->get( AgentRepository::class ), $c->get( AvatarUploader::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			AgentManagementController::class,
+			static function ( Container $c ): AgentManagementController {
+				return new AgentManagementController( $c->get( AgentService::class ), $c->get( Presenter::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			RestModule::class,
 			static function ( Container $c ): RestModule {
-				return new RestModule( $c->get( WidgetController::class ), $c->get( AgentController::class ) );
+				return new RestModule(
+					$c->get( WidgetController::class ),
+					$c->get( AgentController::class ),
+					$c->get( AgentManagementController::class )
+				);
 			}
 		);
 	}
@@ -389,7 +417,12 @@ final class Plugin {
 		$this->container->singleton(
 			PanelPage::class,
 			static function ( Container $c ): PanelPage {
-				return new PanelPage( $c->get( ColorPalette::class ), $c->get( FontFace::class ), $c->get( PanelStrings::class ) );
+				return new PanelPage(
+					$c->get( ColorPalette::class ),
+					$c->get( FontFace::class ),
+					$c->get( PanelStrings::class ),
+					$c->get( AvatarUploader::class )->max_bytes()
+				);
 			}
 		);
 

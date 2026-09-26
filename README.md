@@ -22,8 +22,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 6 | REST API | ✅ |
 | 7 | Frontend Chat Widget | ✅ |
 | 8 | Chat Admin Panel (standalone SaaS-style app) | ✅ |
-| 9 | Agent Management | ⏳ |
-| 10 | Welcome Message + Widget Display Rules + Shortcode | |
+| 9 | Agent Management | ✅ |
+| 10 | Welcome Message + Widget Display Rules + Shortcode | ⏳ |
 | 11 | Rate Limiting + Anti-Spam + Security Hardening | |
 | 12 | Plugin Settings | |
 | 13 | Integration + Testing + Optimization | |
@@ -35,9 +35,10 @@ chatchi.php              Bootstrap: constants, requirements check, autoloader, h
 uninstall.php            Removes all plugin data on delete
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
+├── Agents/              Agent management service, avatar uploads
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries
 ├── Messages/            Message service, text rules, paging
-├── Rest/                chatchi/v1 controllers (widget, agent), presenter, CSRF guard
+├── Rest/                chatchi/v1 controllers (widget, agent, agent management), presenter, CSRF guard
 ├── Frontend/            Widget loader, color tokens, font face, interface strings
 ├── Admin/               Standalone agent panel page, access capability, menu entry
 ├── Core/
@@ -54,6 +55,7 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   ├── DatabaseException.php
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
+├── Support/             Small shared helpers (plain-text cleaning)
 └── Visitors/            Identity (cookie token), start-form fields and validation
 assets/shared/           Core JS (DOM, API client, dates) and design tokens shared by widget and panel
 assets/widget/           Chat widget (vanilla JS in Shadow DOM, CSS)
@@ -86,6 +88,7 @@ docs/                    Design and architecture documents
 | `chatchi_widget_position` | filter | `left` (default) or `right` |
 | `chatchi_primary_color` | filter | Widget primary color; hover, soft and text colors are derived |
 | `chatchi_widget_config` | filter | Full widget configuration |
+| `chatchi_avatar_max_bytes` | filter | Largest agent picture upload in bytes (default 2 MB, capped by the server upload limit) |
 
 ## Database
 
@@ -128,6 +131,20 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
 | POST | `/agent/conversations/{id}/close` | Close |
 
+### Agent management
+
+Administrators only (`manage_options`). Agents are never deleted, only deactivated, so past conversations keep their author. A deactivated agent loses API and panel access immediately. Nobody can deactivate themselves.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/agent/agents` | All agents with their WordPress account |
+| POST | `/agent/agents` | Add: `user_id`, `display_name` (2–100 characters), optional `is_active` |
+| POST/PATCH | `/agent/agents/{id}` | Update `display_name`, `avatar_id` (0 removes the picture), `is_active` |
+| POST | `/agent/agents/{id}/avatar` | Upload a picture (multipart field `file`; JPG, PNG, GIF or WebP, checked by content). Also requires `upload_files` |
+| GET | `/agent/users` | WordPress users who are not agents yet: `search` (login, email, display name), up to 20 |
+
 ## Agent panel
 
 `wp-admin/admin.php?page=chatchi` serves a standalone, full-screen app (no WordPress admin chrome). Access requires the virtual `chatchi_access_panel` capability, granted to site administrators and active agents. Administrators get an agent record automatically on their first visit.
+
+Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.

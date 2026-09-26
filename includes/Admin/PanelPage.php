@@ -27,15 +27,19 @@ final class PanelPage {
 
 	private PanelStrings $strings;
 
+	private int $avatar_max_bytes;
+
 	/**
-	 * @param ColorPalette $palette Brand colors.
-	 * @param FontFace     $font    Bundled font.
-	 * @param PanelStrings $strings Interface text.
+	 * @param ColorPalette $palette          Brand colors.
+	 * @param FontFace     $font             Bundled font.
+	 * @param PanelStrings $strings          Interface text.
+	 * @param int          $avatar_max_bytes Largest avatar upload, for client-side checks.
 	 */
-	public function __construct( ColorPalette $palette, FontFace $font, PanelStrings $strings ) {
-		$this->palette = $palette;
-		$this->font    = $font;
-		$this->strings = $strings;
+	public function __construct( ColorPalette $palette, FontFace $font, PanelStrings $strings, int $avatar_max_bytes ) {
+		$this->palette          = $palette;
+		$this->font             = $font;
+		$this->strings          = $strings;
+		$this->avatar_max_bytes = $avatar_max_bytes;
 	}
 
 	/**
@@ -45,13 +49,16 @@ final class PanelPage {
 	 */
 	public function config(): array {
 		return array(
-			'restUrl'     => esc_url_raw( rest_url( 'chatchi/v1' ) ),
-			'nonce'       => wp_create_nonce( 'wp_rest' ),
-			'locale'      => str_replace( '_', '-', determine_locale() ),
-			'dir'         => is_rtl() ? 'rtl' : 'ltr',
-			'adminUrl'    => esc_url_raw( admin_url() ),
-			'userEditUrl' => esc_url_raw( admin_url( 'user-edit.php' ) ),
-			'strings'     => $this->strings->all(),
+			'restUrl'         => esc_url_raw( rest_url( 'chatchi/v1' ) ),
+			'nonce'           => wp_create_nonce( 'wp_rest' ),
+			'locale'          => str_replace( '_', '-', determine_locale() ),
+			'dir'             => is_rtl() ? 'rtl' : 'ltr',
+			'adminUrl'        => esc_url_raw( admin_url() ),
+			'userEditUrl'     => esc_url_raw( admin_url( 'user-edit.php' ) ),
+			'canManageAgents' => current_user_can( 'manage_options' ),
+			'canUpload'       => current_user_can( 'upload_files' ),
+			'maxAvatarBytes'  => $this->avatar_max_bytes,
+			'strings'         => $this->strings->all(),
 		);
 	}
 

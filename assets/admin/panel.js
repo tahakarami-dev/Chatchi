@@ -26,7 +26,8 @@
 	var h = Core.h;
 	var icon = Core.icon;
 	var fmt = Core.createFormatter( config.locale, S );
-	var request = Core.createApi( { restUrl: config.restUrl, nonce: config.nonce, networkError: S.networkError } ).request;
+	var client = Core.createApi( { restUrl: config.restUrl, nonce: config.nonce, networkError: S.networkError } );
+	var request = client.request;
 
 	var PER_PAGE = 20;
 	var PAGE_SIZE = 30;
@@ -59,6 +60,41 @@
 		},
 		close: function ( id ) {
 			return request( 'POST', '/agent/conversations/' + id + '/close' );
+		},
+		agents: function () {
+			return request( 'GET', '/agent/agents' );
+		},
+		createAgent: function ( data ) {
+			return request( 'POST', '/agent/agents', { body: data } );
+		},
+		updateAgent: function ( id, data ) {
+			// POST is accepted too, for servers that block PATCH.
+			return request( 'POST', '/agent/agents/' + id, { body: data } );
+		},
+		users: function ( search ) {
+			return request( 'GET', '/agent/users', { query: { search: search } } );
+		},
+		uploadAvatar: function ( id, file ) {
+			var form = new FormData();
+			form.append( 'file', file );
+
+			return fetch( client.endpoint( '/agent/agents/' + id + '/avatar' ), {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { Accept: 'application/json', 'X-WP-Nonce': config.nonce },
+				body: form
+			} ).then( function ( response ) {
+				return response.json().catch( function () {
+					return null;
+				} ).then( function ( data ) {
+					if ( response.ok ) {
+						return data;
+					}
+					throw new Core.ApiError( response.status, data && data.code, data && data.message ? data.message : S.networkError, data && data.data );
+				} );
+			}, function () {
+				throw new Core.ApiError( 0, 'network', S.networkError );
+			} );
 		}
 	};
 
@@ -135,8 +171,13 @@
 		this.listPane = h( 'section', { className: 'cc-list-pane', 'aria-label': S.conversations } );
 		this.convPane = h( 'main', { className: 'cc-conv-pane' } );
 		this.infoPane = h( 'aside', { className: 'cc-info-pane', 'aria-label': S.visitorInfo } );
-		this.shell = h( 'div', { className: 'cc-shell' }, [ this.rail, this.listPane, this.convPane, this.infoPane ] );
+		this.page = h( 'main', { className: 'cc-page' } );
+		this.shell = h( 'div', { className: 'cc-shell' }, [ this.rail, this.listPane, this.convPane, this.infoPane, this.page ] );
 		root.appendChild( this.shell );
+		this.view = 'inbox';
+		this.agentsView = config.canManageAgents ? new AgentsView( this ) : null;
+		this.toast = h( 'div', { className: 'cc-toast', role: 'status', 'aria-live': 'polite', hidden: true } );
+		root.appendChild( this.toast );
 
 		this.buildListHead();
 		this.renderRail();
@@ -186,12 +227,15 @@
 			return item.unread_count > 0;
 		} );
 
+		var inbox = this.view === 'inbox';
+
 		this.rail.replaceChildren(
 			h( 'span', { className: 'cc-logo', title: S.appName }, [ icon( 'chat' ) ] ),
-			h( 'a', { className: 'cc-rail-item is-active', href: '#/', 'aria-current': 'page', title: S.conversations, 'aria-label': S.conversations }, [
+			h( 'a', { className: 'cc-rail-item' + ( inbox ? ' is-active' : '' ), href: '#/', 'aria-current': inbox ? 'page' : null, title: S.conversations, 'aria-label': S.conversations }, [
 				icon( 'inbox' ),
 				hasUnread ? h( 'span', { className: 'cc-rail-dot' } ) : null
 			] ),
+			this.agentsView ? h( 'a', { className: 'cc-rail-item' + ( inbox ? '' : ' is-active' ), href: '#/agents', 'aria-current': inbox ? null : 'page', title: S.agents, 'aria-label': S.agents }, [ icon( 'users' ) ] ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
 			agent ? h( 'span', { title: agent.name }, [ avatar( agent.name, 'rail', agent.avatar_url ) ] ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
@@ -461,12 +505,39 @@
 	/* --------------------------- conversation -------------------------- */
 
 	Panel.prototype.route = function () {
+		var agents = this.agentsView && window.location.hash === '#/agents';
+
+		this.view = agents ? 'agents' : 'inbox';
+		this.shell.classList.toggle( 'is-page', agents );
+		this.renderRail();
+
+		if ( agents ) {
+			this.agentsView.show();
+			return;
+		}
+
 		var match = /^#\/conversations\/(\d+)$/.exec( window.location.hash );
 		var id = match ? parseInt( match[ 1 ], 10 ) : 0;
 
 		if ( id !== this.state.selectedId ) {
 			this.select( id );
 		}
+	};
+
+	/**
+	 * Shows a short confirmation or error message at the bottom of the screen.
+	 */
+	Panel.prototype.notify = function ( message, isError ) {
+		var toast = this.toast;
+
+		toast.textContent = message;
+		toast.classList.toggle( 'is-error', !! isError );
+		toast.hidden = false;
+
+		window.clearTimeout( this.toastTimer );
+		this.toastTimer = window.setTimeout( function () {
+			toast.hidden = true;
+		}, 3500 );
 	};
 
 	Panel.prototype.select = function ( id ) {
@@ -1191,6 +1262,440 @@
 			return url;
 		}
 	}
+
+	/* ------------------------------------------------------------------ *
+	 * Agents screen (site administrators only)
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Lists agents and lets administrators add WordPress users as agents,
+	 * rename them, set their picture and switch them on or off.
+	 *
+	 * Inputs are built once per open form and only result lists are
+	 * re-rendered, so typing (including Persian IME input) is not disturbed.
+	 */
+	function AgentsView( panel ) {
+		this.panel = panel;
+		this.el = panel.page;
+		this.loaded = false;
+		this.state = {
+			loading: true,
+			error: '',
+			agents: [],
+			adding: false,
+			editingId: 0,
+			busyId: 0
+		};
+		this.searchTimer = null;
+		this.searchTicket = 0;
+	}
+
+	AgentsView.prototype.show = function () {
+		if ( ! this.loaded ) {
+			this.loaded = true;
+			this.load();
+		}
+		this.render();
+	};
+
+	AgentsView.prototype.load = function () {
+		var self = this;
+
+		this.state.loading = true;
+		this.state.error = '';
+		this.render();
+
+		api.agents().then( function ( agents ) {
+			self.state.agents = agents;
+			self.state.loading = false;
+			self.render();
+		} ).catch( function ( error ) {
+			self.state.loading = false;
+			self.state.error = error.message || S.agentsError;
+			self.render();
+		} );
+	};
+
+	AgentsView.prototype.replaceAgent = function ( updated ) {
+		this.state.agents = this.state.agents.map( function ( agent ) {
+			return agent.id === updated.id ? updated : agent;
+		} );
+
+		// Keep the rail avatar in sync when admins edit themselves.
+		if ( updated.is_me && this.panel.state.agent ) {
+			this.panel.state.agent.name = updated.name;
+			this.panel.state.agent.avatar_url = updated.avatar_url;
+			this.panel.renderRail();
+		}
+	};
+
+	AgentsView.prototype.render = function () {
+		var self = this;
+		var state = this.state;
+
+		var header = h( 'header', { className: 'cc-page-head' }, [
+			h( 'div', {}, [
+				h( 'h1', { text: S.agents } ),
+				h( 'p', { text: S.agentsIntro } )
+			] ),
+			state.adding ? null : h( 'button', {
+				type: 'button',
+				className: 'cc-button',
+				onClick: function () {
+					self.openAdd();
+				}
+			}, [ icon( 'plus' ), S.addAgent ] )
+		] );
+
+		var body;
+
+		if ( state.loading ) {
+			body = h( 'div', { className: 'cc-agent-list', 'aria-busy': 'true' }, [ 1, 2, 3 ].map( function () {
+				return h( 'div', { className: 'cc-agent cc-agent--skeleton' }, [
+					h( 'span', { className: 'cc-skeleton', style: 'width:48px;height:48px;border-radius:50%' } ),
+					h( 'span', { className: 'cc-skeleton', style: 'width:40%;height:14px' } )
+				] );
+			} ) );
+		} else if ( state.error ) {
+			body = h( 'div', { className: 'cc-state', role: 'alert' }, [
+				icon( 'alert' ),
+				h( 'p', { text: state.error } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary',
+					text: S.retry,
+					onClick: function () {
+						self.load();
+					}
+				} )
+			] );
+		} else if ( ! state.agents.length && ! state.adding ) {
+			body = h( 'div', { className: 'cc-state' }, [
+				icon( 'users' ),
+				h( 'h2', { text: S.noAgents } ),
+				h( 'p', { text: S.noAgentsHint } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button',
+					onClick: function () {
+						self.openAdd();
+					}
+				}, [ icon( 'plus' ), S.addAgent ] )
+			] );
+		} else {
+			body = h( 'div', { className: 'cc-agent-list' }, state.agents.map( function ( agent ) {
+				return agent.id === state.editingId ? self.buildEditor( agent ) : self.buildCard( agent );
+			} ) );
+		}
+
+		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner' }, [
+			header,
+			state.adding ? this.buildAddForm() : null,
+			body
+		] ) );
+	};
+
+	AgentsView.prototype.buildCard = function ( agent ) {
+		var self = this;
+		var busy = this.state.busyId === agent.id;
+		var user = agent.user;
+
+		return h( 'article', { className: 'cc-agent' + ( agent.is_active ? '' : ' is-inactive' ) }, [
+			avatar( agent.name, 'lg', agent.avatar_url ),
+			h( 'div', { className: 'cc-agent__text' }, [
+				h( 'h2', {}, [
+					agent.name,
+					agent.is_me ? h( 'span', { className: 'cc-tag', text: S.you } ) : null
+				] ),
+				user ? h( 'p', { dir: 'ltr', text: user.login + ' · ' + user.email } ) : null
+			] ),
+			h( 'button', {
+				type: 'button',
+				className: 'cc-switch',
+				role: 'switch',
+				'aria-checked': agent.is_active ? 'true' : 'false',
+				'aria-label': ( agent.is_active ? S.active : S.inactive ) + ' — ' + agent.name,
+				title: agent.is_me ? S.cannotDeactivateMe : ( agent.is_active ? S.active : S.inactive ),
+				disabled: busy || ( agent.is_me && agent.is_active ),
+				onClick: function () {
+					self.toggle( agent );
+				}
+			}, [ h( 'span', { className: 'cc-switch__track' } ), h( 'span', { className: 'cc-switch__label', text: agent.is_active ? S.active : S.inactive } ) ] ),
+			h( 'button', {
+				type: 'button',
+				className: 'cc-button cc-button--secondary',
+				text: S.edit,
+				disabled: busy,
+				onClick: function () {
+					self.state.editingId = agent.id;
+					self.render();
+					var input = self.el.querySelector( '#cc-agent-name' );
+					if ( input ) {
+						input.focus();
+					}
+				}
+			} )
+		] );
+	};
+
+	AgentsView.prototype.toggle = function ( agent ) {
+		var self = this;
+		var next = ! agent.is_active;
+
+		this.state.busyId = agent.id;
+		this.render();
+
+		api.updateAgent( agent.id, { is_active: next } ).then( function ( updated ) {
+			self.replaceAgent( updated );
+			self.panel.notify( S.saved );
+		} ).catch( function ( error ) {
+			self.panel.notify( error.message, true );
+		} ).then( function () {
+			self.state.busyId = 0;
+			self.render();
+		} );
+	};
+
+	AgentsView.prototype.buildEditor = function ( agent ) {
+		var self = this;
+		var error = h( 'p', { className: 'cc-field-error', role: 'alert', hidden: true } );
+		var nameInput = h( 'input', { id: 'cc-agent-name', className: 'cc-input', type: 'text', maxlength: '100', value: agent.name, required: true } );
+		var preview = avatar( agent.name, 'xl', agent.avatar_url );
+		var file = h( 'input', { type: 'file', accept: 'image/jpeg,image/png,image/gif,image/webp', className: 'cc-sr', id: 'cc-agent-file' } );
+		var saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
+
+		function showError( message ) {
+			error.textContent = message;
+			error.hidden = ! message;
+		}
+
+		file.addEventListener( 'change', function () {
+			var chosen = file.files && file.files[ 0 ];
+			if ( ! chosen ) {
+				return;
+			}
+			if ( chosen.size > config.maxAvatarBytes ) {
+				showError( S.pictureTooLarge.replace( '%s', fmt.number( Math.round( config.maxAvatarBytes / 1048576 ) ) + ' MB' ) );
+				file.value = '';
+				return;
+			}
+			showError( '' );
+			uploadLabel.textContent = S.uploading;
+			api.uploadAvatar( agent.id, chosen ).then( function ( updated ) {
+				self.replaceAgent( updated );
+				preview.replaceWith( avatar( updated.name, 'xl', updated.avatar_url ) );
+				agent.avatar_url = updated.avatar_url;
+				agent.avatar_id = updated.avatar_id;
+				self.panel.notify( S.saved );
+			} ).catch( function ( err ) {
+				showError( err.message );
+			} ).then( function () {
+				uploadLabel.textContent = S.uploadPicture;
+				file.value = '';
+				preview = self.el.querySelector( '.cc-agent-editor .cc-avatar' ) || preview;
+			} );
+		} );
+
+		var uploadLabel = h( 'label', { className: 'cc-button cc-button--secondary', for: 'cc-agent-file', text: S.uploadPicture } );
+
+		var form = h( 'form', {
+			className: 'cc-agent cc-agent-editor',
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				saveButton.disabled = true;
+				saveButton.textContent = S.saving;
+				showError( '' );
+				api.updateAgent( agent.id, { display_name: nameInput.value } ).then( function ( updated ) {
+					self.replaceAgent( updated );
+					self.state.editingId = 0;
+					self.render();
+					self.panel.notify( S.saved );
+				} ).catch( function ( err ) {
+					saveButton.disabled = false;
+					saveButton.textContent = S.save;
+					showError( err.message );
+					nameInput.focus();
+				} );
+			}
+		}, [
+			preview,
+			h( 'div', { className: 'cc-agent-editor__fields' }, [
+				h( 'label', { className: 'cc-label', for: 'cc-agent-name', text: S.displayName } ),
+				nameInput,
+				h( 'span', { className: 'cc-label', text: S.picture } ),
+				h( 'div', { className: 'cc-inline' }, [
+					config.canUpload ? uploadLabel : null,
+					config.canUpload ? file : null,
+					agent.avatar_id ? h( 'button', {
+						type: 'button',
+						className: 'cc-button cc-button--secondary',
+						text: S.removePicture,
+						onClick: function () {
+							api.updateAgent( agent.id, { avatar_id: 0 } ).then( function ( updated ) {
+								self.replaceAgent( updated );
+								self.render();
+								self.panel.notify( S.saved );
+							} ).catch( function ( err ) {
+								showError( err.message );
+							} );
+						}
+					} ) : null
+				] ),
+				h( 'p', { className: 'cc-hint', text: S.pictureHint } ),
+				error,
+				h( 'div', { className: 'cc-inline' }, [
+					saveButton,
+					h( 'button', {
+						type: 'button',
+						className: 'cc-button cc-button--secondary',
+						text: S.cancel,
+						onClick: function () {
+							self.state.editingId = 0;
+							self.render();
+						}
+					} )
+				] )
+			] )
+		] );
+
+		return form;
+	};
+
+	AgentsView.prototype.openAdd = function () {
+		this.state.adding = true;
+		this.state.editingId = 0;
+		this.selectedUser = null;
+		this.render();
+
+		var search = this.el.querySelector( '#cc-user-search' );
+		if ( search ) {
+			search.focus();
+		}
+		this.searchUsers( '' );
+	};
+
+	AgentsView.prototype.buildAddForm = function () {
+		var self = this;
+
+		this.results = h( 'ul', { className: 'cc-user-results', 'aria-live': 'polite' } );
+		this.addError = h( 'p', { className: 'cc-field-error', role: 'alert', hidden: true } );
+
+		var search = h( 'input', {
+			id: 'cc-user-search',
+			className: 'cc-input',
+			type: 'search',
+			placeholder: S.findUser,
+			'aria-label': S.findUser,
+			onInput: function () {
+				window.clearTimeout( self.searchTimer );
+				self.searchTimer = window.setTimeout( function () {
+					self.searchUsers( search.value.trim() );
+				}, SEARCH_DELAY );
+			}
+		} );
+
+		this.confirmArea = h( 'div', { className: 'cc-add-confirm' } );
+
+		return h( 'section', { className: 'cc-card cc-add', 'aria-label': S.addAgent }, [
+			h( 'div', { className: 'cc-add__head' }, [
+				h( 'h2', { text: S.addAgent } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-icon-button',
+					'aria-label': S.cancel,
+					onClick: function () {
+						self.state.adding = false;
+						self.render();
+					}
+				}, [ icon( 'close' ) ] )
+			] ),
+			search,
+			this.results,
+			this.confirmArea,
+			this.addError
+		] );
+	};
+
+	AgentsView.prototype.searchUsers = function ( term ) {
+		var self = this;
+		var ticket = ++this.searchTicket;
+
+		this.results.replaceChildren( h( 'li', { className: 'cc-hint', text: S.loading } ) );
+
+		api.users( term ).then( function ( users ) {
+			if ( ticket !== self.searchTicket ) {
+				return;
+			}
+			if ( ! users.length ) {
+				self.results.replaceChildren( h( 'li', { className: 'cc-hint', text: S.noUsers } ) );
+				return;
+			}
+			self.results.replaceChildren.apply( self.results, users.map( function ( user ) {
+				return h( 'li', {}, [
+					h( 'button', {
+						type: 'button',
+						className: 'cc-user' + ( self.selectedUser && self.selectedUser.id === user.id ? ' is-selected' : '' ),
+						'data-user-id': user.id,
+						'aria-pressed': self.selectedUser && self.selectedUser.id === user.id ? 'true' : 'false',
+						onClick: function () {
+							self.selectUser( user );
+						}
+					}, [
+						avatar( user.display_name ),
+						h( 'span', {}, [
+							h( 'strong', { text: user.display_name } ),
+							h( 'small', { dir: 'ltr', text: user.login + ' · ' + user.email } )
+						] )
+					] )
+				] );
+			} ) );
+		} ).catch( function ( error ) {
+			if ( ticket === self.searchTicket ) {
+				self.results.replaceChildren( h( 'li', { className: 'cc-field-error', text: error.message } ) );
+			}
+		} );
+	};
+
+	AgentsView.prototype.selectUser = function ( user ) {
+		var self = this;
+		var nameInput = h( 'input', { id: 'cc-new-agent-name', className: 'cc-input', type: 'text', maxlength: '100', value: user.display_name } );
+		var submit = h( 'button', { type: 'submit', className: 'cc-button', text: S.create } );
+
+		this.selectedUser = user;
+		this.results.querySelectorAll( '.cc-user' ).forEach( function ( button ) {
+			var selected = button.getAttribute( 'data-user-id' ) === String( user.id );
+			button.classList.toggle( 'is-selected', selected );
+			button.setAttribute( 'aria-pressed', selected ? 'true' : 'false' );
+		} );
+
+		this.confirmArea.replaceChildren( h( 'form', {
+			className: 'cc-inline cc-inline--wrap',
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				submit.disabled = true;
+				submit.textContent = S.saving;
+				self.addError.hidden = true;
+				api.createAgent( { user_id: user.id, display_name: nameInput.value } ).then( function ( agent ) {
+					self.state.agents.push( agent );
+					self.state.adding = false;
+					self.render();
+					self.panel.notify( S.saved );
+				} ).catch( function ( error ) {
+					submit.disabled = false;
+					submit.textContent = S.create;
+					self.addError.textContent = error.message;
+					self.addError.hidden = false;
+				} );
+			}
+		}, [
+			h( 'label', { className: 'cc-label', for: 'cc-new-agent-name', text: S.displayName } ),
+			nameInput,
+			submit
+		] ) );
+
+		nameInput.focus();
+		nameInput.select();
+	};
 
 	/* ------------------------------- start ----------------------------- */
 

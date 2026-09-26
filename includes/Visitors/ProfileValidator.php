@@ -7,6 +7,8 @@
 
 namespace ChatChi\Visitors;
 
+use ChatChi\Support\PlainText;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -160,7 +162,7 @@ final class ProfileValidator {
 	 * @return string|\WP_Error
 	 */
 	private function clean_name( string $raw ) {
-		$name   = $this->plain_text( $raw );
+		$name   = PlainText::line( $raw );
 		$length = mb_strlen( $name );
 
 		if ( $length < self::NAME_MIN_LENGTH ) {
@@ -180,26 +182,6 @@ final class ProfileValidator {
 		}
 
 		return $name;
-	}
-
-	/**
-	 * Reduces input to a single line of plain text.
-	 *
-	 * Removes script/style blocks and real HTML tags, but keeps a lone "<" or
-	 * "&" (as in "Ali <3" or "Tom & Jerry"). sanitize_text_field() is not used
-	 * because it stores such characters as HTML entities, which then show up
-	 * literally wherever the name is displayed as text. Output is escaped at
-	 * display time instead.
-	 *
-	 * @param string $raw Raw input.
-	 */
-	private function plain_text( string $raw ): string {
-		$text = wp_check_invalid_utf8( $raw, true );
-		$text = (string) preg_replace( '#<(script|style)\b[^>]*>.*?</\1\s*>#is', '', $text );
-		$text = (string) preg_replace( '#</?[a-z][^>]*>#i', '', $text );
-		$text = (string) preg_replace( '/[\x00-\x1F\x7F]/u', ' ', $text );
-
-		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 
 	/**

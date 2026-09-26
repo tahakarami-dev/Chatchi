@@ -17,14 +17,14 @@ defined( 'ABSPATH' ) || exit;
 final class RestModule implements Module {
 
 	/**
-	 * @var ConversationController[]
+	 * @var RouteProvider[]
 	 */
 	private array $controllers;
 
 	/**
-	 * @param ConversationController ...$controllers Controllers to register.
+	 * @param RouteProvider ...$controllers Controllers to register.
 	 */
-	public function __construct( ConversationController ...$controllers ) {
+	public function __construct( RouteProvider ...$controllers ) {
 		$this->controllers = $controllers;
 	}
 
