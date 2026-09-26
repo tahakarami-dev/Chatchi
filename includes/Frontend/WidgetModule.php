@@ -171,6 +171,9 @@ final class WidgetModule implements Module {
 			'locale'    => str_replace( '_', '-', determine_locale() ),
 			'dir'       => is_rtl() ? 'rtl' : 'ltr',
 			'welcome'   => $this->settings->welcome_message(),
+			// Administrators see technical details of failed requests in the
+			// widget. Pages of logged-in users are not cached.
+			'debug'     => is_user_logged_in() && current_user_can( 'manage_options' ),
 			'strings'   => $this->strings(),
 		);
 

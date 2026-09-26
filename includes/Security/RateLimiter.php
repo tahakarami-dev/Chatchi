@@ -9,6 +9,7 @@ namespace ChatChi\Security;
 
 use ChatChi\Database\Repositories\RateLimitRepository;
 use ChatChi\Settings\Settings;
+use ChatChi\Support\Failure;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -149,6 +150,9 @@ final class RateLimiter {
 				}
 			}
 		} catch ( \Throwable $e ) {
+			// A missing counter table means an upgrade did not finish: repair on the next request.
+			Failure::repair_if_needed( $e );
+
 			/**
 			 * Fires when the rate limiter could not reach its counters.
 			 *

@@ -9,6 +9,7 @@ namespace ChatChi\Visitors;
 
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Models\Visitor;
+use ChatChi\Support\Failure;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -107,13 +108,6 @@ final class VisitorService {
 	 * @param \Throwable $error Failure.
 	 */
 	private function failure( \Throwable $error ): \WP_Error {
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Unexpected failures must reach the server log.
-		error_log( '[ChatChi] Visitor error: ' . $error->getMessage() );
-
-		return new \WP_Error(
-			'chatchi_visitor_unavailable',
-			__( 'Something went wrong. Please try again.', 'chatchi' ),
-			array( 'status' => 500 )
-		);
+		return Failure::report( $error, 'Visitor', 'chatchi_visitor_unavailable' );
 	}
 }

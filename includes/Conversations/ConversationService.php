@@ -16,6 +16,7 @@ use ChatChi\Models\Agent;
 use ChatChi\Models\Conversation;
 use ChatChi\Models\Message;
 use ChatChi\Models\Visitor;
+use ChatChi\Support\Failure;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -373,13 +374,6 @@ final class ConversationService {
 	 * @param \Throwable $error Failure.
 	 */
 	private function failure( \Throwable $error ): \WP_Error {
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Unexpected failures must reach the server log.
-		error_log( '[ChatChi] Conversation error: ' . $error->getMessage() );
-
-		return new \WP_Error(
-			'chatchi_conversation_unavailable',
-			__( 'Something went wrong. Please try again.', 'chatchi' ),
-			array( 'status' => 500 )
-		);
+		return Failure::report( $error, 'Conversation', 'chatchi_conversation_unavailable' );
 	}
 }

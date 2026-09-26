@@ -9,6 +9,7 @@ namespace ChatChi\Agents;
 
 use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Models\Agent;
+use ChatChi\Support\Failure;
 use ChatChi\Support\PlainText;
 
 defined( 'ABSPATH' ) || exit;
@@ -306,9 +307,6 @@ final class AgentService {
 	 * @param \Throwable $error Failure.
 	 */
 	private function failure( \Throwable $error ): \WP_Error {
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Unexpected failures must reach the server log.
-		error_log( '[ChatChi] Agent error: ' . $error->getMessage() );
-
-		return new \WP_Error( 'chatchi_agent_unavailable', __( 'Something went wrong. Please try again.', 'chatchi' ), array( 'status' => 500 ) );
+		return Failure::report( $error, 'Agent', 'chatchi_agent_unavailable' );
 	}
 }
