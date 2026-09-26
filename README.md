@@ -23,8 +23,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 7 | Frontend Chat Widget | ✅ |
 | 8 | Chat Admin Panel (standalone SaaS-style app) | ✅ |
 | 9 | Agent Management | ✅ |
-| 10 | Welcome Message + Widget Display Rules + Shortcode | ⏳ |
-| 11 | Rate Limiting + Anti-Spam + Security Hardening | |
+| 10 | Welcome Message + Widget Display Rules + Shortcode | ✅ |
+| 11 | Rate Limiting + Anti-Spam + Security Hardening | ⏳ |
 | 12 | Plugin Settings | |
 | 13 | Integration + Testing + Optimization | |
 
@@ -38,8 +38,8 @@ includes/                PSR-4 root for the ChatChi\ namespace
 ├── Agents/              Agent management service, avatar uploads
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries
 ├── Messages/            Message service, text rules, paging
-├── Rest/                chatchi/v1 controllers (widget, agent, agent management), presenter, CSRF guard
-├── Frontend/            Widget loader, color tokens, font face, interface strings
+├── Rest/                chatchi/v1 controllers (widget, agent, agent management, settings), presenter, CSRF guard
+├── Frontend/            Widget loader, display rules, [chatchi] shortcode, color tokens, font face, interface strings
 ├── Admin/               Standalone agent panel page, access capability, menu entry
 ├── Core/
 │   ├── Container.php    Lazy service container
@@ -55,6 +55,7 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   ├── DatabaseException.php
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
+├── Settings/            Settings store (one autoloaded option), validation, content lookup for display rules
 ├── Support/             Small shared helpers (plain-text cleaning)
 └── Visitors/            Identity (cookie token), start-form fields and validation
 assets/shared/           Core JS (DOM, API client, dates) and design tokens shared by widget and panel
@@ -84,10 +85,12 @@ docs/                    Design and architecture documents
 | `chatchi_message_sent` | action | A new message was stored (not fired for retried duplicates) |
 | `chatchi_messages_read` | action | Messages were marked as read |
 | `chatchi_message_max_length` | filter | Maximum message length in characters (default 2000) |
-| `chatchi_widget_enabled` | filter | Whether the widget loads on the current page |
+| `chatchi_widget_enabled` | filter | Final say on whether the widget loads on the current page; receives the display-rules/shortcode decision |
 | `chatchi_widget_position` | filter | `left` (default) or `right` |
 | `chatchi_primary_color` | filter | Widget primary color; hover, soft and text colors are derived |
 | `chatchi_widget_config` | filter | Full widget configuration |
+| `chatchi_settings` | filter | Settings as the plugin uses them (not saved) |
+| `chatchi_settings_updated` | action | Settings were saved, with the validated changes |
 | `chatchi_avatar_max_bytes` | filter | Largest agent picture upload in bytes (default 2 MB, capped by the server upload limit) |
 
 ## Database
@@ -143,8 +146,24 @@ Administrators only (`manage_options`). Agents are never deleted, only deactivat
 | POST | `/agent/agents/{id}/avatar` | Upload a picture (multipart field `file`; JPG, PNG, GIF or WebP, checked by content). Also requires `upload_files` |
 | GET | `/agent/users` | WordPress users who are not agents yet: `search` (login, email, display name), up to 20 |
 
+### Settings
+
+Administrators only (`manage_options`).
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/agent/settings` | Settings, the default welcome message, limits, available page types, and the chosen items with titles |
+| POST/PATCH | `/agent/settings` | Save any of `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
+| GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
+
 ## Agent panel
 
 `wp-admin/admin.php?page=chatchi` serves a standalone, full-screen app (no WordPress admin chrome). Access requires the virtual `chatchi_access_panel` capability, granted to site administrators and active agents. Administrators get an agent record automatically on their first visit.
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
+
+Administrators also get a **Settings** screen (`#/settings`):
+
+- **Welcome message**: shown in the widget as the first bubble from support, above the start form and at the top of every conversation. It is not stored as a message, so agents never see it in the inbox. On by default with a translated default text.
+- **Where the widget appears**: on every page, only on chosen page types and items, or everywhere except them. Page types are the home page, all pages, all blog posts, and WooCommerce products (single products, the shop, product categories and tags).
+- **Shortcode**: `[chatchi]` (alias `[hamyarchat]`) shows the floating widget on that page even where the rules hide it. It prints nothing itself and also works in widget areas and page builders (the widget then loads in the footer).

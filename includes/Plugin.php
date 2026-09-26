@@ -26,7 +26,9 @@ use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
 use ChatChi\Frontend\ColorPalette;
+use ChatChi\Frontend\DisplayRules;
 use ChatChi\Frontend\FontFace;
+use ChatChi\Frontend\Shortcode;
 use ChatChi\Frontend\WidgetModule;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Messages\MessageBody;
@@ -36,7 +38,11 @@ use ChatChi\Rest\AgentManagementController;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
 use ChatChi\Rest\RestModule;
+use ChatChi\Rest\SettingsController;
 use ChatChi\Rest\WidgetController;
+use ChatChi\Settings\ContentLookup;
+use ChatChi\Settings\Settings;
+use ChatChi\Settings\SettingsValidator;
 use ChatChi\Visitors\ProfileFields;
 use ChatChi\Visitors\ProfileValidator;
 use ChatChi\Visitors\VisitorCookie;
@@ -168,6 +174,7 @@ final class Plugin {
 			);
 		}
 
+		$this->register_settings_services();
 		$this->register_visitor_services();
 		$this->register_conversation_services();
 		$this->register_message_services();
@@ -186,6 +193,32 @@ final class Plugin {
 			InstallNotice::class,
 			static function ( Container $c ): InstallNotice {
 				return new InstallNotice( $c->get( Installer::class ) );
+			}
+		);
+	}
+
+	/**
+	 * Registers the settings store.
+	 */
+	private function register_settings_services(): void {
+		$this->container->singleton(
+			ContentLookup::class,
+			static function (): ContentLookup {
+				return new ContentLookup();
+			}
+		);
+
+		$this->container->singleton(
+			SettingsValidator::class,
+			static function ( Container $c ): SettingsValidator {
+				return new SettingsValidator( $c->get( ContentLookup::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			Settings::class,
+			static function ( Container $c ): Settings {
+				return new Settings( $c->get( SettingsValidator::class ) );
 			}
 		);
 	}
@@ -352,12 +385,20 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			SettingsController::class,
+			static function ( Container $c ): SettingsController {
+				return new SettingsController( $c->get( Settings::class ), $c->get( ContentLookup::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			RestModule::class,
 			static function ( Container $c ): RestModule {
 				return new RestModule(
 					$c->get( WidgetController::class ),
 					$c->get( AgentController::class ),
-					$c->get( AgentManagementController::class )
+					$c->get( AgentManagementController::class ),
+					$c->get( SettingsController::class )
 				);
 			}
 		);
@@ -389,9 +430,29 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			DisplayRules::class,
+			static function ( Container $c ): DisplayRules {
+				return new DisplayRules( $c->get( Settings::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			WidgetModule::class,
 			static function ( Container $c ): WidgetModule {
-				return new WidgetModule( $c->get( ColorPalette::class ), $c->get( WidgetStrings::class ), $c->get( FontFace::class ) );
+				return new WidgetModule(
+					$c->get( ColorPalette::class ),
+					$c->get( WidgetStrings::class ),
+					$c->get( FontFace::class ),
+					$c->get( Settings::class ),
+					$c->get( DisplayRules::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			Shortcode::class,
+			static function ( Container $c ): Shortcode {
+				return new Shortcode( $c->get( WidgetModule::class ) );
 			}
 		);
 	}
@@ -445,6 +506,7 @@ final class Plugin {
 			InstallNotice::class,
 			RestModule::class,
 			WidgetModule::class,
+			Shortcode::class,
 			AdminModule::class,
 		);
 

@@ -307,6 +307,10 @@
 	color: var(--chatchi-text-muted);
 }
 
+.chatchi-form .chatchi-row--welcome {
+	margin: 0 0 4px;
+}
+
 .chatchi-field {
 	display: flex;
 	flex-direction: column;

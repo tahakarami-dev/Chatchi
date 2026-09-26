@@ -74,6 +74,16 @@
 		users: function ( search ) {
 			return request( 'GET', '/agent/users', { query: { search: search } } );
 		},
+		settings: function () {
+			return request( 'GET', '/agent/settings' );
+		},
+		saveSettings: function ( data ) {
+			// POST is accepted too, for servers that block PATCH.
+			return request( 'POST', '/agent/settings', { body: data } );
+		},
+		content: function ( search ) {
+			return request( 'GET', '/agent/content', { query: { search: search } } );
+		},
 		uploadAvatar: function ( id, file ) {
 			var form = new FormData();
 			form.append( 'file', file );
@@ -176,6 +186,7 @@
 		root.appendChild( this.shell );
 		this.view = 'inbox';
 		this.agentsView = config.canManageAgents ? new AgentsView( this ) : null;
+		this.settingsView = config.canManageSettings ? new SettingsView( this ) : null;
 		this.toast = h( 'div', { className: 'cc-toast', role: 'status', 'aria-live': 'polite', hidden: true } );
 		root.appendChild( this.toast );
 
@@ -227,7 +238,12 @@
 			return item.unread_count > 0;
 		} );
 
-		var inbox = this.view === 'inbox';
+		var view = this.view;
+		var railLink = function ( name, href, label, iconName ) {
+			var current = view === name;
+			return h( 'a', { className: 'cc-rail-item' + ( current ? ' is-active' : '' ), href: href, 'aria-current': current ? 'page' : null, title: label, 'aria-label': label }, [ icon( iconName ) ] );
+		};
+		var inbox = view === 'inbox';
 
 		this.rail.replaceChildren(
 			h( 'span', { className: 'cc-logo', title: S.appName }, [ icon( 'chat' ) ] ),
@@ -235,7 +251,8 @@
 				icon( 'inbox' ),
 				hasUnread ? h( 'span', { className: 'cc-rail-dot' } ) : null
 			] ),
-			this.agentsView ? h( 'a', { className: 'cc-rail-item' + ( inbox ? '' : ' is-active' ), href: '#/agents', 'aria-current': inbox ? null : 'page', title: S.agents, 'aria-label': S.agents }, [ icon( 'users' ) ] ) : null,
+			this.agentsView ? railLink( 'agents', '#/agents', S.agents, 'users' ) : null,
+			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
 			agent ? h( 'span', { title: agent.name }, [ avatar( agent.name, 'rail', agent.avatar_url ) ] ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
@@ -505,14 +522,15 @@
 	/* --------------------------- conversation -------------------------- */
 
 	Panel.prototype.route = function () {
-		var agents = this.agentsView && window.location.hash === '#/agents';
+		var pages = { '#/agents': this.agentsView, '#/settings': this.settingsView };
+		var page = pages[ window.location.hash ] || null;
 
-		this.view = agents ? 'agents' : 'inbox';
-		this.shell.classList.toggle( 'is-page', agents );
+		this.view = page ? window.location.hash.slice( 2 ) : 'inbox';
+		this.shell.classList.toggle( 'is-page', !! page );
 		this.renderRail();
 
-		if ( agents ) {
-			this.agentsView.show();
+		if ( page ) {
+			page.show();
 			return;
 		}
 
@@ -1333,6 +1351,11 @@
 		var self = this;
 		var state = this.state;
 
+		// Responses can arrive after the admin moved on to another screen.
+		if ( this.panel.view !== 'agents' ) {
+			return;
+		}
+
 		var header = h( 'header', { className: 'cc-page-head' }, [
 			h( 'div', {}, [
 				h( 'h1', { text: S.agents } ),
@@ -1695,6 +1718,502 @@
 
 		nameInput.focus();
 		nameInput.select();
+	};
+
+	/* ------------------------------------------------------------------ *
+	 * Settings screen (site administrators only)
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Welcome message, where the widget appears, and the shortcode.
+	 *
+	 * The form is built once per load or save; typing only updates the
+	 * draft, the character counter and the search results, so input
+	 * (including Persian IME composition) is never interrupted.
+	 */
+	function SettingsView( panel ) {
+		this.panel = panel;
+		this.el = panel.page;
+		this.loaded = false;
+		this.state = { loading: true, error: '' };
+		this.data = null;
+		this.draft = null;
+		this.items = [];
+		this.searchTimer = null;
+		this.searchTicket = 0;
+	}
+
+	SettingsView.prototype.show = function () {
+		if ( ! this.loaded ) {
+			this.loaded = true;
+			this.load();
+			return;
+		}
+		this.render();
+	};
+
+	SettingsView.prototype.load = function () {
+		var self = this;
+
+		this.state = { loading: true, error: '' };
+		this.render();
+
+		api.settings().then( function ( data ) {
+			self.apply( data );
+			self.state.loading = false;
+			self.render();
+		} ).catch( function ( error ) {
+			self.state = { loading: false, error: error.message || S.settingsError };
+			self.render();
+		} );
+	};
+
+	SettingsView.prototype.apply = function ( data ) {
+		this.data = data;
+		this.draft = {
+			welcome_enabled: data.settings.welcome_enabled,
+			welcome_message: data.settings.welcome_message,
+			display_mode: data.settings.display_mode,
+			display_targets: data.settings.display_targets.slice()
+		};
+		// Items that were deleted since they were chosen are dropped on save.
+		this.items = data.items.slice();
+	};
+
+	SettingsView.prototype.render = function () {
+		var self = this;
+
+		if ( this.panel.view !== 'settings' ) {
+			return;
+		}
+
+		var header = h( 'header', { className: 'cc-page-head' }, [
+			h( 'div', {}, [
+				h( 'h1', { text: S.settings } ),
+				h( 'p', { text: S.settingsIntro } )
+			] )
+		] );
+
+		var body;
+
+		if ( this.state.loading ) {
+			body = h( 'div', { className: 'cc-settings', 'aria-busy': 'true' }, [ 1, 2 ].map( function () {
+				return h( 'div', { className: 'cc-card' }, [
+					h( 'span', { className: 'cc-skeleton', style: 'display:block;width:30%;height:16px;margin-bottom:16px' } ),
+					h( 'span', { className: 'cc-skeleton', style: 'display:block;width:100%;height:80px' } )
+				] );
+			} ) );
+		} else if ( this.state.error ) {
+			body = h( 'div', { className: 'cc-state', role: 'alert' }, [
+				icon( 'alert' ),
+				h( 'p', { text: this.state.error } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary',
+					text: S.retry,
+					onClick: function () {
+						self.load();
+					}
+				} )
+			] );
+		} else {
+			body = this.buildForm();
+		}
+
+		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner' }, [ header, body ] ) );
+
+		// The picker is part of the form just built; fill its suggestions.
+		if ( ! this.state.loading && ! this.state.error && this.draft.display_mode !== 'all' ) {
+			this.searchContent( '' );
+		}
+	};
+
+	SettingsView.prototype.buildForm = function () {
+		var self = this;
+
+		this.errors = {};
+		this.saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
+
+		return h( 'form', {
+			className: 'cc-settings',
+			noValidate: true,
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				self.save();
+			}
+		}, [
+			this.buildWelcome(),
+			this.buildDisplay(),
+			this.buildShortcode(),
+			h( 'div', { className: 'cc-settings__actions' }, [ this.saveButton ] )
+		] );
+	};
+
+	SettingsView.prototype.fieldError = function ( key ) {
+		this.errors[ key ] = h( 'p', { className: 'cc-field-error', role: 'alert', hidden: true } );
+		return this.errors[ key ];
+	};
+
+	SettingsView.prototype.clearError = function ( key ) {
+		if ( this.errors[ key ] ) {
+			this.errors[ key ].hidden = true;
+		}
+	};
+
+	SettingsView.prototype.buildWelcome = function () {
+		var self = this;
+		var draft = this.draft;
+		var limit = this.data.limits.welcome_message;
+
+		var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+		var textarea = h( 'textarea', {
+			id: 'cc-welcome-message',
+			className: 'cc-input cc-textarea',
+			rows: '3',
+			placeholder: this.data.defaults.welcome_message,
+			disabled: ! draft.welcome_enabled,
+			'aria-describedby': 'cc-welcome-hint'
+		} );
+		textarea.value = draft.welcome_message;
+
+		// Counts characters the way the server does (an emoji is one), so
+		// no maxlength attribute, which counts UTF-16 units.
+		function count() {
+			var used = Array.from( textarea.value ).length;
+			counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limit );
+			counter.classList.toggle( 'is-over', used > limit );
+		}
+
+		textarea.addEventListener( 'input', function () {
+			draft.welcome_message = textarea.value;
+			count();
+			self.clearError( 'welcome_message' );
+		} );
+		count();
+
+		var toggle = this.buildSwitch( 'cc-welcome-enabled', S.welcomeEnabled, draft.welcome_enabled, function ( on ) {
+			draft.welcome_enabled = on;
+			textarea.disabled = ! on;
+		} );
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-welcome-title' }, [
+			h( 'div', { className: 'cc-settings__head' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-welcome-title', text: S.welcomeTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.welcomeIntro } )
+				] ),
+				toggle
+			] ),
+			h( 'label', { className: 'cc-label', for: 'cc-welcome-message', text: S.welcomeText } ),
+			textarea,
+			h( 'div', { className: 'cc-settings__row' }, [
+				h( 'p', { id: 'cc-welcome-hint', className: 'cc-hint', text: S.welcomeDefault } ),
+				counter
+			] ),
+			this.fieldError( 'welcome_message' ),
+			this.fieldError( 'welcome_enabled' )
+		] );
+	};
+
+	SettingsView.prototype.buildSwitch = function ( id, label, on, onChange ) {
+		var button = h( 'button', {
+			id: id,
+			type: 'button',
+			className: 'cc-switch',
+			role: 'switch',
+			'aria-checked': on ? 'true' : 'false',
+			'aria-label': label
+		}, [ h( 'span', { className: 'cc-switch__track' } ), h( 'span', { className: 'cc-switch__label', text: label } ) ] );
+
+		button.addEventListener( 'click', function () {
+			on = ! on;
+			button.setAttribute( 'aria-checked', on ? 'true' : 'false' );
+			onChange( on );
+		} );
+
+		return button;
+	};
+
+	SettingsView.prototype.buildDisplay = function () {
+		var self = this;
+		var draft = this.draft;
+		var modes = [
+			[ 'all', S.displayAll ],
+			[ 'include', S.displayInclude ],
+			[ 'exclude', S.displayExclude ]
+		];
+
+		this.pickerLegend = h( 'span', { className: 'cc-label' } );
+		this.picker = h( 'div', { className: 'cc-picker' }, [
+			this.pickerLegend,
+			this.buildTargets(),
+			h( 'span', { className: 'cc-label', text: S.specificItems } ),
+			this.buildItemPicker(),
+			this.fieldError( 'display_targets' ),
+			this.fieldError( 'display_ids' )
+		] );
+		this.emptyWarning = h( 'p', { className: 'cc-warning', role: 'status', text: S.nothingChosen } );
+
+		var radios = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-display-title' }, modes.map( function ( mode ) {
+			var id = 'cc-display-' + mode[ 0 ];
+			var input = h( 'input', { id: id, type: 'radio', name: 'cc-display-mode', value: mode[ 0 ], checked: draft.display_mode === mode[ 0 ] } );
+
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					var wasAll = draft.display_mode === 'all';
+					draft.display_mode = mode[ 0 ];
+					self.syncDisplay();
+					if ( wasAll && mode[ 0 ] !== 'all' ) {
+						self.searchContent( self.searchInput.value.trim() );
+					}
+				}
+			} );
+
+			return h( 'label', { className: 'cc-radio', for: id }, [ input, h( 'span', { text: mode[ 1 ] } ) ] );
+		} ) );
+
+		var section = h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-display-title' }, [
+			h( 'h2', { id: 'cc-display-title', text: S.displayTitle } ),
+			radios,
+			this.fieldError( 'display_mode' ),
+			this.picker,
+			this.emptyWarning
+		] );
+
+		this.syncDisplay();
+
+		return section;
+	};
+
+	/**
+	 * Shows the picker only when it applies, labels it for the current mode
+	 * and warns when "only on chosen pages" has nothing chosen.
+	 */
+	SettingsView.prototype.syncDisplay = function () {
+		var draft = this.draft;
+		var mode = draft.display_mode;
+
+		this.picker.hidden = mode === 'all';
+		this.pickerLegend.textContent = mode === 'exclude' ? S.hideOn : S.showOn;
+		this.emptyWarning.hidden = ! ( mode === 'include' && ! draft.display_targets.length && ! this.items.length );
+	};
+
+	SettingsView.prototype.buildTargets = function () {
+		var self = this;
+		var draft = this.draft;
+		var labels = { home: S.targetHome, pages: S.targetPages, posts: S.targetPosts, products: S.targetProducts };
+
+		return h( 'div', { className: 'cc-checks' }, this.data.targets.map( function ( target ) {
+			var id = 'cc-target-' + target;
+			var input = h( 'input', { id: id, type: 'checkbox', value: target, checked: draft.display_targets.indexOf( target ) !== -1 } );
+
+			input.addEventListener( 'change', function () {
+				draft.display_targets = draft.display_targets.filter( function ( t ) {
+					return t !== target;
+				} );
+				if ( input.checked ) {
+					draft.display_targets.push( target );
+				}
+				self.syncDisplay();
+			} );
+
+			return h( 'label', { className: 'cc-check', for: id }, [ input, h( 'span', { text: labels[ target ] || target } ) ] );
+		} ) );
+	};
+
+	SettingsView.prototype.buildItemPicker = function () {
+		var self = this;
+
+		this.chips = h( 'ul', { className: 'cc-chips', 'aria-live': 'polite' } );
+		this.results = h( 'ul', { className: 'cc-user-results cc-content-results' } );
+		this.searchInput = h( 'input', {
+			id: 'cc-content-search',
+			className: 'cc-input',
+			type: 'search',
+			placeholder: S.findContent,
+			'aria-label': S.findContent,
+			onInput: function () {
+				window.clearTimeout( self.searchTimer );
+				self.searchTimer = window.setTimeout( function () {
+					self.searchContent( self.searchInput.value.trim() );
+				}, SEARCH_DELAY );
+			}
+		} );
+
+		this.renderChips();
+
+		return h( 'div', { className: 'cc-item-picker' }, [ this.chips, this.searchInput, this.results ] );
+	};
+
+	SettingsView.prototype.renderChips = function () {
+		var self = this;
+
+		this.chips.replaceChildren.apply( this.chips, this.items.map( function ( item ) {
+			return h( 'li', { className: 'cc-chip', 'data-id': item.id }, [
+				h( 'span', { className: 'cc-chip__type', text: item.type_label } ),
+				h( 'span', { className: 'cc-chip__title', text: item.title } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-chip__remove',
+					'aria-label': S.removeItem.replace( '%s', item.title ),
+					title: S.removeItem.replace( '%s', item.title ),
+					onClick: function () {
+						self.toggleItem( item );
+					}
+				}, [ icon( 'close' ) ] )
+			] );
+		} ) );
+		this.chips.hidden = ! this.items.length;
+	};
+
+	SettingsView.prototype.isChosen = function ( id ) {
+		return this.items.some( function ( item ) {
+			return item.id === id;
+		} );
+	};
+
+	SettingsView.prototype.toggleItem = function ( item ) {
+		if ( this.isChosen( item.id ) ) {
+			this.items = this.items.filter( function ( chosen ) {
+				return chosen.id !== item.id;
+			} );
+		} else if ( this.items.length >= this.data.limits.display_ids ) {
+			this.panel.notify( S.tooManyItems.replace( '%d', fmt.number( this.data.limits.display_ids ) ), true );
+			return;
+		} else {
+			this.items.push( item );
+		}
+
+		this.renderChips();
+		this.syncDisplay();
+		this.markResults();
+		this.clearError( 'display_ids' );
+	};
+
+	SettingsView.prototype.markResults = function () {
+		var self = this;
+
+		this.results.querySelectorAll( '.cc-content' ).forEach( function ( button ) {
+			var chosen = self.isChosen( parseInt( button.getAttribute( 'data-id' ), 10 ) );
+			button.classList.toggle( 'is-selected', chosen );
+			button.setAttribute( 'aria-pressed', chosen ? 'true' : 'false' );
+		} );
+	};
+
+	SettingsView.prototype.searchContent = function ( term ) {
+		var self = this;
+		var ticket = ++this.searchTicket;
+		var results = this.results;
+
+		results.replaceChildren( h( 'li', { className: 'cc-hint', text: S.loading } ) );
+
+		api.content( term ).then( function ( items ) {
+			if ( ticket !== self.searchTicket ) {
+				return;
+			}
+			if ( ! items.length ) {
+				results.replaceChildren( h( 'li', { className: 'cc-hint', text: S.noContent } ) );
+				return;
+			}
+			results.replaceChildren.apply( results, items.map( function ( item ) {
+				return h( 'li', {}, [
+					h( 'button', {
+						type: 'button',
+						className: 'cc-user cc-content',
+						'data-id': item.id,
+						onClick: function () {
+							self.toggleItem( item );
+						}
+					}, [
+						h( 'span', {}, [
+							h( 'strong', { text: item.title } ),
+							h( 'small', { text: item.type_label } )
+						] ),
+						icon( 'check', 'cc-content__check' )
+					] )
+				] );
+			} ) );
+			self.markResults();
+		} ).catch( function ( error ) {
+			if ( ticket === self.searchTicket ) {
+				results.replaceChildren( h( 'li', { className: 'cc-field-error', text: error.message } ) );
+			}
+		} );
+	};
+
+	SettingsView.prototype.buildShortcode = function () {
+		var self = this;
+		var code = '[chatchi]';
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-shortcode-title' }, [
+			h( 'h2', { id: 'cc-shortcode-title', text: S.shortcodeTitle } ),
+			h( 'p', { className: 'cc-hint', text: S.shortcodeIntro } ),
+			h( 'div', { className: 'cc-inline' }, [
+				h( 'code', { className: 'cc-code', dir: 'ltr', text: code } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary',
+					onClick: function () {
+						if ( ! navigator.clipboard ) {
+							return;
+						}
+						navigator.clipboard.writeText( code ).then( function () {
+							self.panel.notify( S.copied );
+						}, function () {} );
+					}
+				}, [ icon( 'copy' ), S.copy ] )
+			] )
+		] );
+	};
+
+	SettingsView.prototype.save = function () {
+		var self = this;
+		var draft = this.draft;
+		var button = this.saveButton;
+
+		Object.keys( this.errors ).forEach( function ( key ) {
+			self.errors[ key ].hidden = true;
+		} );
+
+		button.disabled = true;
+		button.textContent = S.saving;
+
+		api.saveSettings( {
+			welcome_enabled: draft.welcome_enabled,
+			welcome_message: draft.welcome_message,
+			display_mode: draft.display_mode,
+			display_targets: draft.display_targets,
+			display_ids: this.items.map( function ( item ) {
+				return item.id;
+			} )
+		} ).then( function ( data ) {
+			self.apply( data );
+			self.render();
+			self.panel.notify( S.saved );
+		} ).catch( function ( error ) {
+			button.disabled = false;
+			button.textContent = S.save;
+
+			var fields = ( error.data && error.data.fields ) || {};
+			var shown = false;
+
+			Object.keys( fields ).forEach( function ( key ) {
+				if ( self.errors[ key ] ) {
+					self.errors[ key ].textContent = fields[ key ];
+					self.errors[ key ].hidden = false;
+					shown = true;
+				}
+			} );
+
+			self.panel.notify( error.message, true );
+
+			if ( shown ) {
+				var first = self.el.querySelector( '.cc-field-error:not([hidden])' );
+				if ( first ) {
+					first.scrollIntoView( { block: 'center' } );
+				}
+			}
+		} );
 	};
 
 	/* ------------------------------- start ----------------------------- */

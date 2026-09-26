@@ -8,11 +8,16 @@
 namespace ChatChi\Frontend;
 
 use ChatChi\Core\Contracts\Module;
+use ChatChi\Settings\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Loads the widget script and its configuration on front-end pages.
+ *
+ * Whether a page gets the widget is decided by the display rules, a
+ * [chatchi] shortcode on the page, and finally the chatchi_widget_enabled
+ * filter.
  *
  * The page itself gets no markup: the script builds the widget inside a
  * Shadow DOM so theme styles cannot leak in or out. Nothing per-visitor is
@@ -34,15 +39,33 @@ final class WidgetModule implements Module {
 
 	private FontFace $font;
 
+	private Settings $settings;
+
+	private DisplayRules $rules;
+
 	/**
-	 * @param ColorPalette  $palette Color tokens.
-	 * @param WidgetStrings $strings Interface text.
-	 * @param FontFace      $font    Bundled font.
+	 * Whether a shortcode asked for the widget on this page.
 	 */
-	public function __construct( ColorPalette $palette, WidgetStrings $strings, FontFace $font ) {
-		$this->palette = $palette;
-		$this->strings = $strings;
-		$this->font    = $font;
+	private bool $forced = false;
+
+	/**
+	 * Whether the assets were already enqueued.
+	 */
+	private bool $loaded = false;
+
+	/**
+	 * @param ColorPalette  $palette  Color tokens.
+	 * @param WidgetStrings $strings  Interface text.
+	 * @param FontFace      $font     Bundled font.
+	 * @param Settings      $settings Plugin settings.
+	 * @param DisplayRules  $rules    Where the widget appears.
+	 */
+	public function __construct( ColorPalette $palette, WidgetStrings $strings, FontFace $font, Settings $settings, DisplayRules $rules ) {
+		$this->palette  = $palette;
+		$this->strings  = $strings;
+		$this->font     = $font;
+		$this->settings = $settings;
+		$this->rules    = $rules;
 	}
 
 	/**
@@ -60,21 +83,39 @@ final class WidgetModule implements Module {
 			return false;
 		}
 
+		$enabled = $this->forced || $this->shortcode_on_page() || $this->rules->allows_current_page();
+
 		/**
 		 * Filters whether the chat widget loads on the current page.
 		 *
-		 * @param bool $enabled Whether to load the widget.
+		 * @param bool $enabled Whether the display rules or a shortcode show the widget here.
 		 */
-		return (bool) apply_filters( 'chatchi_widget_enabled', true );
+		return (bool) apply_filters( 'chatchi_widget_enabled', $enabled );
+	}
+
+	/**
+	 * Shows the widget on the current page regardless of the display rules.
+	 *
+	 * Called by the shortcode. When the page head was already printed, the
+	 * assets are enqueued late and WordPress prints them in the footer.
+	 */
+	public function force(): void {
+		$this->forced = true;
+
+		if ( did_action( 'wp_enqueue_scripts' ) ) {
+			$this->enqueue();
+		}
 	}
 
 	/**
 	 * Enqueues the font face, script and configuration.
 	 */
 	public function enqueue(): void {
-		if ( ! $this->should_load() ) {
+		if ( $this->loaded || ! $this->should_load() ) {
 			return;
 		}
+
+		$this->loaded = true;
 
 		// @font-face must live in the document; Shadow DOM styles cannot declare fonts.
 		wp_register_style( self::FONT_HANDLE, false, array(), CHATCHI_VERSION );
@@ -127,6 +168,7 @@ final class WidgetModule implements Module {
 			'colors'    => $this->palette->tokens(),
 			'locale'    => str_replace( '_', '-', determine_locale() ),
 			'dir'       => is_rtl() ? 'rtl' : 'ltr',
+			'welcome'   => $this->settings->welcome_message(),
 			'strings'   => $this->strings->all(),
 		);
 
@@ -136,6 +178,19 @@ final class WidgetModule implements Module {
 		 * @param array<string, mixed> $config Configuration.
 		 */
 		return (array) apply_filters( 'chatchi_widget_config', $config );
+	}
+
+	/**
+	 * Whether the post being viewed contains the shortcode in its content.
+	 */
+	private function shortcode_on_page(): bool {
+		if ( ! is_singular() ) {
+			return false;
+		}
+
+		$post = get_queried_object();
+
+		return $post instanceof \WP_Post && Shortcode::in( (string) $post->post_content );
 	}
 
 	/**

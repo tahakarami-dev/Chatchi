@@ -794,7 +794,10 @@
 				event.preventDefault();
 				self.submitForm( form );
 			}
-		}, [ h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } ) ] );
+		}, [
+			config.welcome ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
+		] );
 
 		Object.keys( specs ).forEach( function ( name ) {
 			var field = fields[ name ];
@@ -868,6 +871,12 @@
 			return { key: p.clientId, mine: true, type: 'visitor', body: p.body, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: true };
 		} ) );
 
+		// The welcome message opens the conversation once its start is loaded.
+		if ( config.welcome && ! state.hasMore ) {
+			var started = state.conversation && state.conversation.created_at ? new Date( state.conversation.created_at ) : null;
+			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
+		}
+
 		if ( ! entries.length ) {
 			log.appendChild( h( 'div', { className: 'chatchi-state' }, [ h( 'p', { text: S.empty } ) ] ) );
 			return log;
@@ -894,6 +903,21 @@
 		return log;
 	};
 
+	/**
+	 * The configured welcome message, shown as the first bubble from support.
+	 * It exists only in the widget and is never stored as a message.
+	 */
+	Widget.prototype.welcomeEntry = function ( date ) {
+		return {
+			key: 'welcome',
+			mine: false,
+			type: 'welcome',
+			sender: { name: S.support, avatar_url: null },
+			body: config.welcome,
+			date: date
+		};
+	};
+
 	Widget.prototype.sameGroup = function ( a, b ) {
 		return a.mine === b.mine &&
 			a.type === b.type &&
@@ -910,6 +934,9 @@
 		}
 
 		var classes = [ 'chatchi-row', entry.mine ? 'chatchi-row--mine' : 'chatchi-row--theirs' ];
+		if ( entry.type === 'welcome' ) {
+			classes.push( 'chatchi-row--welcome' );
+		}
 		if ( groupStart ) {
 			classes.push( 'is-group-start' );
 		}
@@ -946,7 +973,7 @@
 					self.focusDefault();
 				}
 			} ) );
-		} else if ( groupEnd ) {
+		} else if ( groupEnd && entry.type !== 'welcome' ) {
 			stack.appendChild( this.renderMeta( entry ) );
 		}
 

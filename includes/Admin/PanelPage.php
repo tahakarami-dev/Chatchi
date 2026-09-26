@@ -49,16 +49,17 @@ final class PanelPage {
 	 */
 	public function config(): array {
 		return array(
-			'restUrl'         => esc_url_raw( rest_url( 'chatchi/v1' ) ),
-			'nonce'           => wp_create_nonce( 'wp_rest' ),
-			'locale'          => str_replace( '_', '-', determine_locale() ),
-			'dir'             => is_rtl() ? 'rtl' : 'ltr',
-			'adminUrl'        => esc_url_raw( admin_url() ),
-			'userEditUrl'     => esc_url_raw( admin_url( 'user-edit.php' ) ),
-			'canManageAgents' => current_user_can( 'manage_options' ),
-			'canUpload'       => current_user_can( 'upload_files' ),
-			'maxAvatarBytes'  => $this->avatar_max_bytes,
-			'strings'         => $this->strings->all(),
+			'restUrl'           => esc_url_raw( rest_url( 'chatchi/v1' ) ),
+			'nonce'             => wp_create_nonce( 'wp_rest' ),
+			'locale'            => str_replace( '_', '-', determine_locale() ),
+			'dir'               => is_rtl() ? 'rtl' : 'ltr',
+			'adminUrl'          => esc_url_raw( admin_url() ),
+			'userEditUrl'       => esc_url_raw( admin_url( 'user-edit.php' ) ),
+			'canManageAgents'   => current_user_can( 'manage_options' ),
+			'canManageSettings' => current_user_can( 'manage_options' ),
+			'canUpload'         => current_user_can( 'upload_files' ),
+			'maxAvatarBytes'    => $this->avatar_max_bytes,
+			'strings'           => $this->strings->all(),
 		);
 	}
 

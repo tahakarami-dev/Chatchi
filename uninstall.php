@@ -37,6 +37,7 @@ function chatchi_uninstall_site() {
 		'chatchi_install_lock',
 		'chatchi_install_error',
 		'chatchi_db_version',
+		'chatchi_settings',
 	);
 
 	foreach ( $options as $option ) {

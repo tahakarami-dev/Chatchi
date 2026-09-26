@@ -7,6 +7,8 @@
 
 namespace ChatChi\Messages;
 
+use ChatChi\Support\PlainText;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -43,18 +45,7 @@ final class MessageBody {
 	 * @return string|\WP_Error Clean text, or an error.
 	 */
 	public function clean( $raw ) {
-		$text = is_scalar( $raw ) ? (string) $raw : '';
-
-		$text = wp_check_invalid_utf8( $text, true );
-		$text = str_replace( array( "\r\n", "\r" ), "\n", $text );
-
-		// Control characters except tab and newline. Zero-width non-joiner and
-		// other formatting characters used in Persian are not affected.
-		$text = (string) preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text );
-
-		// At most one empty line between paragraphs.
-		$text = (string) preg_replace( "/\n{3,}/", "\n\n", $text );
-		$text = trim( $text );
+		$text = PlainText::paragraphs( is_scalar( $raw ) ? (string) $raw : '' );
 
 		if ( '' === $text ) {
 			return new \WP_Error(
