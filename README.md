@@ -25,8 +25,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 9 | Agent Management | ✅ |
 | 10 | Welcome Message + Widget Display Rules + Shortcode | ✅ |
 | 11 | Rate Limiting + Anti-Spam + Security Hardening | ✅ |
-| 12 | Plugin Settings | ⏳ |
-| 13 | Integration + Testing + Optimization | |
+| 12 | Plugin Settings | ✅ |
+| 13 | Integration + Testing + Optimization | ⏳ |
 
 ## Architecture
 
@@ -87,8 +87,8 @@ docs/                    Design and architecture documents
 | `chatchi_messages_read` | action | Messages were marked as read |
 | `chatchi_message_max_length` | filter | Maximum message length in characters (default 2000) |
 | `chatchi_widget_enabled` | filter | Final say on whether the widget loads on the current page; receives the display-rules/shortcode decision |
-| `chatchi_widget_position` | filter | `left` (default) or `right` |
-| `chatchi_primary_color` | filter | Widget primary color; hover, soft and text colors are derived |
+| `chatchi_widget_position` | filter | `left` or `right`; receives the corner chosen in Settings (default `left`) |
+| `chatchi_primary_color` | filter | Primary color of the widget and panel; receives the color chosen in Settings. Hover, soft and text colors are derived (text switches to dark below 4.5:1 contrast) |
 | `chatchi_widget_config` | filter | Full widget configuration |
 | `chatchi_settings` | filter | Settings as the plugin uses them (not saved) |
 | `chatchi_settings_updated` | action | Settings were saved, with the validated changes |
@@ -163,7 +163,7 @@ Administrators only (`manage_options`).
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/agent/settings` | Settings, the default welcome message, limits, available page types, and the chosen items with titles |
-| POST/PATCH | `/agent/settings` | Save any of `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
+| POST/PATCH | `/agent/settings` | Save any of `primary_color` (`#RRGGBB`, `#RGB`; empty = default), `widget_position` (`left` / `right`), `widget_title` (≤ 60 characters), `widget_subtitle` (≤ 100; empty = translated default), `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
 | GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
 
 ## Agent panel
@@ -172,7 +172,10 @@ Administrators only (`manage_options`).
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
 
-Administrators also get a **Settings** screen (`#/settings`):
+Administrators also get a **Settings** screen with three sections, each saved on its own (unsaved sections are marked in the sub-menu):
+
+- **Appearance** (`#/settings/appearance`): brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
+- **Welcome & display** (`#/settings/display`) and **IP & security** (`#/settings/security`), described below.
 
 - **Welcome message**: shown in the widget as the first bubble from support, above the start form and at the top of every conversation. It is not stored as a message, so agents never see it in the inbox. On by default with a translated default text.
 - **Where the widget appears**: on every page, only on chosen page types and items, or everywhere except them. Page types are the home page, all pages, all blog posts, and WooCommerce products (single products, the shop, product categories and tags).

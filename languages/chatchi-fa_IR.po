@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 0.11.0\n"
+"Project-Id-Version: ChatChi | چت‌چی 0.12.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: Persian\n"
@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T16:43:21+00:00\n"
+"POT-Creation-Date: 2026-09-26T17:37:34+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -490,7 +490,7 @@ msgstr "هنوز چیزی انتخاب نشده؛ پس ویجت فقط در صف
 
 #. translators: %d: maximum number of items.
 #: includes/Admin/PanelStrings.php:128
-#: includes/Settings/SettingsValidator.php:271
+#: includes/Settings/SettingsValidator.php:323
 #, php-format
 msgid "You can choose at most %d items."
 msgstr "حداکثر %d مورد می‌توانی انتخاب کنی."
@@ -552,6 +552,103 @@ msgstr "بدون این فهرست، هر کسی که مستقیم به سرور
 #, php-format
 msgid "Your address as ChatChi sees it now: %s"
 msgstr "آدرس تو از نگاه چت‌چی: %s"
+
+#: includes/Admin/PanelStrings.php:144
+msgid "Appearance"
+msgstr "ظاهر"
+
+#: includes/Admin/PanelStrings.php:145
+msgid "Welcome & display"
+msgstr "خوش‌آمد و نمایش"
+
+#: includes/Admin/PanelStrings.php:146
+msgid "IP & security"
+msgstr "IP و امنیت"
+
+#: includes/Admin/PanelStrings.php:147
+msgid "Unsaved changes"
+msgstr "تغییرات ذخیره‌نشده"
+
+#: includes/Admin/PanelStrings.php:148
+msgid "Widget appearance"
+msgstr "ظاهر ویجت"
+
+#: includes/Admin/PanelStrings.php:149
+msgid "Your brand color, the corner the widget sits in, and its heading. The agent panel uses the same color."
+msgstr "رنگ برندت، گوشه‌ای که ویجت در آن قرار می‌گیرد و عنوانش. پنل اپراتور هم همین رنگ را می‌گیرد."
+
+#: includes/Admin/PanelStrings.php:150
+msgid "Brand color"
+msgstr "رنگ برند"
+
+#: includes/Admin/PanelStrings.php:151
+msgid "Color code"
+msgstr "کد رنگ"
+
+#: includes/Admin/PanelStrings.php:152
+msgid "Pick a color"
+msgstr "انتخاب رنگ"
+
+#. translators: %s: color code.
+#: includes/Admin/PanelStrings.php:154
+#, php-format
+msgid "Use %s"
+msgstr "استفاده از %s"
+
+#: includes/Admin/PanelStrings.php:155
+msgid "Use the default color"
+msgstr "برگشت به رنگ پیش‌فرض"
+
+#: includes/Admin/PanelStrings.php:156
+msgid "Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed."
+msgstr "یک رنگ انتخاب کن یا کدی مثل #5B5BD6 بنویس. اگر لازم باشد، متن روی آن خودکار تیره می‌شود."
+
+#: includes/Admin/PanelStrings.php:157
+msgid "This color is light: icons and links in this color may be hard to see on white."
+msgstr "این رنگ روشن است؛ آیکون‌ها و لینک‌ها با این رنگ روی زمینه‌ی سفید ممکن است کم‌رنگ دیده شوند."
+
+#. translators: %s: color code.
+#: includes/Admin/PanelStrings.php:159
+#, php-format
+msgid "Code on your site sets the color to %s, so the widget uses that."
+msgstr "کدی در سایتت رنگ را روی %s گذاشته، پس ویجت از همان استفاده می‌کند."
+
+#: includes/Admin/PanelStrings.php:160
+msgid "Position"
+msgstr "جایگاه"
+
+#: includes/Admin/PanelStrings.php:161
+msgid "Bottom left"
+msgstr "پایین چپ"
+
+#: includes/Admin/PanelStrings.php:162
+msgid "Bottom right"
+msgstr "پایین راست"
+
+#: includes/Admin/PanelStrings.php:163
+msgid "Title"
+msgstr "عنوان"
+
+#: includes/Admin/PanelStrings.php:164
+msgid "Subtitle"
+msgstr "زیرعنوان"
+
+#: includes/Admin/PanelStrings.php:165
+msgid "Leave a field empty to use the default text, which follows the site language."
+msgstr "اگر فیلدی خالی بماند، متن پیش‌فرض (هم‌زبان با سایت) نمایش داده می‌شود."
+
+#: includes/Admin/PanelStrings.php:166
+msgid "Preview"
+msgstr "پیش‌نمایش"
+
+#: includes/Admin/PanelStrings.php:167
+msgid "Hi, I have a question 🙂"
+msgstr "سلام، یک سؤال داشتم 🙂"
+
+#: includes/Admin/PanelStrings.php:168
+#: includes/Frontend/WidgetStrings.php:38
+msgid "Write a message…"
+msgstr "پیامت را بنویس…"
 
 #: includes/Agents/AgentService.php:83
 msgid "This user does not exist."
@@ -675,10 +772,6 @@ msgstr "اختیاری"
 msgid "Start chat"
 msgstr "شروع گفتگو"
 
-#: includes/Frontend/WidgetStrings.php:38
-msgid "Write a message…"
-msgstr "پیامت را بنویس…"
-
 #: includes/Frontend/WidgetStrings.php:40
 msgid "Ask us anything 👋"
 msgstr "سؤالت را بپرس 👋"
@@ -752,11 +845,11 @@ msgstr "حساب اپراتوری‌ات غیرفعال است."
 msgid "This request was rejected."
 msgstr "این درخواست پذیرفته نشد."
 
-#: includes/Rest/SettingsController.php:202
+#: includes/Rest/SettingsController.php:237
 msgid "(no title)"
 msgstr "(بدون عنوان)"
 
-#: includes/Rest/WidgetController.php:284
+#: includes/Rest/WidgetController.php:316
 msgid "Start a conversation first."
 msgstr "اول یک گفتگو شروع کن."
 
@@ -780,68 +873,86 @@ msgstr "فرم گفتگو منقضی شده. لطفاً دوباره امتحا�
 msgid "Hi! 👋 How can we help you today?"
 msgstr "سلام! 👋 امروز چطور می‌تونیم کمکت کنیم؟"
 
-#: includes/Settings/SettingsValidator.php:97
-msgid "Some settings need your attention."
-msgstr "چند مورد از تنظیمات نیاز به اصلاح دارد."
-
-#: includes/Settings/SettingsValidator.php:113
+#: includes/Settings/SettingsValidator.php:109
 msgid "Enter the header your proxy puts the visitor address in."
 msgstr "نام هدری را که پراکسی آدرس بازدیدکننده را در آن می‌گذارد وارد کن."
 
-#: includes/Settings/SettingsValidator.php:192
+#: includes/Settings/SettingsValidator.php:118
+msgid "Some settings need your attention."
+msgstr "چند مورد از تنظیمات نیاز به اصلاح دارد."
+
+#: includes/Settings/SettingsValidator.php:226
 msgid "Choose where the widget appears."
 msgstr "محل نمایش ویجت را انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:203
+#: includes/Settings/SettingsValidator.php:237
 msgid "Choose how visitors reach your site."
 msgstr "مشخص کن بازدیدکننده‌ها چطور به سایتت وصل می‌شوند."
 
-#: includes/Settings/SettingsValidator.php:212
+#: includes/Settings/SettingsValidator.php:250
+msgid "Enter a color code like #5B5BD6."
+msgstr "کد رنگ را به شکل #5B5BD6 وارد کن."
+
+#: includes/Settings/SettingsValidator.php:255
+msgid "Choose a corner for the widget."
+msgstr "جایگاه ویجت را انتخاب کن."
+
+#: includes/Settings/SettingsValidator.php:264
 msgid "Unknown setting."
 msgstr "تنظیم ناشناخته."
 
-#: includes/Settings/SettingsValidator.php:221
+#: includes/Settings/SettingsValidator.php:273
 msgid "Enter the message as text."
 msgstr "پیام را به‌صورت متن وارد کن."
 
 #. translators: %d: maximum number of characters.
-#: includes/Settings/SettingsValidator.php:230
+#: includes/Settings/SettingsValidator.php:282
 #, php-format
 msgid "The welcome message can be at most %d characters."
 msgstr "پیام خوش‌آمد حداکثر می‌تواند %d نویسه باشد."
 
-#: includes/Settings/SettingsValidator.php:243
+#: includes/Settings/SettingsValidator.php:295
 msgid "Choose page types from the list."
 msgstr "نوع صفحه را از فهرست انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:256
-#: includes/Settings/SettingsValidator.php:261
+#: includes/Settings/SettingsValidator.php:308
+#: includes/Settings/SettingsValidator.php:313
 msgid "Choose items from the search results."
 msgstr "موردها را از نتایج جست‌وجو انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:276
+#: includes/Settings/SettingsValidator.php:328
 msgid "Some of the chosen items no longer exist or are not published."
 msgstr "بعضی از موردهای انتخاب‌شده دیگر وجود ندارند یا منتشر نشده‌اند."
 
-#: includes/Settings/SettingsValidator.php:290
+#: includes/Settings/SettingsValidator.php:342
 msgid "Use a header name made of letters, digits and dashes, like X-Real-IP."
 msgstr "نام هدر فقط می‌تواند حرف انگلیسی، عدد و خط تیره باشد؛ مثل X-Real-IP."
 
-#: includes/Settings/SettingsValidator.php:302
+#: includes/Settings/SettingsValidator.php:354
 msgid "Enter one address or range per line."
 msgstr "در هر خط یک آدرس یا بازه وارد کن."
 
 #. translators: %s: the invalid entry.
-#: includes/Settings/SettingsValidator.php:320
+#: includes/Settings/SettingsValidator.php:372
 #, php-format
 msgid "“%s” is not an IP address or range."
 msgstr "«%s» آدرس یا بازه‌ی IP معتبر نیست."
 
 #. translators: %d: maximum number of entries.
-#: includes/Settings/SettingsValidator.php:331
+#: includes/Settings/SettingsValidator.php:383
 #, php-format
 msgid "Enter at most %d addresses or ranges."
 msgstr "حداکثر %d آدرس یا بازه وارد کن."
+
+#: includes/Settings/SettingsValidator.php:423
+msgid "Enter the text as plain text."
+msgstr "متن را به‌صورت ساده وارد کن."
+
+#. translators: %d: maximum number of characters.
+#: includes/Settings/SettingsValidator.php:432
+#, php-format
+msgid "Use at most %d characters."
+msgstr "حداکثر %d نویسه مجاز است."
 
 #: includes/Visitors/ProfileValidator.php:90
 msgid "Please check the highlighted fields."

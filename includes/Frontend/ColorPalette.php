@@ -7,6 +7,8 @@
 
 namespace ChatChi\Frontend;
 
+use ChatChi\Settings\Settings;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -23,16 +25,27 @@ final class ColorPalette {
 
 	private const MIN_CONTRAST = 4.5;
 
+	private ?Settings $settings;
+
+	/**
+	 * @param Settings|null $settings Plugin settings; without them the default color is used.
+	 */
+	public function __construct( ?Settings $settings = null ) {
+		$this->settings = $settings;
+	}
+
 	/**
 	 * Returns the configured primary color as #RRGGBB.
 	 */
 	public function primary(): string {
+		$chosen = $this->settings ? (string) $this->settings->get( 'primary_color' ) : '';
+
 		/**
 		 * Filters the widget's primary color.
 		 *
-		 * @param string $color Hex color, e.g. #5B5BD6.
+		 * @param string $color Hex color, e.g. #5B5BD6: the one chosen in the settings, or the default.
 		 */
-		$color = sanitize_hex_color( (string) apply_filters( 'chatchi_primary_color', self::DEFAULT_PRIMARY ) );
+		$color = sanitize_hex_color( (string) apply_filters( 'chatchi_primary_color', '' !== $chosen ? $chosen : self::DEFAULT_PRIMARY ) );
 
 		return $color ? $this->normalize( $color ) : self::DEFAULT_PRIMARY;
 	}

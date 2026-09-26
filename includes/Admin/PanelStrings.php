@@ -141,6 +141,31 @@ final class PanelStrings {
 			'trustedEmpty'       => __( 'Without this list, anyone who can reach your server directly can fake their address and get around the per-address limits.', 'chatchi' ),
 			/* translators: %s: IP address. */
 			'yourIp'             => __( 'Your address as ChatChi sees it now: %s', 'chatchi' ),
+			'sectionAppearance'  => __( 'Appearance', 'chatchi' ),
+			'sectionDisplay'     => __( 'Welcome & display', 'chatchi' ),
+			'sectionSecurity'    => __( 'IP & security', 'chatchi' ),
+			'unsaved'            => __( 'Unsaved changes', 'chatchi' ),
+			'appearanceTitle'    => __( 'Widget appearance', 'chatchi' ),
+			'appearanceIntro'    => __( 'Your brand color, the corner the widget sits in, and its heading. The agent panel uses the same color.', 'chatchi' ),
+			'brandColor'         => __( 'Brand color', 'chatchi' ),
+			'colorCode'          => __( 'Color code', 'chatchi' ),
+			'pickColor'          => __( 'Pick a color', 'chatchi' ),
+			/* translators: %s: color code. */
+			'presetColor'        => __( 'Use %s', 'chatchi' ),
+			'resetColor'         => __( 'Use the default color', 'chatchi' ),
+			'colorHint'          => __( 'Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed.', 'chatchi' ),
+			'colorLowContrast'   => __( 'This color is light: icons and links in this color may be hard to see on white.', 'chatchi' ),
+			/* translators: %s: color code. */
+			'colorOverridden'    => __( 'Code on your site sets the color to %s, so the widget uses that.', 'chatchi' ),
+			'position'           => __( 'Position', 'chatchi' ),
+			'positionLeft'       => __( 'Bottom left', 'chatchi' ),
+			'positionRight'      => __( 'Bottom right', 'chatchi' ),
+			'widgetTitle'        => __( 'Title', 'chatchi' ),
+			'widgetSubtitle'     => __( 'Subtitle', 'chatchi' ),
+			'textDefault'        => __( 'Leave a field empty to use the default text, which follows the site language.', 'chatchi' ),
+			'preview'            => __( 'Preview', 'chatchi' ),
+			'previewMessage'     => __( 'Hi, I have a question 🙂', 'chatchi' ),
+			'previewPlaceholder' => __( 'Write a message…', 'chatchi' ),
 		);
 	}
 }

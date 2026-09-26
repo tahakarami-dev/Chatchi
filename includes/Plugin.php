@@ -429,7 +429,13 @@ final class Plugin {
 		$this->container->singleton(
 			SettingsController::class,
 			static function ( Container $c ): SettingsController {
-				return new SettingsController( $c->get( Settings::class ), $c->get( ContentLookup::class ), $c->get( ClientIp::class ) );
+				return new SettingsController(
+					$c->get( Settings::class ),
+					$c->get( ContentLookup::class ),
+					$c->get( ClientIp::class ),
+					$c->get( ColorPalette::class ),
+					$c->get( WidgetStrings::class )
+				);
 			}
 		);
 
@@ -452,8 +458,8 @@ final class Plugin {
 	private function register_frontend_services(): void {
 		$this->container->singleton(
 			ColorPalette::class,
-			static function (): ColorPalette {
-				return new ColorPalette();
+			static function ( Container $c ): ColorPalette {
+				return new ColorPalette( $c->get( Settings::class ) );
 			}
 		);
 

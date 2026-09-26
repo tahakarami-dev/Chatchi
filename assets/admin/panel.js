@@ -522,15 +522,26 @@
 	/* --------------------------- conversation -------------------------- */
 
 	Panel.prototype.route = function () {
-		var pages = { '#/agents': this.agentsView, '#/settings': this.settingsView };
-		var page = pages[ window.location.hash ] || null;
+		var hash = window.location.hash;
+		var settings = this.settingsView && /^#\/settings(\/[a-z]+)?$/.exec( hash );
+		var page = null;
 
-		this.view = page ? window.location.hash.slice( 2 ) : 'inbox';
+		if ( this.agentsView && hash === '#/agents' ) {
+			page = 'agents';
+		} else if ( settings ) {
+			page = 'settings';
+		}
+
+		this.view = page || 'inbox';
 		this.shell.classList.toggle( 'is-page', !! page );
 		this.renderRail();
 
-		if ( page ) {
-			page.show();
+		if ( page === 'agents' ) {
+			this.agentsView.show();
+			return;
+		}
+		if ( page === 'settings' ) {
+			this.settingsView.show( settings[ 1 ] ? settings[ 1 ].slice( 1 ) : '' );
 			return;
 		}
 
@@ -1736,14 +1747,33 @@
 		this.el = panel.page;
 		this.loaded = false;
 		this.state = { loading: true, error: '' };
+		this.section = SETTINGS_SECTIONS[ 0 ].id;
 		this.data = null;
-		this.draft = null;
+		this.draft = {};
 		this.items = [];
 		this.searchTimer = null;
 		this.searchTicket = 0;
 	}
 
-	SettingsView.prototype.show = function () {
+	/**
+	 * Settings sections: each has its own screen and saves only its keys, so
+	 * errors and unsaved changes stay where they belong.
+	 */
+	var SETTINGS_SECTIONS = [
+		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
+		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
+		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
+	];
+
+	function settingsSection( id ) {
+		return SETTINGS_SECTIONS.filter( function ( section ) {
+			return section.id === id;
+		} )[ 0 ] || null;
+	}
+
+	SettingsView.prototype.show = function ( section ) {
+		this.section = settingsSection( section ) ? section : SETTINGS_SECTIONS[ 0 ].id;
+
 		if ( ! this.loaded ) {
 			this.loaded = true;
 			this.load();
@@ -1768,19 +1798,98 @@
 		} );
 	};
 
-	SettingsView.prototype.apply = function ( data ) {
+	/**
+	 * Takes a server response; resets the drafts of the given sections (all
+	 * when none are given) and keeps unsaved edits in the others.
+	 */
+	SettingsView.prototype.apply = function ( data, sections ) {
+		var self = this;
+
 		this.data = data;
-		this.draft = {
-			welcome_enabled: data.settings.welcome_enabled,
-			welcome_message: data.settings.welcome_message,
-			display_mode: data.settings.display_mode,
-			display_targets: data.settings.display_targets.slice(),
-			proxy_mode: data.settings.proxy_mode,
-			proxy_header: data.settings.proxy_header,
-			trusted_proxies: data.settings.trusted_proxies.join( '\n' )
-		};
-		// Items that were deleted since they were chosen are dropped on save.
-		this.items = data.items.slice();
+		( sections || SETTINGS_SECTIONS.map( function ( s ) {
+			return s.id;
+		} ) ).forEach( function ( id ) {
+			self.resetDraft( id );
+		} );
+	};
+
+	SettingsView.prototype.resetDraft = function ( id ) {
+		var draft = this.draft;
+		var saved = this.data.settings;
+
+		settingsSection( id ).keys.forEach( function ( key ) {
+			if ( key === 'display_ids' ) {
+				return;
+			}
+			var value = saved[ key ];
+			draft[ key ] = Array.isArray( value ) ? value.slice() : value;
+		} );
+
+		if ( id === 'display' ) {
+			// Items that were deleted since they were chosen are dropped on save.
+			this.items = this.data.items.slice();
+		}
+		if ( id === 'security' ) {
+			draft.trusted_proxies = saved.trusted_proxies.join( '\n' );
+		}
+	};
+
+	/**
+	 * Returns the values a section would save, from the draft.
+	 */
+	SettingsView.prototype.payload = function ( id ) {
+		var draft = this.draft;
+		var payload = {};
+
+		settingsSection( id ).keys.forEach( function ( key ) {
+			payload[ key ] = draft[ key ];
+		} );
+
+		if ( id === 'display' ) {
+			payload.display_ids = this.items.map( function ( item ) {
+				return item.id;
+			} );
+		}
+		if ( id === 'security' ) {
+			payload.proxy_header = draft.proxy_header.trim();
+			payload.trusted_proxies = draft.trusted_proxies.split( /[\s,]+/ ).filter( function ( line ) {
+				return line !== '';
+			} );
+		}
+		if ( id === 'appearance' ) {
+			payload.primary_color = draft.primary_color.trim();
+		}
+
+		return payload;
+	};
+
+	/**
+	 * Whether a section has changes that are not saved yet.
+	 */
+	SettingsView.prototype.isDirty = function ( id ) {
+		var self = this;
+		var saved = this.data.settings;
+		var payload = this.payload( id );
+
+		return Object.keys( payload ).some( function ( key ) {
+			var current = payload[ key ];
+			var stored = saved[ key ];
+
+			if ( key === 'primary_color' ) {
+				current = String( current ).toUpperCase().replace( /^#?/, current ? '#' : '' );
+			}
+			if ( key === 'display_targets' ) {
+				current = current.slice().sort();
+				stored = stored.slice().sort();
+			}
+			if ( key === 'display_ids' ) {
+				// Chosen items deleted since are dropped anyway; not a change.
+				stored = self.data.items.map( function ( item ) {
+					return item.id;
+				} );
+			}
+			return JSON.stringify( current ) !== JSON.stringify( stored );
+		} );
 	};
 
 	SettingsView.prototype.render = function () {
@@ -1820,37 +1929,390 @@
 				} )
 			] );
 		} else {
-			body = this.buildForm();
+			body = h( 'div', { className: 'cc-settings-layout' }, [ this.buildNav(), this.buildForm() ] );
 		}
 
-		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner' }, [ header, body ] ) );
+		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner cc-page-inner--wide' }, [ header, body ] ) );
 
 		// The picker is part of the form just built; fill its suggestions.
-		if ( ! this.state.loading && ! this.state.error && this.draft.display_mode !== 'all' ) {
+		if ( ! this.state.loading && ! this.state.error && this.section === 'display' && this.draft.display_mode !== 'all' ) {
 			this.searchContent( '' );
 		}
 	};
 
+	SettingsView.prototype.buildNav = function () {
+		var self = this;
+		var labels = { appearance: S.sectionAppearance, display: S.sectionDisplay, security: S.sectionSecurity };
+
+		this.navLinks = {};
+
+		return h( 'nav', { className: 'cc-subnav', 'aria-label': S.settings }, SETTINGS_SECTIONS.map( function ( section ) {
+			var current = section.id === self.section;
+			var dirty = self.isDirty( section.id );
+			var link = h( 'a', {
+				className: 'cc-subnav__item' + ( current ? ' is-active' : '' ) + ( dirty ? ' is-dirty' : '' ),
+				href: '#/settings/' + section.id,
+				'aria-current': current ? 'page' : null
+			}, [
+				icon( section.icon ),
+				h( 'span', { text: labels[ section.id ] } ),
+				h( 'span', { className: 'cc-subnav__dot', title: S.unsaved, 'aria-label': S.unsaved, hidden: ! dirty } )
+			] );
+
+			self.navLinks[ section.id ] = link;
+			return link;
+		} ) );
+	};
+
+	/**
+	 * Updates the "unsaved changes" dots after any edit.
+	 */
+	SettingsView.prototype.syncNav = function () {
+		var self = this;
+
+		SETTINGS_SECTIONS.forEach( function ( section ) {
+			var link = self.navLinks && self.navLinks[ section.id ];
+			if ( link ) {
+				var dirty = self.isDirty( section.id );
+				link.classList.toggle( 'is-dirty', dirty );
+				link.querySelector( '.cc-subnav__dot' ).hidden = ! dirty;
+			}
+		} );
+	};
+
 	SettingsView.prototype.buildForm = function () {
 		var self = this;
+		var children;
 
 		this.errors = {};
 		this.saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
 
-		return h( 'form', {
+		if ( this.section === 'appearance' ) {
+			children = [ this.buildAppearance() ];
+		} else if ( this.section === 'security' ) {
+			children = [ this.buildProxy() ];
+		} else {
+			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
+		}
+
+		var form = h( 'form', {
 			className: 'cc-settings',
 			noValidate: true,
+			'data-section': this.section,
 			onSubmit: function ( event ) {
 				event.preventDefault();
 				self.save();
 			}
-		}, [
-			this.buildWelcome(),
-			this.buildDisplay(),
-			this.buildShortcode(),
-			this.buildProxy(),
-			h( 'div', { className: 'cc-settings__actions' }, [ this.saveButton ] )
+		}, children.concat( [ h( 'div', { className: 'cc-settings__actions' }, [ this.saveButton ] ) ] ) );
+
+		// Any edit may change which sections have unsaved changes.
+		[ 'input', 'change', 'click' ].forEach( function ( type ) {
+			form.addEventListener( type, function () {
+				window.setTimeout( function () {
+					self.syncNav();
+				}, 0 );
+			} );
+		} );
+
+		return form;
+	};
+
+	/* --------------------------- brand colors -------------------------- */
+
+	var DEFAULT_TEXT_ON_LIGHT = '#1A1A2E';
+	var COLOR_PRESETS = [ '#5B5BD6', '#2563EB', '#0D9488', '#16A34A', '#EA580C', '#DC2626', '#DB2777', '#1F2937' ];
+
+	/**
+	 * Returns #RRGGBB for "#abc", "abc", "#aabbcc" or "aabbcc", else null.
+	 */
+	function normalizeHex( value ) {
+		var match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec( String( value ).trim() );
+		if ( ! match ) {
+			return null;
+		}
+		var hex = match[ 1 ];
+		if ( hex.length === 3 ) {
+			hex = hex[ 0 ] + hex[ 0 ] + hex[ 1 ] + hex[ 1 ] + hex[ 2 ] + hex[ 2 ];
+		}
+		return '#' + hex.toUpperCase();
+	}
+
+	function hexToRgb( hex ) {
+		return [ 1, 3, 5 ].map( function ( i ) {
+			return parseInt( hex.substr( i, 2 ), 16 );
+		} );
+	}
+
+	function rgbToHex( rgb ) {
+		return '#' + rgb.map( function ( c ) {
+			return ( '0' + c.toString( 16 ) ).slice( -2 );
+		} ).join( '' ).toUpperCase();
+	}
+
+	function mixRgb( rgb, target, weight ) {
+		return rgb.map( function ( c, i ) {
+			return Math.round( c + ( target[ i ] - c ) * weight );
+		} );
+	}
+
+	function luminance( rgb ) {
+		var linear = rgb.map( function ( c ) {
+			c /= 255;
+			return c <= 0.03928 ? c / 12.92 : Math.pow( ( c + 0.055 ) / 1.055, 2.4 );
+		} );
+		return 0.2126 * linear[ 0 ] + 0.7152 * linear[ 1 ] + 0.0722 * linear[ 2 ];
+	}
+
+	function contrastRatio( a, b ) {
+		var la = luminance( a );
+		var lb = luminance( b );
+		return ( Math.max( la, lb ) + 0.05 ) / ( Math.min( la, lb ) + 0.05 );
+	}
+
+	/**
+	 * Same derivation as ColorPalette::tokens() on the server.
+	 */
+	function colorTokens( hex ) {
+		var rgb = hexToRgb( hex );
+		var white = [ 255, 255, 255 ];
+
+		return {
+			primary: hex,
+			primaryHover: rgbToHex( mixRgb( rgb, [ 0, 0, 0 ], 0.12 ) ),
+			primarySoft: rgbToHex( mixRgb( rgb, white, 0.9 ) ),
+			primaryContrast: contrastRatio( rgb, white ) >= 4.5 ? '#FFFFFF' : DEFAULT_TEXT_ON_LIGHT
+		};
+	}
+
+	function setColorVars( el, hex ) {
+		var tokens = colorTokens( hex );
+
+		el.style.setProperty( '--chatchi-primary', tokens.primary );
+		el.style.setProperty( '--chatchi-primary-hover', tokens.primaryHover );
+		el.style.setProperty( '--chatchi-primary-soft', tokens.primarySoft );
+		el.style.setProperty( '--chatchi-primary-contrast', tokens.primaryContrast );
+	}
+
+	/**
+	 * Recolors the panel itself right after the brand color is saved.
+	 */
+	function applyBrandColor( hex ) {
+		var color = normalizeHex( hex );
+		if ( color ) {
+			setColorVars( document.documentElement, color );
+		}
+	}
+
+	/* ---------------------------- appearance --------------------------- */
+
+	SettingsView.prototype.buildAppearance = function () {
+		var self = this;
+		var draft = this.draft;
+		var defaults = this.data.defaults;
+
+		// Color: presets, the native picker and a hex field, kept in sync.
+		var hexInput = h( 'input', {
+			id: 'cc-color',
+			className: 'cc-input cc-input--code',
+			type: 'text',
+			dir: 'ltr',
+			maxlength: '7',
+			spellcheck: 'false',
+			autocomplete: 'off',
+			placeholder: defaults.primary_color,
+			'aria-describedby': 'cc-color-hint'
+		} );
+		hexInput.value = draft.primary_color;
+
+		var picker = h( 'input', { id: 'cc-color-picker', className: 'cc-color-picker', type: 'color', 'aria-label': S.pickColor } );
+		var swatches = h( 'div', { className: 'cc-swatches', role: 'group', 'aria-label': S.brandColor }, COLOR_PRESETS.map( function ( color ) {
+			var swatch = h( 'button', {
+				type: 'button',
+				className: 'cc-swatch',
+				'data-color': color,
+				'aria-label': S.presetColor.replace( '%s', color ),
+				title: color,
+				onClick: function () {
+					setColor( color === defaults.primary_color ? '' : color );
+				}
+			} );
+			swatch.style.setProperty( '--swatch', color );
+			return swatch;
+		} ) );
+		var reset = h( 'button', {
+			type: 'button',
+			className: 'cc-link-button',
+			text: S.resetColor,
+			onClick: function () {
+				setColor( '' );
+			}
+		} );
+		var contrastWarning = h( 'p', { className: 'cc-warning', role: 'status', text: S.colorLowContrast } );
+		var overridden = h( 'p', { className: 'cc-hint', role: 'status' } );
+
+		function effectiveColor() {
+			return normalizeHex( draft.primary_color ) || defaults.primary_color;
+		}
+
+		function syncColor() {
+			var color = effectiveColor();
+			var valid = draft.primary_color.trim() === '' || !! normalizeHex( draft.primary_color );
+
+			picker.value = color.toLowerCase();
+			reset.hidden = draft.primary_color.trim() === '';
+			swatches.querySelectorAll( '.cc-swatch' ).forEach( function ( swatch ) {
+				swatch.setAttribute( 'aria-pressed', swatch.getAttribute( 'data-color' ) === color ? 'true' : 'false' );
+			} );
+			contrastWarning.hidden = ! valid || contrastRatio( hexToRgb( color ), [ 255, 255, 255 ] ) >= 3;
+
+			var saved = normalizeHex( self.data.settings.primary_color ) || defaults.primary_color;
+			var used = self.data.effective.primary_color;
+			overridden.hidden = used === saved;
+			overridden.textContent = S.colorOverridden.replace( '%s', used );
+
+			self.updatePreview();
+		}
+
+		function setColor( value ) {
+			draft.primary_color = value;
+			hexInput.value = value;
+			self.clearError( 'primary_color' );
+			syncColor();
+		}
+
+		hexInput.addEventListener( 'input', function () {
+			draft.primary_color = hexInput.value;
+			self.clearError( 'primary_color' );
+			syncColor();
+		} );
+		picker.addEventListener( 'input', function () {
+			setColor( picker.value.toUpperCase() === defaults.primary_color ? '' : picker.value.toUpperCase() );
+		} );
+
+		// Position.
+		var positions = h( 'div', { className: 'cc-positions', role: 'radiogroup', 'aria-labelledby': 'cc-position-label' }, [
+			[ 'left', S.positionLeft ],
+			[ 'right', S.positionRight ]
+		].map( function ( option ) {
+			var id = 'cc-position-' + option[ 0 ];
+			var input = h( 'input', { id: id, type: 'radio', name: 'cc-position', value: option[ 0 ], checked: draft.widget_position === option[ 0 ] } );
+
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.widget_position = option[ 0 ];
+					self.updatePreview();
+				}
+			} );
+
+			return h( 'label', { className: 'cc-position cc-position--' + option[ 0 ], for: id }, [
+				input,
+				h( 'span', { className: 'cc-position__screen', 'aria-hidden': 'true' }, [ h( 'span', { className: 'cc-position__dot' } ) ] ),
+				h( 'span', { text: option[ 1 ] } )
+			] );
+		} ) );
+
+		// Title and subtitle.
+		function textField( key, id, label ) {
+			var input = h( 'input', {
+				id: id,
+				className: 'cc-input',
+				type: 'text',
+				placeholder: defaults[ key ],
+				'aria-describedby': 'cc-text-default'
+			} );
+			input.value = draft[ key ];
+			input.addEventListener( 'input', function () {
+				draft[ key ] = input.value;
+				self.clearError( key );
+				self.updatePreview();
+			} );
+
+			return [ h( 'label', { className: 'cc-label', for: id, text: label } ), input, self.fieldError( key ) ];
+		}
+
+		var fields = h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-appearance-title' }, [
+			h( 'div', {}, [
+				h( 'h2', { id: 'cc-appearance-title', text: S.appearanceTitle } ),
+				h( 'p', { className: 'cc-hint', text: S.appearanceIntro } )
+			] ),
+			h( 'span', { className: 'cc-label', id: 'cc-color-label', text: S.brandColor } ),
+			swatches,
+			h( 'div', { className: 'cc-inline' }, [
+				picker,
+				h( 'label', { className: 'cc-sr', for: 'cc-color', text: S.colorCode } ),
+				hexInput,
+				reset
+			] ),
+			h( 'p', { id: 'cc-color-hint', className: 'cc-hint', text: S.colorHint } ),
+			this.fieldError( 'primary_color' ),
+			contrastWarning,
+			overridden,
+			h( 'span', { className: 'cc-label', id: 'cc-position-label', text: S.position } ),
+			positions,
+			this.fieldError( 'widget_position' )
+		].concat(
+			textField( 'widget_title', 'cc-widget-title', S.widgetTitle ),
+			textField( 'widget_subtitle', 'cc-widget-subtitle', S.widgetSubtitle ),
+			[ h( 'p', { id: 'cc-text-default', className: 'cc-hint', text: S.textDefault } ) ]
+		) );
+
+		this.preview = this.buildPreview();
+
+		var layout = h( 'div', { className: 'cc-appearance' }, [ fields, this.preview.root ] );
+
+		syncColor();
+
+		return layout;
+	};
+
+	/**
+	 * A small mock of the widget that follows the unsaved appearance draft.
+	 */
+	SettingsView.prototype.buildPreview = function () {
+		var title = h( 'strong', { className: 'cc-preview__title' } );
+		var subtitle = h( 'span', { className: 'cc-preview__subtitle' } );
+		var welcome = h( 'div', { className: 'cc-preview__bubble cc-preview__bubble--theirs' } );
+		var frame = h( 'div', { className: 'cc-preview__frame', dir: config.dir } , [
+			h( 'div', { className: 'cc-preview__panel' }, [
+				h( 'div', { className: 'cc-preview__header' }, [ title, subtitle ] ),
+				h( 'div', { className: 'cc-preview__body' }, [
+					welcome,
+					h( 'div', { className: 'cc-preview__bubble cc-preview__bubble--mine', text: S.previewMessage } )
+				] ),
+				h( 'div', { className: 'cc-preview__composer' }, [ h( 'span', { text: S.previewPlaceholder } ), h( 'span', { className: 'cc-preview__send' }, [ icon( 'send', 'cc-flip' ) ] ) ] )
+			] ),
+			h( 'span', { className: 'cc-preview__launcher' }, [ icon( 'chat' ) ] )
 		] );
+
+		return {
+			root: h( 'aside', { className: 'cc-card cc-preview', 'aria-label': S.preview }, [
+				h( 'h2', { text: S.preview } ),
+				frame
+			] ),
+			frame: frame,
+			title: title,
+			subtitle: subtitle,
+			welcome: welcome
+		};
+	};
+
+	SettingsView.prototype.updatePreview = function () {
+		var preview = this.preview;
+		var draft = this.draft;
+		var defaults = this.data.defaults;
+
+		if ( ! preview ) {
+			return;
+		}
+
+		setColorVars( preview.frame, normalizeHex( draft.primary_color ) || defaults.primary_color );
+		preview.frame.classList.toggle( 'is-right', draft.widget_position === 'right' );
+		preview.title.textContent = draft.widget_title.trim() || defaults.widget_title;
+		preview.subtitle.textContent = draft.widget_subtitle.trim() || defaults.widget_subtitle;
+
+		var welcomeOn = this.data.settings.welcome_enabled;
+		preview.welcome.hidden = ! welcomeOn;
+		preview.welcome.textContent = this.data.settings.welcome_message || defaults.welcome_message;
 	};
 
 	SettingsView.prototype.fieldError = function ( key ) {
@@ -2267,7 +2729,7 @@
 
 	SettingsView.prototype.save = function () {
 		var self = this;
-		var draft = this.draft;
+		var section = this.section;
 		var button = this.saveButton;
 
 		Object.keys( this.errors ).forEach( function ( key ) {
@@ -2277,21 +2739,11 @@
 		button.disabled = true;
 		button.textContent = S.saving;
 
-		api.saveSettings( {
-			welcome_enabled: draft.welcome_enabled,
-			welcome_message: draft.welcome_message,
-			display_mode: draft.display_mode,
-			display_targets: draft.display_targets,
-			display_ids: this.items.map( function ( item ) {
-				return item.id;
-			} ),
-			proxy_mode: draft.proxy_mode,
-			proxy_header: draft.proxy_mode === 'custom' ? draft.proxy_header.trim() : draft.proxy_header,
-			trusted_proxies: draft.trusted_proxies.split( /[\s,]+/ ).filter( function ( line ) {
-				return line !== '';
-			} )
-		} ).then( function ( data ) {
-			self.apply( data );
+		api.saveSettings( this.payload( section ) ).then( function ( data ) {
+			self.apply( data, [ section ] );
+			if ( section === 'appearance' ) {
+				applyBrandColor( data.effective.primary_color );
+			}
 			self.render();
 			self.panel.notify( S.saved );
 		} ).catch( function ( error ) {

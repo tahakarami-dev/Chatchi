@@ -7,6 +7,8 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Frontend\ColorPalette;
+use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Security\ClientIp;
 use ChatChi\Settings\ContentLookup;
 use ChatChi\Settings\Settings;
@@ -28,15 +30,23 @@ final class SettingsController implements RouteProvider {
 
 	private ClientIp $client_ip;
 
+	private ColorPalette $palette;
+
+	private WidgetStrings $strings;
+
 	/**
 	 * @param Settings      $settings  Plugin settings.
 	 * @param ContentLookup $content   Pages, posts and products.
 	 * @param ClientIp      $client_ip Visitor address, to show the admin what is detected.
+	 * @param ColorPalette  $palette   Brand colors, for the effective color.
+	 * @param WidgetStrings $strings   Widget text, for the default title and subtitle.
 	 */
-	public function __construct( Settings $settings, ContentLookup $content, ClientIp $client_ip ) {
+	public function __construct( Settings $settings, ContentLookup $content, ClientIp $client_ip, ColorPalette $palette, WidgetStrings $strings ) {
 		$this->settings  = $settings;
 		$this->content   = $content;
 		$this->client_ip = $client_ip;
+		$this->palette   = $palette;
+		$this->strings   = $strings;
 	}
 
 	/**
@@ -93,6 +103,22 @@ final class SettingsController implements RouteProvider {
 							'type'      => 'string',
 							'maxLength' => 64,
 						),
+						'primary_color'   => array(
+							'type'      => 'string',
+							'maxLength' => 20,
+						),
+						'widget_position' => array(
+							'type' => 'string',
+							'enum' => SettingsValidator::POSITIONS,
+						),
+						'widget_title'    => array(
+							'type'      => 'string',
+							'maxLength' => 1000,
+						),
+						'widget_subtitle' => array(
+							'type'      => 'string',
+							'maxLength' => 1000,
+						),
 						'trusted_proxies' => array(
 							'type'     => 'array',
 							'items'    => array(
@@ -140,7 +166,7 @@ final class SettingsController implements RouteProvider {
 	public function update( \WP_REST_Request $request ) {
 		$changes = array();
 
-		foreach ( array( 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids', 'proxy_mode', 'proxy_header', 'trusted_proxies' ) as $key ) {
+		foreach ( array( 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids', 'proxy_mode', 'proxy_header', 'trusted_proxies', 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ) as $key ) {
 			if ( $request->has_param( $key ) && null !== $request[ $key ] ) {
 				$changes[ $key ] = $request[ $key ];
 			}
@@ -174,19 +200,28 @@ final class SettingsController implements RouteProvider {
 		}
 
 		return array(
-			'settings' => $settings,
-			'defaults' => array(
+			'settings'  => $settings,
+			'defaults'  => array(
 				'welcome_message' => $this->settings->default_welcome_message(),
+				'primary_color'   => ColorPalette::DEFAULT_PRIMARY,
+				'widget_title'    => $this->strings->all()['title'],
+				'widget_subtitle' => $this->strings->all()['subtitle'],
 			),
-			'limits'   => array(
+			'limits'    => array(
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
 				'display_ids'     => SettingsValidator::MAX_DISPLAY_IDS,
+				'widget_title'    => SettingsValidator::TITLE_MAX_LENGTH,
+				'widget_subtitle' => SettingsValidator::SUBTITLE_MAX_LENGTH,
+			),
+			// What the widget actually uses, after filters from other code.
+			'effective' => array(
+				'primary_color' => $this->palette->primary(),
 			),
 			// The admin's own address as the plugin sees it with these settings.
-			'your_ip'  => $this->client_ip->get(),
-			'targets'  => $targets,
+			'your_ip'   => $this->client_ip->get(),
+			'targets'   => $targets,
 			// Chosen items that still exist, with titles for display.
-			'items'    => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['display_ids'] ) ),
+			'items'     => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['display_ids'] ) ),
 		);
 	}
 
