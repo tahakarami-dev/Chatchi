@@ -18,7 +18,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 2 | Database Layer | ✅ |
 | 3 | User / Visitor Identity | ✅ |
 | 4 | Conversation System | ✅ |
-| 5 | Message System | ⏳ |
+| 5 | Message System | ✅ |
+| 6 | REST API | ⏳ |
 
 ## Architecture
 
@@ -28,6 +29,7 @@ uninstall.php            Removes all plugin data on delete
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries
+├── Messages/            Message service, text rules, paging
 ├── Core/
 │   ├── Container.php    Lazy service container
 │   ├── Contracts/       Interfaces (Module)
@@ -62,6 +64,10 @@ docs/                    Design and architecture documents
 | `chatchi_conversation_started` | action | A visitor opened a new conversation |
 | `chatchi_conversation_status_changed` | action | Status moved (`new` → `active` → `closed`) |
 | `chatchi_conversation_closed` | action | A conversation was closed, with the actor who closed it |
+| `chatchi_pre_send_message` | filter | Return a `WP_Error` to refuse a message before it is stored |
+| `chatchi_message_sent` | action | A new message was stored (not fired for retried duplicates) |
+| `chatchi_messages_read` | action | Messages were marked as read |
+| `chatchi_message_max_length` | filter | Maximum message length in characters (default 2000) |
 
 ## Database
 

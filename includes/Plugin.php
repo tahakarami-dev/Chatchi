@@ -19,6 +19,8 @@ use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
+use ChatChi\Messages\MessageBody;
+use ChatChi\Messages\MessageService;
 use ChatChi\Visitors\ProfileFields;
 use ChatChi\Visitors\ProfileValidator;
 use ChatChi\Visitors\VisitorCookie;
@@ -152,6 +154,7 @@ final class Plugin {
 
 		$this->register_visitor_services();
 		$this->register_conversation_services();
+		$this->register_message_services();
 
 		$this->container->singleton(
 			I18n::class,
@@ -233,6 +236,31 @@ final class Plugin {
 					$c->get( AgentRepository::class ),
 					$c->get( MessageRepository::class ),
 					$c->get( ConversationPolicy::class )
+				);
+			}
+		);
+	}
+
+	/**
+	 * Registers message rules and use cases.
+	 */
+	private function register_message_services(): void {
+		$this->container->singleton(
+			MessageBody::class,
+			static function (): MessageBody {
+				return new MessageBody();
+			}
+		);
+
+		$this->container->singleton(
+			MessageService::class,
+			static function ( Container $c ): MessageService {
+				return new MessageService(
+					$c->get( ConversationService::class ),
+					$c->get( ConversationRepository::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( AgentRepository::class ),
+					$c->get( MessageBody::class )
 				);
 			}
 		);
