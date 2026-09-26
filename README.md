@@ -20,8 +20,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 4 | Conversation System | ✅ |
 | 5 | Message System | ✅ |
 | 6 | REST API | ✅ |
-| 7 | Frontend Chat Widget | ⏳ |
-| 8 | Chat Admin Panel (standalone SaaS-style app) | |
+| 7 | Frontend Chat Widget | ✅ |
+| 8 | Chat Admin Panel (standalone SaaS-style app) | ⏳ |
 | 9 | Agent Management | |
 | 10 | Welcome Message + Widget Display Rules + Shortcode | |
 | 11 | Rate Limiting + Anti-Spam + Security Hardening | |
@@ -38,6 +38,7 @@ includes/                PSR-4 root for the ChatChi\ namespace
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries
 ├── Messages/            Message service, text rules, paging
 ├── Rest/                chatchi/v1 controllers (widget, agent), presenter, CSRF guard
+├── Frontend/            Widget loader, color tokens, interface strings
 ├── Core/
 │   ├── Container.php    Lazy service container
 │   ├── Contracts/       Interfaces (Module)
@@ -53,6 +54,8 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
 └── Visitors/            Identity (cookie token), start-form fields and validation
+assets/widget/           Chat widget (vanilla JS in Shadow DOM, CSS)
+assets/fonts/vazirmatn/  Bundled Vazirmatn variable font (OFL)
 languages/               chatchi.pot + Persian (fa_IR) translation, text domain: chatchi
 docs/                    Design and architecture documents
 ```
@@ -76,6 +79,10 @@ docs/                    Design and architecture documents
 | `chatchi_message_sent` | action | A new message was stored (not fired for retried duplicates) |
 | `chatchi_messages_read` | action | Messages were marked as read |
 | `chatchi_message_max_length` | filter | Maximum message length in characters (default 2000) |
+| `chatchi_widget_enabled` | filter | Whether the widget loads on the current page |
+| `chatchi_widget_position` | filter | `left` (default) or `right` |
+| `chatchi_primary_color` | filter | Widget primary color; hover, soft and text colors are derived |
+| `chatchi_widget_config` | filter | Full widget configuration |
 
 ## Database
 

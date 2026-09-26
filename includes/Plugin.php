@@ -19,6 +19,9 @@ use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
+use ChatChi\Frontend\ColorPalette;
+use ChatChi\Frontend\WidgetModule;
+use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
 use ChatChi\Rest\AgentController;
@@ -161,6 +164,7 @@ final class Plugin {
 		$this->register_conversation_services();
 		$this->register_message_services();
 		$this->register_rest_services();
+		$this->register_frontend_services();
 
 		$this->container->singleton(
 			I18n::class,
@@ -326,6 +330,32 @@ final class Plugin {
 	}
 
 	/**
+	 * Registers the front-end chat widget.
+	 */
+	private function register_frontend_services(): void {
+		$this->container->singleton(
+			ColorPalette::class,
+			static function (): ColorPalette {
+				return new ColorPalette();
+			}
+		);
+
+		$this->container->singleton(
+			WidgetStrings::class,
+			static function (): WidgetStrings {
+				return new WidgetStrings();
+			}
+		);
+
+		$this->container->singleton(
+			WidgetModule::class,
+			static function ( Container $c ): WidgetModule {
+				return new WidgetModule( $c->get( ColorPalette::class ), $c->get( WidgetStrings::class ) );
+			}
+		);
+	}
+
+	/**
 	 * Returns the ordered list of module IDs to boot.
 	 *
 	 * @return string[]
@@ -335,6 +365,7 @@ final class Plugin {
 			I18n::class,
 			InstallNotice::class,
 			RestModule::class,
+			WidgetModule::class,
 		);
 
 		/**
