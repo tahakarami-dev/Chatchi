@@ -1,0 +1,225 @@
+<?php
+/**
+ * REST response shapes.
+ *
+ * @package ChatChi
+ */
+
+namespace ChatChi\Rest;
+
+use ChatChi\Conversations\Actor;
+use ChatChi\Conversations\ConversationSummary;
+use ChatChi\Messages\MessagePage;
+use ChatChi\Models\Agent;
+use ChatChi\Models\Conversation;
+use ChatChi\Models\Message;
+use ChatChi\Models\Visitor;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Turns models into the arrays the API returns.
+ *
+ * Each audience gets only what it needs: visitors never see agents' user
+ * IDs or other visitors' data, and nobody ever sees token hashes. Dates are
+ * ISO 8601 in UTC. Message bodies are plain text and must be rendered as
+ * text by clients (textContent), never as HTML.
+ */
+final class Presenter {
+
+	/**
+	 * Formats a stored UTC datetime as ISO 8601.
+	 *
+	 * @param string|null $datetime MySQL datetime in UTC.
+	 */
+	public function date( ?string $datetime ): ?string {
+		if ( null === $datetime || '' === $datetime ) {
+			return null;
+		}
+
+		$timestamp = strtotime( $datetime . ' UTC' );
+
+		return false === $timestamp ? null : gmdate( 'Y-m-d\TH:i:s\Z', $timestamp );
+	}
+
+	/**
+	 * Public agent card, safe to show to visitors.
+	 *
+	 * @param Agent|null $agent Agent.
+	 * @return array<string, mixed>|null
+	 */
+	public function agent( ?Agent $agent ): ?array {
+		if ( ! $agent ) {
+			return null;
+		}
+
+		return array(
+			'id'         => $agent->id,
+			'name'       => $agent->display_name,
+			'avatar_url' => $this->avatar_url( $agent ),
+		);
+	}
+
+	/**
+	 * The signed-in agent's own profile.
+	 *
+	 * @param Agent $agent Agent.
+	 * @return array<string, mixed>
+	 */
+	public function agent_self( Agent $agent ): array {
+		return $this->agent( $agent ) + array(
+			'user_id'   => $agent->user_id,
+			'is_active' => $agent->is_active,
+		);
+	}
+
+	/**
+	 * The visitor's own details, for the widget.
+	 *
+	 * @param Visitor $visitor Visitor.
+	 * @return array<string, string>
+	 */
+	public function visitor_self( Visitor $visitor ): array {
+		return array(
+			'name'  => $visitor->name,
+			'email' => $visitor->email,
+			'phone' => $visitor->phone,
+		);
+	}
+
+	/**
+	 * Visitor details for agents.
+	 *
+	 * @param Visitor|null $visitor Visitor.
+	 * @return array<string, mixed>|null
+	 */
+	public function visitor_for_agent( ?Visitor $visitor ): ?array {
+		if ( ! $visitor ) {
+			return null;
+		}
+
+		return array(
+			'id'           => $visitor->id,
+			'name'         => $visitor->name,
+			'email'        => $visitor->email,
+			'phone'        => $visitor->phone,
+			'user_id'      => $visitor->user_id,
+			'created_at'   => $this->date( $visitor->created_at ),
+			'last_seen_at' => $this->date( $visitor->last_seen_at ),
+		);
+	}
+
+	/**
+	 * A conversation as its visitor sees it.
+	 *
+	 * @param Conversation $conversation Conversation.
+	 * @param Agent|null   $agent        Assigned agent.
+	 * @return array<string, mixed>
+	 */
+	public function conversation_for_visitor( Conversation $conversation, ?Agent $agent ): array {
+		return array(
+			'id'              => $conversation->id,
+			'status'          => $conversation->status,
+			'agent'           => $this->agent( $agent ),
+			'created_at'      => $this->date( $conversation->created_at ),
+			'last_message_at' => $this->date( $conversation->last_message_at ),
+			'closed_at'       => $this->date( $conversation->closed_at ),
+		);
+	}
+
+	/**
+	 * A conversation with inbox details, for agents.
+	 *
+	 * @param ConversationSummary $summary Conversation summary.
+	 * @param Actor               $viewer  Viewing agent.
+	 * @return array<string, mixed>
+	 */
+	public function conversation_for_agent( ConversationSummary $summary, Actor $viewer ): array {
+		$conversation = $summary->conversation;
+		$agents       = $summary->agent ? array( $summary->agent->id => $summary->agent ) : array();
+
+		return array(
+			'id'              => $conversation->id,
+			'status'          => $conversation->status,
+			'visitor'         => $this->visitor_for_agent( $summary->visitor ),
+			'agent'           => $this->agent( $summary->agent ),
+			'page_url'        => $conversation->page_url,
+			'unread_count'    => $summary->unread_count,
+			'last_message'    => $summary->last_message ? $this->message( $summary->last_message, $viewer, $agents ) : null,
+			'created_at'      => $this->date( $conversation->created_at ),
+			'last_message_at' => $this->date( $conversation->last_message_at ),
+			'closed_at'       => $this->date( $conversation->closed_at ),
+		);
+	}
+
+	/**
+	 * A message, from the viewer's perspective.
+	 *
+	 * @param Message           $message Message.
+	 * @param Actor             $viewer  Who is reading.
+	 * @param array<int, Agent> $agents  Agents by ID, to name agent senders.
+	 * @return array<string, mixed>
+	 */
+	public function message( Message $message, Actor $viewer, array $agents = array() ): array {
+		$sender = array(
+			'type'       => $message->sender_type,
+			'name'       => null,
+			'avatar_url' => null,
+		);
+
+		if ( Message::SENDER_AGENT === $message->sender_type && isset( $agents[ $message->sender_id ] ) ) {
+			$sender['name']       = $agents[ $message->sender_id ]->display_name;
+			$sender['avatar_url'] = $this->avatar_url( $agents[ $message->sender_id ] );
+		}
+
+		return array(
+			'id'              => $message->id,
+			'conversation_id' => $message->conversation_id,
+			'sender'          => $sender,
+			'is_mine'         => $message->sender_type === $viewer->type() && $message->sender_id === $viewer->id(),
+			'body'            => $message->body,
+			'client_id'       => $message->client_id,
+			'created_at'      => $this->date( $message->created_at ),
+			'read_at'         => $this->date( $message->read_at ),
+		);
+	}
+
+	/**
+	 * A page of messages.
+	 *
+	 * @param MessagePage $page   Messages.
+	 * @param Actor       $viewer Who is reading.
+	 * @return array<string, mixed>
+	 */
+	public function message_page( MessagePage $page, Actor $viewer ): array {
+		$items = array();
+
+		foreach ( $page->messages as $message ) {
+			$items[] = $this->message( $message, $viewer, $page->agents );
+		}
+
+		return array(
+			'items'    => $items,
+			'has_more' => $page->has_more,
+			'last_id'  => $page->last_id(),
+		);
+	}
+
+	/**
+	 * Uploaded avatar URL, or null so clients show initials.
+	 *
+	 * Gravatar is deliberately not used: its URL is derived from the agent's
+	 * email address, which visitors should not be able to infer.
+	 *
+	 * @param Agent $agent Agent.
+	 */
+	private function avatar_url( Agent $agent ): ?string {
+		if ( $agent->avatar_id <= 0 ) {
+			return null;
+		}
+
+		$url = wp_get_attachment_image_url( $agent->avatar_id, 'thumbnail' );
+
+		return is_string( $url ) ? $url : null;
+	}
+}

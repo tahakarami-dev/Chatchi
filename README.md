@@ -18,7 +18,15 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 2 | Database Layer | ✅ |
 | 3 | User / Visitor Identity | ✅ |
 | 4 | Conversation System | ✅ |
-| 5 | Message System | ⏳ |
+| 5 | Message System | ✅ |
+| 6 | REST API | ✅ |
+| 7 | Frontend Chat Widget | ⏳ |
+| 8 | Chat Admin Panel (standalone SaaS-style app) | |
+| 9 | Agent Management | |
+| 10 | Welcome Message + Widget Display Rules + Shortcode | |
+| 11 | Rate Limiting + Anti-Spam + Security Hardening | |
+| 12 | Plugin Settings | |
+| 13 | Integration + Testing + Optimization | |
 
 ## Architecture
 
@@ -28,6 +36,8 @@ uninstall.php            Removes all plugin data on delete
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries
+├── Messages/            Message service, text rules, paging
+├── Rest/                chatchi/v1 controllers (widget, agent), presenter, CSRF guard
 ├── Core/
 │   ├── Container.php    Lazy service container
 │   ├── Contracts/       Interfaces (Module)
@@ -62,6 +72,10 @@ docs/                    Design and architecture documents
 | `chatchi_conversation_started` | action | A visitor opened a new conversation |
 | `chatchi_conversation_status_changed` | action | Status moved (`new` → `active` → `closed`) |
 | `chatchi_conversation_closed` | action | A conversation was closed, with the actor who closed it |
+| `chatchi_pre_send_message` | filter | Return a `WP_Error` to refuse a message before it is stored |
+| `chatchi_message_sent` | action | A new message was stored (not fired for retried duplicates) |
+| `chatchi_messages_read` | action | Messages were marked as read |
+| `chatchi_message_max_length` | filter | Maximum message length in characters (default 2000) |
 
 ## Database
 
@@ -73,3 +87,33 @@ docs/                    Design and architecture documents
 | `{prefix}chatchi_messages` | Messages and read state | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
 
 All datetimes are stored in UTC. Relations are enforced in the application layer.
+
+## REST API (`chatchi/v1`)
+
+All responses are JSON with `Cache-Control: no-store`. Errors use the standard WordPress shape `{code, message, data: {status}}`. Message `body` is plain text and must be rendered as text, never as HTML. Dates are ISO 8601 UTC.
+
+### Widget (visitors)
+
+Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account, when `X-WP-Nonce` is sent). Requests from other origins are rejected.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/widget/session` | Visitor, open conversation, unread count, start-form config. Never sets a cookie |
+| POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url` → visitor + open conversation |
+| GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50 |
+| POST | `/widget/conversations/{id}/messages` | `body`, optional `client_id` (UUID, makes retries idempotent) |
+| POST | `/widget/conversations/{id}/read` | Mark agent messages read, optional `up_to_id` |
+| POST | `/widget/conversations/{id}/close` | Close own conversation |
+
+### Agent panel
+
+Logged-in user with `X-WP-Nonce` and an active agent record.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/agent/me` | Current agent |
+| GET | `/agent/conversations` | Inbox: `status`, `search`, `page`, `per_page` (≤100); `X-WP-Total` headers |
+| GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
+| GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
+| POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
+| POST | `/agent/conversations/{id}/close` | Close |
