@@ -21,6 +21,11 @@ use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
 use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
+use ChatChi\Rest\AgentController;
+use ChatChi\Rest\Presenter;
+use ChatChi\Rest\RequestGuard;
+use ChatChi\Rest\RestModule;
+use ChatChi\Rest\WidgetController;
 use ChatChi\Visitors\ProfileFields;
 use ChatChi\Visitors\ProfileValidator;
 use ChatChi\Visitors\VisitorCookie;
@@ -155,6 +160,7 @@ final class Plugin {
 		$this->register_visitor_services();
 		$this->register_conversation_services();
 		$this->register_message_services();
+		$this->register_rest_services();
 
 		$this->container->singleton(
 			I18n::class,
@@ -267,6 +273,59 @@ final class Plugin {
 	}
 
 	/**
+	 * Registers the REST API controllers.
+	 */
+	private function register_rest_services(): void {
+		$this->container->singleton(
+			Presenter::class,
+			static function (): Presenter {
+				return new Presenter();
+			}
+		);
+
+		$this->container->singleton(
+			RequestGuard::class,
+			static function (): RequestGuard {
+				return new RequestGuard();
+			}
+		);
+
+		$this->container->singleton(
+			WidgetController::class,
+			static function ( Container $c ): WidgetController {
+				return new WidgetController(
+					$c->get( ConversationService::class ),
+					$c->get( MessageService::class ),
+					$c->get( Presenter::class ),
+					$c->get( VisitorService::class ),
+					$c->get( AgentRepository::class ),
+					$c->get( MessageBody::class ),
+					$c->get( RequestGuard::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			AgentController::class,
+			static function ( Container $c ): AgentController {
+				return new AgentController(
+					$c->get( ConversationService::class ),
+					$c->get( MessageService::class ),
+					$c->get( Presenter::class ),
+					$c->get( AgentRepository::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			RestModule::class,
+			static function ( Container $c ): RestModule {
+				return new RestModule( $c->get( WidgetController::class ), $c->get( AgentController::class ) );
+			}
+		);
+	}
+
+	/**
 	 * Returns the ordered list of module IDs to boot.
 	 *
 	 * @return string[]
@@ -275,6 +334,7 @@ final class Plugin {
 		$modules = array(
 			I18n::class,
 			InstallNotice::class,
+			RestModule::class,
 		);
 
 		/**
