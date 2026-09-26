@@ -1,40 +1,10 @@
 /*
  * ChatChi widget styles. Loaded inside the widget's Shadow DOM, so nothing
  * here can affect the host page and theme styles cannot reach the widget.
- * Tokens follow docs/design-system.md.
+ * Design tokens come from assets/shared/tokens.css.
  */
 
 .chatchi {
-	--chatchi-primary: #5b5bd6;
-	--chatchi-primary-hover: #4a4ac4;
-	--chatchi-primary-soft: #eeeefc;
-	--chatchi-primary-contrast: #fff;
-	--chatchi-accent: #ff7a59;
-
-	--chatchi-bg: #f7f7fa;
-	--chatchi-surface: #fff;
-	--chatchi-surface-muted: #eeeef3;
-	--chatchi-border: #e2e2ea;
-	--chatchi-border-strong: #cfcfda;
-	--chatchi-text: #1a1a2e;
-	--chatchi-text-muted: #6b6b80;
-	--chatchi-text-subtle: #8a8a9e;
-	--chatchi-error: #dc2626;
-	--chatchi-error-text: #b91c1c;
-	--chatchi-error-soft: #fef2f2;
-
-	--chatchi-font: "ChatChi Vazirmatn", Tahoma, "Segoe UI", system-ui, sans-serif;
-	--chatchi-radius-sm: 8px;
-	--chatchi-radius-md: 12px;
-	--chatchi-radius-lg: 18px;
-	--chatchi-shadow-md: 0 4px 12px rgba(26, 26, 46, .08), 0 1px 3px rgba(26, 26, 46, .06);
-	--chatchi-shadow-lg: 0 16px 40px rgba(26, 26, 46, .14), 0 4px 12px rgba(26, 26, 46, .06);
-	--chatchi-focus-ring: 0 0 0 3px rgba(91, 91, 214, .35);
-	--chatchi-duration-fast: 150ms;
-	--chatchi-duration-base: 200ms;
-	--chatchi-duration-slow: 250ms;
-	--chatchi-ease-out: cubic-bezier(.16, 1, .3, 1);
-
 	font-family: var(--chatchi-font);
 	font-size: 14px;
 	line-height: 1.7;

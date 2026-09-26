@@ -24,19 +24,25 @@ final class WidgetModule implements Module {
 
 	public const SCRIPT_HANDLE = 'chatchi-widget';
 
+	public const CORE_HANDLE = 'chatchi-core';
+
 	public const FONT_HANDLE = 'chatchi-fonts';
 
 	private ColorPalette $palette;
 
 	private WidgetStrings $strings;
 
+	private FontFace $font;
+
 	/**
 	 * @param ColorPalette  $palette Color tokens.
 	 * @param WidgetStrings $strings Interface text.
+	 * @param FontFace      $font    Bundled font.
 	 */
-	public function __construct( ColorPalette $palette, WidgetStrings $strings ) {
+	public function __construct( ColorPalette $palette, WidgetStrings $strings, FontFace $font ) {
 		$this->palette = $palette;
 		$this->strings = $strings;
+		$this->font    = $font;
 	}
 
 	/**
@@ -73,12 +79,23 @@ final class WidgetModule implements Module {
 		// @font-face must live in the document; Shadow DOM styles cannot declare fonts.
 		wp_register_style( self::FONT_HANDLE, false, array(), CHATCHI_VERSION );
 		wp_enqueue_style( self::FONT_HANDLE );
-		wp_add_inline_style( self::FONT_HANDLE, $this->font_face() );
+		wp_add_inline_style( self::FONT_HANDLE, $this->font->css() );
+
+		wp_register_script(
+			self::CORE_HANDLE,
+			CHATCHI_URL . 'assets/shared/core.js',
+			array(),
+			CHATCHI_VERSION,
+			array(
+				'in_footer' => true,
+				'strategy'  => 'defer',
+			)
+		);
 
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			CHATCHI_URL . 'assets/widget/widget.js',
-			array(),
+			array( self::CORE_HANDLE ),
 			CHATCHI_VERSION,
 			array(
 				'in_footer' => true,
@@ -100,14 +117,17 @@ final class WidgetModule implements Module {
 	 */
 	public function config(): array {
 		$config = array(
-			'restUrl'  => esc_url_raw( rest_url( 'chatchi/v1' ) ),
-			'nonce'    => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
-			'styleUrl' => esc_url_raw( add_query_arg( 'ver', CHATCHI_VERSION, CHATCHI_URL . 'assets/widget/widget.css' ) ),
-			'position' => $this->position(),
-			'colors'   => $this->palette->tokens(),
-			'locale'   => str_replace( '_', '-', determine_locale() ),
-			'dir'      => is_rtl() ? 'rtl' : 'ltr',
-			'strings'  => $this->strings->all(),
+			'restUrl'   => esc_url_raw( rest_url( 'chatchi/v1' ) ),
+			'nonce'     => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+			'styleUrls' => array(
+				esc_url_raw( add_query_arg( 'ver', CHATCHI_VERSION, CHATCHI_URL . 'assets/shared/tokens.css' ) ),
+				esc_url_raw( add_query_arg( 'ver', CHATCHI_VERSION, CHATCHI_URL . 'assets/widget/widget.css' ) ),
+			),
+			'position'  => $this->position(),
+			'colors'    => $this->palette->tokens(),
+			'locale'    => str_replace( '_', '-', determine_locale() ),
+			'dir'       => is_rtl() ? 'rtl' : 'ltr',
+			'strings'   => $this->strings->all(),
 		);
 
 		/**
@@ -130,17 +150,5 @@ final class WidgetModule implements Module {
 		$position = apply_filters( 'chatchi_widget_position', 'left' );
 
 		return 'right' === $position ? 'right' : 'left';
-	}
-
-	/**
-	 * Returns the @font-face rule for the bundled Vazirmatn variable font.
-	 *
-	 * A plugin-specific family name avoids clashing with a theme that ships
-	 * its own Vazirmatn. Browsers only download it once text uses it.
-	 */
-	private function font_face(): string {
-		$url = esc_url( CHATCHI_URL . 'assets/fonts/vazirmatn/Vazirmatn-Variable.woff2' );
-
-		return "@font-face{font-family:'ChatChi Vazirmatn';src:url('{$url}') format('woff2-variations'),url('{$url}') format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}";
 	}
 }
