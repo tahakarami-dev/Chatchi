@@ -28,6 +28,28 @@ final class SettingsValidator {
 
 	public const PROXY_MODES = array( 'direct', 'cloudflare', 'custom' );
 
+	public const POSITIONS = array( 'left', 'right' );
+
+	public const TITLE_MAX_LENGTH = 60;
+
+	public const SUBTITLE_MAX_LENGTH = 100;
+
+	public const FORM_INTRO_MAX_LENGTH = 200;
+
+	public const FIELD_MODES = array( 'off', 'optional', 'required' );
+
+	/**
+	 * Whole-number settings: name => array( min, max, default ).
+	 */
+	public const NUMBERS = array(
+		'visitor_cookie_days'    => array( 1, 400, 30 ),
+		'message_max_length'     => array( 100, 10000, 2000 ),
+		'limit_messages_visitor' => array( 1, 500, 20 ),
+		'limit_messages_ip'      => array( 1, 5000, 60 ),
+		'limit_starts_visitor'   => array( 1, 100, 5 ),
+		'limit_starts_ip'        => array( 1, 1000, 10 ),
+	);
+
 	public const MAX_TRUSTED_PROXIES = 100;
 
 	private ContentLookup $content;
@@ -55,7 +77,38 @@ final class SettingsValidator {
 			'proxy_mode'      => 'direct',
 			'proxy_header'    => '',
 			'trusted_proxies' => array(),
+			// Empty means "use the default color".
+			'primary_color'   => '',
+			'widget_position' => 'left',
+			// Empty means "use the translated default text".
+			'widget_title'    => '',
+			'widget_subtitle' => '',
+		) + $this->general_defaults();
+	}
+
+	/**
+	 * Defaults of the general, start form and limit settings.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function general_defaults(): array {
+		$defaults = array(
+			'widget_enabled'           => true,
+			// Keeping conversations when the plugin is deleted is the safe default.
+			'delete_data_on_uninstall' => false,
+			'form_name'                => 'required',
+			'form_email'               => 'required',
+			'form_phone'               => 'optional',
+			// Empty means "use the translated default text".
+			'form_intro'               => '',
+			'spam_protection'          => true,
 		);
+
+		foreach ( self::NUMBERS as $key => $range ) {
+			$defaults[ $key ] = $range[2];
+		}
+
+		return $defaults;
 	}
 
 	/**
@@ -176,6 +229,38 @@ final class SettingsValidator {
 				case 'trusted_proxies':
 					$settings[ $key ] = is_array( $value ) ? array_values( array_filter( array_map( array( IpRange::class, 'range' ), array_filter( $value, 'is_string' ) ) ) ) : $default;
 					break;
+
+				case 'primary_color':
+					$settings[ $key ] = is_string( $value ) ? (string) $this->color( $value ) : $default;
+					break;
+
+				case 'widget_position':
+					$settings[ $key ] = in_array( $value, self::POSITIONS, true ) ? $value : $default;
+					break;
+
+				case 'widget_title':
+				case 'widget_subtitle':
+				case 'form_intro':
+					$settings[ $key ] = is_string( $value ) ? PlainText::line( $value ) : $default;
+					break;
+
+				case 'widget_enabled':
+				case 'delete_data_on_uninstall':
+				case 'spam_protection':
+					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'form_name':
+				case 'form_email':
+				case 'form_phone':
+					$settings[ $key ] = in_array( $value, self::FIELD_MODES, true ) ? $value : $default;
+					break;
+
+				default:
+					if ( isset( self::NUMBERS[ $key ] ) ) {
+						$number           = $this->number( $key, $value );
+						$settings[ $key ] = null !== $number ? $number : $default;
+					}
 			}
 		}
 
@@ -216,6 +301,51 @@ final class SettingsValidator {
 
 			case 'trusted_proxies':
 				return $this->trusted_proxies( $value );
+
+			case 'primary_color':
+				$color = is_string( $value ) ? $this->color( $value ) : null;
+
+				return null !== $color
+					? $color
+					: new \WP_Error( 'invalid', __( 'Enter a color code like #5B5BD6.', 'chatchi' ) );
+
+			case 'widget_position':
+				return in_array( $value, self::POSITIONS, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose a corner for the widget.', 'chatchi' ) );
+
+			case 'widget_title':
+				return $this->short_text( $value, self::TITLE_MAX_LENGTH );
+
+			case 'widget_subtitle':
+				return $this->short_text( $value, self::SUBTITLE_MAX_LENGTH );
+
+			case 'form_intro':
+				return $this->short_text( $value, self::FORM_INTRO_MAX_LENGTH );
+
+			case 'widget_enabled':
+			case 'delete_data_on_uninstall':
+			case 'spam_protection':
+				return rest_sanitize_boolean( $value );
+
+			case 'form_name':
+			case 'form_email':
+			case 'form_phone':
+				return in_array( $value, self::FIELD_MODES, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose off, optional or required.', 'chatchi' ) );
+		}
+
+		if ( isset( self::NUMBERS[ $key ] ) ) {
+			$number = $this->number( $key, $value );
+
+			return null !== $number
+				? $number
+				: new \WP_Error(
+					'invalid',
+					/* translators: 1: smallest allowed number, 2: largest allowed number. */
+					sprintf( __( 'Enter a whole number from %1$d to %2$d.', 'chatchi' ), self::NUMBERS[ $key ][0], self::NUMBERS[ $key ][1] )
+				);
 		}
 
 		return new \WP_Error( 'invalid', __( 'Unknown setting.', 'chatchi' ) );
@@ -342,6 +472,75 @@ final class SettingsValidator {
 		}
 
 		return array_values( $ranges );
+	}
+
+	/**
+	 * Returns a whole number within the setting's range, or null.
+	 *
+	 * @param string $key   Setting name.
+	 * @param mixed  $value Raw value.
+	 */
+	private function number( string $key, $value ): ?int {
+		if ( is_string( $value ) && preg_match( '/^\s*\d+\s*$/', $value ) ) {
+			$value = (int) $value;
+		}
+
+		if ( ! is_int( $value ) ) {
+			return null;
+		}
+
+		list( $min, $max ) = self::NUMBERS[ $key ];
+
+		return $value >= $min && $value <= $max ? $value : null;
+	}
+
+	/**
+	 * Returns a color as #RRGGBB, an empty string for "default", or null
+	 * when the text is not a hex color.
+	 *
+	 * @param string $value Raw value, e.g. "#5b5bd6", "5B5BD6" or "#abc".
+	 */
+	private function color( string $value ): ?string {
+		$value = trim( $value );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		if ( ! preg_match( '/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i', $value, $m ) ) {
+			return null;
+		}
+
+		$hex = $m[1];
+
+		if ( 3 === strlen( $hex ) ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+
+		return '#' . strtoupper( $hex );
+	}
+
+	/**
+	 * @param mixed $value Raw value.
+	 * @param int   $max   Maximum characters.
+	 * @return string|\WP_Error
+	 */
+	private function short_text( $value, int $max ) {
+		if ( ! is_string( $value ) ) {
+			return new \WP_Error( 'invalid', __( 'Enter the text as plain text.', 'chatchi' ) );
+		}
+
+		$text = PlainText::line( $value );
+
+		if ( mb_strlen( $text ) > $max ) {
+			return new \WP_Error(
+				'invalid',
+				/* translators: %d: maximum number of characters. */
+				sprintf( __( 'Use at most %d characters.', 'chatchi' ), $max )
+			);
+		}
+
+		return $text;
 	}
 
 	/**

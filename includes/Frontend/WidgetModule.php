@@ -83,7 +83,9 @@ final class WidgetModule implements Module {
 			return false;
 		}
 
-		$enabled = $this->forced || $this->shortcode_on_page() || $this->rules->allows_current_page();
+		// The master switch in Settings turns the widget off everywhere, shortcodes included.
+		$enabled = $this->settings->get( 'widget_enabled' )
+			&& ( $this->forced || $this->shortcode_on_page() || $this->rules->allows_current_page() );
 
 		/**
 		 * Filters whether the chat widget loads on the current page.
@@ -169,7 +171,7 @@ final class WidgetModule implements Module {
 			'locale'    => str_replace( '_', '-', determine_locale() ),
 			'dir'       => is_rtl() ? 'rtl' : 'ltr',
 			'welcome'   => $this->settings->welcome_message(),
-			'strings'   => $this->strings->all(),
+			'strings'   => $this->strings(),
 		);
 
 		/**
@@ -194,15 +196,35 @@ final class WidgetModule implements Module {
 	}
 
 	/**
+	 * Returns the interface text, with the title, subtitle and form
+	 * introduction from the settings when the admin wrote their own.
+	 *
+	 * @return array<string, string>
+	 */
+	private function strings(): array {
+		$strings = $this->strings->all();
+
+		foreach ( array( 'title' => 'widget_title', 'subtitle' => 'widget_subtitle', 'formIntro' => 'form_intro' ) as $key => $setting ) {
+			$custom = (string) $this->settings->get( $setting );
+
+			if ( '' !== $custom ) {
+				$strings[ $key ] = $custom;
+			}
+		}
+
+		return $strings;
+	}
+
+	/**
 	 * Returns which bottom corner the widget sits in.
 	 */
 	private function position(): string {
 		/**
 		 * Filters the widget corner: "left" or "right".
 		 *
-		 * @param string $position Corner.
+		 * @param string $position Corner chosen in the settings.
 		 */
-		$position = apply_filters( 'chatchi_widget_position', 'left' );
+		$position = apply_filters( 'chatchi_widget_position', $this->settings->get( 'widget_position' ) );
 
 		return 'right' === $position ? 'right' : 'left';
 	}

@@ -7,6 +7,8 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Frontend\ColorPalette;
+use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Security\ClientIp;
 use ChatChi\Settings\ContentLookup;
 use ChatChi\Settings\Settings;
@@ -28,15 +30,23 @@ final class SettingsController implements RouteProvider {
 
 	private ClientIp $client_ip;
 
+	private ColorPalette $palette;
+
+	private WidgetStrings $strings;
+
 	/**
 	 * @param Settings      $settings  Plugin settings.
 	 * @param ContentLookup $content   Pages, posts and products.
 	 * @param ClientIp      $client_ip Visitor address, to show the admin what is detected.
+	 * @param ColorPalette  $palette   Brand colors, for the effective color.
+	 * @param WidgetStrings $strings   Widget text, for the default title and subtitle.
 	 */
-	public function __construct( Settings $settings, ContentLookup $content, ClientIp $client_ip ) {
+	public function __construct( Settings $settings, ContentLookup $content, ClientIp $client_ip, ColorPalette $palette, WidgetStrings $strings ) {
 		$this->settings  = $settings;
 		$this->content   = $content;
 		$this->client_ip = $client_ip;
+		$this->palette   = $palette;
+		$this->strings   = $strings;
 	}
 
 	/**
@@ -56,52 +66,7 @@ final class SettingsController implements RouteProvider {
 					'methods'             => 'PATCH, POST',
 					'callback'            => array( $this, 'update' ),
 					'permission_callback' => array( AdminPermission::class, 'check' ),
-					'args'                => array(
-						'welcome_enabled' => array(
-							'type' => 'boolean',
-						),
-						'welcome_message' => array(
-							'type'      => 'string',
-							// Hard cap before cleaning; the real limit is checked by the validator.
-							'maxLength' => 5000,
-						),
-						'display_mode'    => array(
-							'type' => 'string',
-							'enum' => SettingsValidator::DISPLAY_MODES,
-						),
-						'display_targets' => array(
-							'type'        => 'array',
-							'items'       => array(
-								'type' => 'string',
-								'enum' => SettingsValidator::DISPLAY_TARGETS,
-							),
-							'uniqueItems' => true,
-						),
-						'display_ids'     => array(
-							'type'     => 'array',
-							'items'    => array(
-								'type'    => 'integer',
-								'minimum' => 1,
-							),
-							'maxItems' => SettingsValidator::MAX_DISPLAY_IDS,
-						),
-						'proxy_mode'      => array(
-							'type' => 'string',
-							'enum' => SettingsValidator::PROXY_MODES,
-						),
-						'proxy_header'    => array(
-							'type'      => 'string',
-							'maxLength' => 64,
-						),
-						'trusted_proxies' => array(
-							'type'     => 'array',
-							'items'    => array(
-								'type'      => 'string',
-								'maxLength' => 64,
-							),
-							'maxItems' => SettingsValidator::MAX_TRUSTED_PROXIES * 2,
-						),
-					),
+					'args'                => $this->settings_args(),
 				),
 			)
 		);
@@ -125,6 +90,74 @@ final class SettingsController implements RouteProvider {
 	}
 
 	/**
+	 * Returns the REST arguments of the settings that can be saved.
+	 *
+	 * Types and hard size caps only; the validator checks the real rules
+	 * and reports errors per field.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function settings_args(): array {
+		$text = static function ( int $max ): array {
+			return array(
+				'type'      => 'string',
+				'maxLength' => $max,
+			);
+		};
+		$enum = static function ( array $values ): array {
+			return array(
+				'type' => 'string',
+				'enum' => $values,
+			);
+		};
+		$flag = array( 'type' => 'boolean' );
+		$args = array(
+			'widget_enabled'           => $flag,
+			'delete_data_on_uninstall' => $flag,
+			'primary_color'            => $text( 20 ),
+			'widget_position'          => $enum( SettingsValidator::POSITIONS ),
+			'widget_title'             => $text( 1000 ),
+			'widget_subtitle'          => $text( 1000 ),
+			'form_name'                => $enum( SettingsValidator::FIELD_MODES ),
+			'form_email'               => $enum( SettingsValidator::FIELD_MODES ),
+			'form_phone'               => $enum( SettingsValidator::FIELD_MODES ),
+			'form_intro'               => $text( 2000 ),
+			'welcome_enabled'          => $flag,
+			// Hard cap before cleaning; the real limit is checked by the validator.
+			'welcome_message'          => $text( 5000 ),
+			'display_mode'             => $enum( SettingsValidator::DISPLAY_MODES ),
+			'display_targets'          => array(
+				'type'        => 'array',
+				'items'       => $enum( SettingsValidator::DISPLAY_TARGETS ),
+				'uniqueItems' => true,
+			),
+			'display_ids'              => array(
+				'type'     => 'array',
+				'items'    => array(
+					'type'    => 'integer',
+					'minimum' => 1,
+				),
+				'maxItems' => SettingsValidator::MAX_DISPLAY_IDS,
+			),
+			'spam_protection'          => $flag,
+			'proxy_mode'               => $enum( SettingsValidator::PROXY_MODES ),
+			'proxy_header'             => $text( 64 ),
+			'trusted_proxies'          => array(
+				'type'     => 'array',
+				'items'    => $text( 64 ),
+				'maxItems' => SettingsValidator::MAX_TRUSTED_PROXIES * 2,
+			),
+		);
+
+		// Numbers arrive as JSON numbers or numeric strings; ranges are the validator's job.
+		foreach ( array_keys( SettingsValidator::NUMBERS ) as $key ) {
+			$args[ $key ] = array( 'type' => array( 'integer', 'string' ) );
+		}
+
+		return $args;
+	}
+
+	/**
 	 * GET /agent/settings
 	 */
 	public function show(): \WP_REST_Response {
@@ -140,7 +173,7 @@ final class SettingsController implements RouteProvider {
 	public function update( \WP_REST_Request $request ) {
 		$changes = array();
 
-		foreach ( array( 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids', 'proxy_mode', 'proxy_header', 'trusted_proxies' ) as $key ) {
+		foreach ( array_keys( $this->settings_args() ) as $key ) {
 			if ( $request->has_param( $key ) && null !== $request[ $key ] ) {
 				$changes[ $key ] = $request[ $key ];
 			}
@@ -174,19 +207,37 @@ final class SettingsController implements RouteProvider {
 		}
 
 		return array(
-			'settings' => $settings,
-			'defaults' => array(
+			'settings'  => $settings,
+			'defaults'  => array(
 				'welcome_message' => $this->settings->default_welcome_message(),
+				'primary_color'   => ColorPalette::DEFAULT_PRIMARY,
+				'widget_title'    => $this->strings->all()['title'],
+				'widget_subtitle' => $this->strings->all()['subtitle'],
+				'form_intro'      => $this->strings->all()['formIntro'],
 			),
-			'limits'   => array(
+			'limits'    => array(
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
 				'display_ids'     => SettingsValidator::MAX_DISPLAY_IDS,
+				'widget_title'    => SettingsValidator::TITLE_MAX_LENGTH,
+				'widget_subtitle' => SettingsValidator::SUBTITLE_MAX_LENGTH,
+				'form_intro'      => SettingsValidator::FORM_INTRO_MAX_LENGTH,
+			),
+			// Allowed ranges of the number settings: key => [min, max].
+			'ranges'    => array_map(
+				static function ( array $range ): array {
+					return array( $range[0], $range[1] );
+				},
+				SettingsValidator::NUMBERS
+			),
+			// What the widget actually uses, after filters from other code.
+			'effective' => array(
+				'primary_color' => $this->palette->primary(),
 			),
 			// The admin's own address as the plugin sees it with these settings.
-			'your_ip'  => $this->client_ip->get(),
-			'targets'  => $targets,
+			'your_ip'   => $this->client_ip->get(),
+			'targets'   => $targets,
 			// Chosen items that still exist, with titles for display.
-			'items'    => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['display_ids'] ) ),
+			'items'     => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['display_ids'] ) ),
 		);
 	}
 

@@ -7,6 +7,8 @@
 
 namespace ChatChi\Security;
 
+use ChatChi\Settings\Settings;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -27,6 +29,15 @@ final class SpamGuard {
 
 	private const TOKEN_LIFETIME = DAY_IN_SECONDS;
 
+	private ?Settings $settings;
+
+	/**
+	 * @param Settings|null $settings Plugin settings; without them the built-in defaults apply.
+	 */
+	public function __construct( ?Settings $settings = null ) {
+		$this->settings = $settings;
+	}
+
 	/**
 	 * Whether the checks are on.
 	 */
@@ -39,7 +50,9 @@ final class SpamGuard {
 		 *
 		 * @param bool $enabled Whether to check.
 		 */
-		return (bool) apply_filters( 'chatchi_spam_protection', true );
+		$default = $this->settings ? (bool) $this->settings->get( 'spam_protection' ) : true;
+
+		return (bool) apply_filters( 'chatchi_spam_protection', $default );
 	}
 
 	/**

@@ -7,13 +7,16 @@
 
 namespace ChatChi\Visitors;
 
+use ChatChi\Settings\Settings;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Which profile fields the start form asks for, and which are required.
  *
- * Plugin Settings (Phase 14) feed this through the `chatchi_profile_fields`
- * filter; disabling every field disables the start form.
+ * The admin chooses per field in Settings (off / optional / required); the
+ * `chatchi_profile_fields` filter has the final say. Disabling every field
+ * disables the start form.
  */
 final class ProfileFields {
 
@@ -21,26 +24,34 @@ final class ProfileFields {
 	public const EMAIL = 'email';
 	public const PHONE = 'phone';
 
+	private ?Settings $settings;
+
+	/**
+	 * @param Settings|null $settings Plugin settings; without them the built-in defaults apply.
+	 */
+	public function __construct( ?Settings $settings = null ) {
+		$this->settings = $settings;
+	}
+
 	/**
 	 * Returns the configuration of every field.
 	 *
 	 * @return array<string, array{enabled: bool, required: bool}>
 	 */
 	public function all(): array {
-		$defaults = array(
-			self::NAME  => array(
-				'enabled'  => true,
-				'required' => true,
-			),
-			self::EMAIL => array(
-				'enabled'  => true,
-				'required' => true,
-			),
-			self::PHONE => array(
-				'enabled'  => true,
-				'required' => false,
-			),
+		$modes    = array(
+			self::NAME  => $this->mode( 'form_name', 'required' ),
+			self::EMAIL => $this->mode( 'form_email', 'required' ),
+			self::PHONE => $this->mode( 'form_phone', 'optional' ),
 		);
+		$defaults = array();
+
+		foreach ( $modes as $field => $mode ) {
+			$defaults[ $field ] = array(
+				'enabled'  => 'off' !== $mode,
+				'required' => 'required' === $mode,
+			);
+		}
 
 		/**
 		 * Filters the start-form fields.
@@ -61,6 +72,16 @@ final class ProfileFields {
 		}
 
 		return $fields;
+	}
+
+	/**
+	 * Returns "off", "optional" or "required" for a field from the settings.
+	 *
+	 * @param string $key      Setting name.
+	 * @param string $fallback Mode without settings.
+	 */
+	private function mode( string $key, string $fallback ): string {
+		return $this->settings ? (string) $this->settings->get( $key ) : $fallback;
 	}
 
 	/**

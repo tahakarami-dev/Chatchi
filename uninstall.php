@@ -1,6 +1,10 @@
 <?php
 /**
- * Removes all ChatChi data when the plugin is deleted from the Plugins screen.
+ * Runs when the plugin is deleted from the Plugins screen.
+ *
+ * Conversations, visitors, agents and settings are only removed when the
+ * site's "Delete all data when the plugin is deleted" setting is on; by
+ * default they are kept, so reinstalling brings everything back.
  *
  * The plugin itself is not loaded during uninstall, so this file is
  * self-contained. Keep the lists below in sync with ChatChi\Database\Table
@@ -12,15 +16,26 @@
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 /**
- * Deletes ChatChi tables and options from the current site.
+ * Deletes ChatChi tables and options from the current site, when the site
+ * asked for it. Temporary data is always removed.
  *
  * @return void
  */
 function chatchi_uninstall_site() {
 	global $wpdb;
 
+	wp_clear_scheduled_hook( 'chatchi_purge_rate_limits' );
+	delete_option( 'chatchi_install_lock' );
+	delete_transient( 'chatchi_install_backoff' );
+	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}chatchi_rate_limits" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.SchemaChange -- Temporary counters, recreated on install.
+
+	$settings = get_option( 'chatchi_settings', array() );
+
+	if ( ! is_array( $settings ) || empty( $settings['delete_data_on_uninstall'] ) ) {
+		return;
+	}
+
 	$tables = array(
-		'chatchi_rate_limits',
 		'chatchi_messages',
 		'chatchi_conversations',
 		'chatchi_agents',
