@@ -111,6 +111,23 @@ final class VisitorRepository extends Repository {
 	}
 
 	/**
+	 * Finds the visitor linked to a WordPress user (the newest, if several).
+	 *
+	 * @param int $user_id WordPress user ID.
+	 */
+	public function find_by_user_id( int $user_id ): ?Visitor {
+		if ( $user_id <= 0 ) {
+			return null;
+		}
+
+		$rows = $this->select(
+			$this->db->prepare( "SELECT * FROM {$this->table()} WHERE user_id = %d ORDER BY id DESC LIMIT 1", $user_id )
+		);
+
+		return $rows ? $rows[0] : null;
+	}
+
+	/**
 	 * Updates any of name, email and phone.
 	 *
 	 * @param int                   $id      Visitor ID.

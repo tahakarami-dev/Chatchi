@@ -16,7 +16,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 0 | Design System + UI/UX Direction ([docs/design-system.md](docs/design-system.md)) | ✅ |
 | 1 | Plugin Foundation + Architecture | ✅ |
 | 2 | Database Layer | ✅ |
-| 3 | User / Visitor Identity | ⏳ |
+| 3 | User / Visitor Identity | ✅ |
+| 4 | Conversation System | ⏳ |
 
 ## Architecture
 
@@ -38,7 +39,8 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   ├── Schema.php       dbDelta definitions
 │   ├── DatabaseException.php
 │   └── Repositories/    Prepared-statement-only data access per table
-└── Models/              Visitor, Agent, Conversation, Message
+├── Models/              Visitor, Agent, Conversation, Message
+└── Visitors/            Identity (cookie token), start-form fields and validation
 languages/               Translation files (text domain: chatchi)
 docs/                    Design and architecture documents
 ```
@@ -52,6 +54,9 @@ docs/                    Design and architecture documents
 | `chatchi_loaded` | action | All modules are registered |
 | `chatchi_installed` | action | Install/upgrade finished on the current site |
 | `chatchi_activated` / `chatchi_deactivated` | action | Plugin lifecycle |
+| `chatchi_visitor_cookie_lifetime` | filter | Visitor identity lifetime in seconds (1 hour – 400 days, default 30 days) |
+| `chatchi_profile_fields` | filter | Start-form fields: `enabled` / `required` per field |
+| `chatchi_normalize_phone` | filter | Accept or reject mobile numbers (default: Iranian mobiles) |
 
 ## Database
 

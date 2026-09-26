@@ -17,6 +17,11 @@ use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
+use ChatChi\Visitors\ProfileFields;
+use ChatChi\Visitors\ProfileValidator;
+use ChatChi\Visitors\VisitorCookie;
+use ChatChi\Visitors\VisitorIdentity;
+use ChatChi\Visitors\VisitorService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -143,6 +148,8 @@ final class Plugin {
 			);
 		}
 
+		$this->register_visitor_services();
+
 		$this->container->singleton(
 			I18n::class,
 			static function (): I18n {
@@ -154,6 +161,51 @@ final class Plugin {
 			InstallNotice::class,
 			static function ( Container $c ): InstallNotice {
 				return new InstallNotice( $c->get( Installer::class ) );
+			}
+		);
+	}
+
+	/**
+	 * Registers visitor identity and profile services.
+	 */
+	private function register_visitor_services(): void {
+		$this->container->singleton(
+			VisitorCookie::class,
+			static function (): VisitorCookie {
+				return new VisitorCookie();
+			}
+		);
+
+		$this->container->singleton(
+			VisitorIdentity::class,
+			static function ( Container $c ): VisitorIdentity {
+				return new VisitorIdentity( $c->get( VisitorRepository::class ), $c->get( VisitorCookie::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			ProfileFields::class,
+			static function (): ProfileFields {
+				return new ProfileFields();
+			}
+		);
+
+		$this->container->singleton(
+			ProfileValidator::class,
+			static function (): ProfileValidator {
+				return new ProfileValidator();
+			}
+		);
+
+		$this->container->singleton(
+			VisitorService::class,
+			static function ( Container $c ): VisitorService {
+				return new VisitorService(
+					$c->get( VisitorIdentity::class ),
+					$c->get( VisitorRepository::class ),
+					$c->get( ProfileFields::class ),
+					$c->get( ProfileValidator::class )
+				);
 			}
 		);
 	}
