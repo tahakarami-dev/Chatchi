@@ -3,7 +3,7 @@
  * Plugin Name:       ChatChi | چت‌چی
  * Plugin URI:        https://github.com/tahakarami-dev/Chatchi
  * Description:       Lightweight, secure live chat for WordPress with a standalone, SaaS-style agent panel.
- * Version:           0.1.0
+ * Version:           0.3.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Taha Karami
@@ -25,7 +25,7 @@ if ( defined( 'CHATCHI_VERSION' ) ) {
 	return;
 }
 
-define( 'CHATCHI_VERSION', '0.1.0' );
+define( 'CHATCHI_VERSION', '0.3.0' );
 define( 'CHATCHI_FILE', __FILE__ );
 define( 'CHATCHI_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CHATCHI_URL', plugin_dir_url( __FILE__ ) );
@@ -62,6 +62,9 @@ function chatchi_requirements_notice() {
 	if ( ! current_user_can( 'activate_plugins' ) ) {
 		return;
 	}
+
+	// The I18n module never boots when requirements are unmet.
+	load_plugin_textdomain( 'chatchi', false, dirname( CHATCHI_BASENAME ) . '/languages' );
 
 	$unmet    = chatchi_unmet_requirements();
 	$messages = array();

@@ -15,7 +15,9 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 |---|---|---|
 | 0 | Design System + UI/UX Direction ([docs/design-system.md](docs/design-system.md)) | ✅ |
 | 1 | Plugin Foundation + Architecture | ✅ |
-| 2 | Database Layer | ⏳ |
+| 2 | Database Layer | ✅ |
+| 3 | User / Visitor Identity | ✅ |
+| 4 | Conversation System | ⏳ |
 
 ## Architecture
 
@@ -24,14 +26,22 @@ chatchi.php              Bootstrap: constants, requirements check, autoloader, h
 uninstall.php            Removes all plugin data on delete
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
-└── Core/
-    ├── Container.php    Lazy service container
-    ├── Contracts/       Interfaces (Module)
-    ├── Installer.php    Versioned, idempotent install/upgrade
-    ├── Activator.php
-    ├── Deactivator.php
-    └── I18n.php
-languages/               Translation files (text domain: chatchi)
+├── Core/
+│   ├── Container.php    Lazy service container
+│   ├── Contracts/       Interfaces (Module)
+│   ├── Installer.php    Versioned, idempotent, lock-protected install/upgrade
+│   ├── InstallNotice.php
+│   ├── Activator.php
+│   ├── Deactivator.php
+│   └── I18n.php
+├── Database/
+│   ├── Table.php        Table names
+│   ├── Schema.php       dbDelta definitions
+│   ├── DatabaseException.php
+│   └── Repositories/    Prepared-statement-only data access per table
+├── Models/              Visitor, Agent, Conversation, Message
+└── Visitors/            Identity (cookie token), start-form fields and validation
+languages/               chatchi.pot + Persian (fa_IR) translation, text domain: chatchi
 docs/                    Design and architecture documents
 ```
 
@@ -44,3 +54,17 @@ docs/                    Design and architecture documents
 | `chatchi_loaded` | action | All modules are registered |
 | `chatchi_installed` | action | Install/upgrade finished on the current site |
 | `chatchi_activated` / `chatchi_deactivated` | action | Plugin lifecycle |
+| `chatchi_visitor_cookie_lifetime` | filter | Visitor identity lifetime in seconds (1 hour – 400 days, default 30 days) |
+| `chatchi_profile_fields` | filter | Start-form fields: `enabled` / `required` per field |
+| `chatchi_normalize_phone` | filter | Accept or reject mobile numbers (default: Iranian mobiles) |
+
+## Database
+
+| Table | Purpose | Key indexes |
+|---|---|---|
+| `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token) and contact info | `UNIQUE token_hash`, `user_id` |
+| `{prefix}chatchi_agents` | Agents, one per WordPress user | `UNIQUE user_id`, `is_active` |
+| `{prefix}chatchi_conversations` | Conversation state and latest activity | `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
+| `{prefix}chatchi_messages` | Messages and read state | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
+
+All datetimes are stored in UTC. Relations are enforced in the application layer.
