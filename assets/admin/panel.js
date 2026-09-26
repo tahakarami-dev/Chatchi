@@ -1774,7 +1774,10 @@
 			welcome_enabled: data.settings.welcome_enabled,
 			welcome_message: data.settings.welcome_message,
 			display_mode: data.settings.display_mode,
-			display_targets: data.settings.display_targets.slice()
+			display_targets: data.settings.display_targets.slice(),
+			proxy_mode: data.settings.proxy_mode,
+			proxy_header: data.settings.proxy_header,
+			trusted_proxies: data.settings.trusted_proxies.join( '\n' )
 		};
 		// Items that were deleted since they were chosen are dropped on save.
 		this.items = data.items.slice();
@@ -1845,6 +1848,7 @@
 			this.buildWelcome(),
 			this.buildDisplay(),
 			this.buildShortcode(),
+			this.buildProxy(),
 			h( 'div', { className: 'cc-settings__actions' }, [ this.saveButton ] )
 		] );
 	};
@@ -2166,6 +2170,101 @@
 		] );
 	};
 
+	/**
+	 * How visitor IP addresses are read: directly, through Cloudflare, or
+	 * through another proxy that names its header and addresses.
+	 */
+	SettingsView.prototype.buildProxy = function () {
+		var self = this;
+		var draft = this.draft;
+		var modes = [
+			[ 'direct', S.ipDirect ],
+			[ 'cloudflare', S.ipCloudflare ],
+			[ 'custom', S.ipCustom ]
+		];
+
+		var header = h( 'input', {
+			id: 'cc-proxy-header',
+			className: 'cc-input',
+			type: 'text',
+			dir: 'ltr',
+			maxlength: '64',
+			placeholder: 'X-Real-IP',
+			autocomplete: 'off',
+			spellcheck: 'false'
+		} );
+		header.value = draft.proxy_header;
+		header.addEventListener( 'input', function () {
+			draft.proxy_header = header.value;
+			self.clearError( 'proxy_header' );
+		} );
+
+		var trusted = h( 'textarea', {
+			id: 'cc-trusted-proxies',
+			className: 'cc-input cc-textarea cc-textarea--code',
+			rows: '4',
+			dir: 'ltr',
+			spellcheck: 'false',
+			placeholder: '203.0.113.0/24\n2001:db8::/32',
+			'aria-describedby': 'cc-trusted-hint'
+		} );
+		trusted.value = draft.trusted_proxies;
+
+		var emptyWarning = h( 'p', { className: 'cc-warning', role: 'status', text: S.trustedEmpty } );
+
+		function syncWarning() {
+			emptyWarning.hidden = draft.trusted_proxies.trim() !== '';
+		}
+
+		trusted.addEventListener( 'input', function () {
+			draft.trusted_proxies = trusted.value;
+			self.clearError( 'trusted_proxies' );
+			syncWarning();
+		} );
+		syncWarning();
+
+		var custom = h( 'div', { className: 'cc-picker', hidden: draft.proxy_mode !== 'custom' }, [
+			h( 'label', { className: 'cc-label', for: 'cc-proxy-header', text: S.proxyHeader } ),
+			header,
+			this.fieldError( 'proxy_header' ),
+			h( 'label', { className: 'cc-label', for: 'cc-trusted-proxies', text: S.trustedProxies } ),
+			trusted,
+			h( 'p', { id: 'cc-trusted-hint', className: 'cc-hint', text: S.trustedHint } ),
+			this.fieldError( 'trusted_proxies' ),
+			emptyWarning
+		] );
+
+		var radios = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-ip-title' }, modes.map( function ( mode ) {
+			var id = 'cc-proxy-' + mode[ 0 ];
+			var input = h( 'input', { id: id, type: 'radio', name: 'cc-proxy-mode', value: mode[ 0 ], checked: draft.proxy_mode === mode[ 0 ] } );
+
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.proxy_mode = mode[ 0 ];
+					custom.hidden = mode[ 0 ] !== 'custom';
+					self.clearError( 'proxy_header' );
+				}
+			} );
+
+			return h( 'label', { className: 'cc-radio', for: id }, [ input, h( 'span', { text: mode[ 1 ] } ) ] );
+		} ) );
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ip-title' }, [
+			h( 'div', {}, [
+				h( 'h2', { id: 'cc-ip-title', text: S.ipTitle } ),
+				h( 'p', { className: 'cc-hint', text: S.ipIntro } )
+			] ),
+			radios,
+			this.fieldError( 'proxy_mode' ),
+			custom,
+			this.data.your_ip ? h( 'p', { className: 'cc-hint cc-your-ip' }, [
+				S.yourIp.split( '%s' )[ 0 ],
+				h( 'bdi', { dir: 'ltr', className: 'cc-code-inline', text: this.data.your_ip } ),
+				S.yourIp.split( '%s' )[ 1 ] || ''
+			] ) : null
+		] );
+	};
+
 	SettingsView.prototype.save = function () {
 		var self = this;
 		var draft = this.draft;
@@ -2185,6 +2284,11 @@
 			display_targets: draft.display_targets,
 			display_ids: this.items.map( function ( item ) {
 				return item.id;
+			} ),
+			proxy_mode: draft.proxy_mode,
+			proxy_header: draft.proxy_mode === 'custom' ? draft.proxy_header.trim() : draft.proxy_header,
+			trusted_proxies: draft.trusted_proxies.split( /[\s,]+/ ).filter( function ( line ) {
+				return line !== '';
 			} )
 		} ).then( function ( data ) {
 			self.apply( data );

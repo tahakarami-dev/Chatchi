@@ -148,7 +148,23 @@ abstract class ConversationController implements RouteProvider {
 	public function permit_actor( \WP_REST_Request $request ) {
 		$actor = $this->actor( $request );
 
-		return $actor instanceof \WP_Error ? $actor : true;
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		return $this->throttle( $request, $actor ) ?? true;
+	}
+
+	/**
+	 * Applies rate limits to a request. Runs once per request, from the
+	 * permission check, so every attempt is counted exactly once.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @param Actor            $actor   Authenticated actor.
+	 * @return \WP_Error|null Error when the request is refused.
+	 */
+	protected function throttle( \WP_REST_Request $request, Actor $actor ): ?\WP_Error {
+		return null;
 	}
 
 	/**

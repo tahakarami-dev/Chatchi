@@ -7,6 +7,8 @@
 
 namespace ChatChi\Core;
 
+use ChatChi\Security\RateLimiter;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -21,6 +23,7 @@ final class Deactivator {
 	 */
 	public static function deactivate( $network_wide = false ): void {
 		delete_option( Installer::LOCK_OPTION );
+		wp_clear_scheduled_hook( RateLimiter::PURGE_HOOK );
 
 		/**
 		 * Fires when ChatChi is deactivated, so modules can clear scheduled events.

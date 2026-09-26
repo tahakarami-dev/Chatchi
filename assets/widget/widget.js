@@ -24,6 +24,7 @@
 	var POLL_MAX = 60000;
 	var SESSION_EVERY = 5;
 	var GROUP_GAP_MS = 2 * 60 * 1000;
+	var TRAP_FIELD = 'website';
 	var PAGE_SIZE = 30;
 
 	var Core = window.ChatChiCore;
@@ -390,7 +391,8 @@
 				return;
 			}
 			pending.failed = true;
-			pending.error = error.message;
+			pending.limited = error.code === 'chatchi_rate_limited';
+			pending.error = pending.limited ? self.waitMessage( error ) : error.message;
 			self.render();
 		} );
 	};
@@ -407,7 +409,7 @@
 
 		if ( ! this.startPromise ) {
 			var visitor = this.state.visitor || {};
-			this.startPromise = api.start( { name: visitor.name, email: visitor.email, phone: visitor.phone } ).then( function ( result ) {
+			this.startPromise = this.startConversation( { name: visitor.name, email: visitor.email, phone: visitor.phone } ).then( function ( result ) {
 				self.state.visitor = result.visitor;
 				self.state.conversation = result.conversation;
 				self.state.closed = false;
@@ -424,6 +426,61 @@
 		return this.startPromise;
 	};
 
+	/**
+	 * Starts (or resumes) a conversation, with the bot checks' form token.
+	 *
+	 * A start sent sooner than a person could fill in the form, or with a
+	 * token from a page left open for a day, is refused by the server; both
+	 * are retried here, so real visitors never see those errors. A renewed
+	 * token is itself brand new, so an expired token can need two retries:
+	 * renew, then wait.
+	 */
+	Widget.prototype.startConversation = function ( profile, trap, attempt ) {
+		var self = this;
+		var session = this.state.session || {};
+		var body = Object.assign( { form_token: session.form_token || '' }, profile );
+
+		body[ TRAP_FIELD ] = trap || '';
+
+		attempt = attempt || 0;
+
+		return api.start( body ).catch( function ( error ) {
+			if ( attempt >= 2 ) {
+				throw error;
+			}
+			if ( error.code === 'chatchi_too_fast' ) {
+				var wait = Math.max( 1, ( error.data && error.data.retry_after ) || 1 ) * 1000;
+				return new Promise( function ( resolve ) {
+					window.setTimeout( resolve, wait );
+				} ).then( function () {
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			if ( error.code === 'chatchi_form_expired' ) {
+				return api.session().then( function ( fresh ) {
+					if ( self.state.session ) {
+						self.state.session.form_token = fresh.form_token;
+					}
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			throw error;
+		} );
+	};
+
+	/**
+	 * Turns a rate-limit error into "try again in N seconds/minutes".
+	 */
+	Widget.prototype.waitMessage = function ( error ) {
+		var seconds = Math.max( 1, Math.ceil( ( error.data && error.data.retry_after ) || 1 ) );
+
+		if ( seconds >= 90 ) {
+			return fmt.format( S.waitMinutes, Math.ceil( seconds / 60 ) );
+		}
+
+		return fmt.format( S.waitSeconds, seconds );
+	};
+
 	Widget.prototype.submitForm = function ( form ) {
 		var self = this;
 		var data = {};
@@ -437,7 +494,9 @@
 		this.state.formValues = data;
 		this.set( { submitting: true, formErrors: {}, formAlert: '' } );
 
-		api.start( data ).then( function ( result ) {
+		var trap = form.elements[ TRAP_FIELD ] ? form.elements[ TRAP_FIELD ].value : '';
+
+		this.startConversation( data, trap ).then( function ( result ) {
 			self.state.visitor = result.visitor;
 			self.state.conversation = result.conversation;
 			self.state.closed = false;
@@ -449,7 +508,8 @@
 			self.schedulePoll();
 		} ).catch( function ( error ) {
 			var fields = ( error.data && error.data.fields ) || {};
-			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : error.message } );
+			var alert = error.code === 'chatchi_rate_limited' ? self.waitMessage( error ) : error.message;
+			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : alert } );
 			var invalid = self.panel.querySelector( '[aria-invalid="true"]' );
 			if ( invalid ) {
 				invalid.focus();
@@ -830,6 +890,12 @@
 			] ) );
 		} );
 
+		// Honeypot: invisible to people and screen readers; bots fill it in.
+		form.appendChild( h( 'div', { className: 'chatchi-trap', 'aria-hidden': 'true' }, [
+			h( 'label', { for: 'chatchi-field-' + TRAP_FIELD, text: 'Website' } ),
+			h( 'input', { id: 'chatchi-field-' + TRAP_FIELD, name: TRAP_FIELD, type: 'text', tabindex: '-1', autocomplete: 'off' } )
+		] ) );
+
 		if ( state.formAlert ) {
 			form.appendChild( h( 'p', { className: 'chatchi-alert', role: 'alert', text: state.formAlert } ) );
 		}
@@ -967,7 +1033,7 @@
 			stack.appendChild( h( 'button', {
 				type: 'button',
 				className: 'chatchi-retry',
-				text: S.sendFailed,
+				text: entry.ref.limited ? entry.ref.error : S.sendFailed,
 				onClick: function () {
 					self.deliver( entry.ref );
 					self.focusDefault();

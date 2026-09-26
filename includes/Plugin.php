@@ -23,6 +23,7 @@ use ChatChi\Core\Installer;
 use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
+use ChatChi\Database\Repositories\RateLimitRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
 use ChatChi\Frontend\ColorPalette;
@@ -40,6 +41,10 @@ use ChatChi\Rest\RequestGuard;
 use ChatChi\Rest\RestModule;
 use ChatChi\Rest\SettingsController;
 use ChatChi\Rest\WidgetController;
+use ChatChi\Security\ClientIp;
+use ChatChi\Security\RateLimiter;
+use ChatChi\Security\SecurityModule;
+use ChatChi\Security\SpamGuard;
 use ChatChi\Settings\ContentLookup;
 use ChatChi\Settings\Settings;
 use ChatChi\Settings\SettingsValidator;
@@ -163,6 +168,7 @@ final class Plugin {
 			AgentRepository::class,
 			ConversationRepository::class,
 			MessageRepository::class,
+			RateLimitRepository::class,
 		);
 
 		foreach ( $repositories as $repository ) {
@@ -175,6 +181,7 @@ final class Plugin {
 		}
 
 		$this->register_settings_services();
+		$this->register_security_services();
 		$this->register_visitor_services();
 		$this->register_conversation_services();
 		$this->register_message_services();
@@ -219,6 +226,39 @@ final class Plugin {
 			Settings::class,
 			static function ( Container $c ): Settings {
 				return new Settings( $c->get( SettingsValidator::class ) );
+			}
+		);
+	}
+
+	/**
+	 * Registers rate limiting and bot protection.
+	 */
+	private function register_security_services(): void {
+		$this->container->singleton(
+			ClientIp::class,
+			static function ( Container $c ): ClientIp {
+				return new ClientIp( $c->get( Settings::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			RateLimiter::class,
+			static function ( Container $c ): RateLimiter {
+				return new RateLimiter( $c->get( RateLimitRepository::class ), $c->get( ClientIp::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			SpamGuard::class,
+			static function (): SpamGuard {
+				return new SpamGuard();
+			}
+		);
+
+		$this->container->singleton(
+			SecurityModule::class,
+			static function ( Container $c ): SecurityModule {
+				return new SecurityModule( $c->get( RateLimiter::class ) );
 			}
 		);
 	}
@@ -346,7 +386,9 @@ final class Plugin {
 					$c->get( VisitorService::class ),
 					$c->get( AgentRepository::class ),
 					$c->get( MessageBody::class ),
-					$c->get( RequestGuard::class )
+					$c->get( RequestGuard::class ),
+					$c->get( RateLimiter::class ),
+					$c->get( SpamGuard::class )
 				);
 			}
 		);
@@ -387,7 +429,7 @@ final class Plugin {
 		$this->container->singleton(
 			SettingsController::class,
 			static function ( Container $c ): SettingsController {
-				return new SettingsController( $c->get( Settings::class ), $c->get( ContentLookup::class ) );
+				return new SettingsController( $c->get( Settings::class ), $c->get( ContentLookup::class ), $c->get( ClientIp::class ) );
 			}
 		);
 
@@ -504,6 +546,7 @@ final class Plugin {
 		$modules = array(
 			I18n::class,
 			InstallNotice::class,
+			SecurityModule::class,
 			RestModule::class,
 			WidgetModule::class,
 			Shortcode::class,

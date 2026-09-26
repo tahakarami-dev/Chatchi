@@ -30,6 +30,11 @@ final class PanelPage {
 	private int $avatar_max_bytes;
 
 	/**
+	 * Nonce for this page's inline script and styles, allowed by the CSP.
+	 */
+	private string $csp_nonce = '';
+
+	/**
 	 * @param ColorPalette $palette          Brand colors.
 	 * @param FontFace     $font             Bundled font.
 	 * @param PanelStrings $strings          Interface text.
@@ -40,6 +45,72 @@ final class PanelPage {
 		$this->font             = $font;
 		$this->strings          = $strings;
 		$this->avatar_max_bytes = $avatar_max_bytes;
+	}
+
+	/**
+	 * Sends security headers for the panel document. Call before render().
+	 *
+	 * The Content-Security-Policy only lets this page's own code run: no
+	 * injected scripts, no framing by other sites, no plugins or forms
+	 * posting elsewhere. Inline style attributes stay allowed because the
+	 * interface sets sizes with them; they cannot run code.
+	 */
+	public function send_headers(): void {
+		$policy = $this->content_security_policy();
+
+		if ( '' !== $policy ) {
+			header( 'Content-Security-Policy: ' . $policy );
+		}
+
+		header( 'X-Frame-Options: DENY' );
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'Referrer-Policy: same-origin' );
+		header( 'Cross-Origin-Opener-Policy: same-origin' );
+		header( 'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()' );
+	}
+
+	/**
+	 * Returns the Content-Security-Policy of the panel.
+	 */
+	public function content_security_policy(): string {
+		$assets = $this->origin( CHATCHI_URL );
+		$api    = $this->origin( rest_url() );
+		$nonce  = "'nonce-" . $this->nonce() . "'";
+
+		$directives = array(
+			'default-src'     => "'self'",
+			'script-src'      => trim( "'self' {$assets} {$nonce}" ),
+			'style-src'       => trim( "'self' {$assets} {$nonce}" ),
+			'style-src-attr'  => "'unsafe-inline'",
+			'font-src'        => trim( "'self' {$assets} data:" ),
+			'img-src'         => "'self' data: blob: https:",
+			'connect-src'     => trim( "'self' {$api}" ),
+			'frame-ancestors' => "'none'",
+			'base-uri'        => "'none'",
+			'form-action'     => "'self'",
+			'object-src'      => "'none'",
+		);
+
+		$policy = implode(
+			'; ',
+			array_map(
+				static function ( string $name, string $value ): string {
+					return $name . ' ' . $value;
+				},
+				array_keys( $directives ),
+				$directives
+			)
+		);
+
+		/**
+		 * Filters the Content-Security-Policy of the agent panel.
+		 *
+		 * Return an empty string to send none.
+		 *
+		 * @param string $policy Policy.
+		 * @param string $nonce  Nonce of the page's inline script and styles.
+		 */
+		return (string) apply_filters( 'chatchi_panel_csp', $policy, $this->nonce() );
 	}
 
 	/**
@@ -85,21 +156,54 @@ final class PanelPage {
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="same-origin">
 <title><?php echo esc_html( $title ); ?></title>
-<style><?php echo $this->font->css(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built from an escaped URL. ?></style>
+<style nonce="<?php echo esc_attr( $this->nonce() ); ?>"><?php echo $this->font->css(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built from an escaped URL. ?></style>
 <link rel="stylesheet" href="<?php echo esc_url( $this->asset( 'assets/shared/tokens.css' ) ); ?>">
 <link rel="stylesheet" href="<?php echo esc_url( $this->asset( 'assets/admin/panel.css' ) ); ?>">
-<style><?php echo $this->color_overrides(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Validated hex colors only. ?></style>
+<style nonce="<?php echo esc_attr( $this->nonce() ); ?>"><?php echo $this->color_overrides(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Validated hex colors only. ?></style>
 </head>
 <body>
 <div id="chatchi-app" class="chatchi-app">
 	<noscript><p class="chatchi-app__noscript"><?php esc_html_e( 'The ChatChi panel needs JavaScript.', 'chatchi' ); ?></p></noscript>
 </div>
-<script>window.ChatChiPanel = <?php echo wp_json_encode( $this->config(), $json_flags ); ?>;</script>
+<script nonce="<?php echo esc_attr( $this->nonce() ); ?>">window.ChatChiPanel = <?php echo wp_json_encode( $this->config(), $json_flags ); ?>;</script>
 <script src="<?php echo esc_url( $this->asset( 'assets/shared/core.js' ) ); ?>"></script>
 <script src="<?php echo esc_url( $this->asset( 'assets/admin/panel.js' ) ); ?>"></script>
 </body>
 </html>
 		<?php
+	}
+
+	/**
+	 * Returns the nonce of this page view, creating it on first use.
+	 */
+	private function nonce(): string {
+		if ( '' === $this->csp_nonce ) {
+			$this->csp_nonce = rtrim( strtr( base64_encode( random_bytes( 18 ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Random nonce, not obfuscation.
+		}
+
+		return $this->csp_nonce;
+	}
+
+	/**
+	 * Returns "scheme://host[:port]" of a URL when it is another origin than
+	 * the site, or an empty string.
+	 *
+	 * @param string $url URL.
+	 */
+	private function origin( string $url ): string {
+		$parts = wp_parse_url( $url );
+		$site  = wp_parse_url( home_url() );
+
+		if ( empty( $parts['host'] ) || empty( $parts['scheme'] ) ) {
+			return '';
+		}
+
+		$origin = $parts['scheme'] . '://' . $parts['host'] . ( isset( $parts['port'] ) ? ':' . (int) $parts['port'] : '' );
+		$same   = isset( $site['host'] ) && strtolower( $site['host'] ) === strtolower( $parts['host'] )
+			&& ( $site['port'] ?? null ) === ( $parts['port'] ?? null )
+			&& ( $site['scheme'] ?? '' ) === $parts['scheme'];
+
+		return $same ? '' : esc_url_raw( $origin );
 	}
 
 	/**

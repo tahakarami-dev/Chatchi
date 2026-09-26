@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '2';
+	public const VERSION = '3';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -98,6 +98,7 @@ final class Schema {
 		$agents        = $prefix . Table::AGENTS;
 		$conversations = $prefix . Table::CONVERSATIONS;
 		$messages      = $prefix . Table::MESSAGES;
+		$rate_limits   = $prefix . Table::RATE_LIMITS;
 
 		// token_hash stores a hash of the visitor's cookie token, never the token itself.
 		// open_visitor_id equals visitor_id while a conversation is open and is NULL once
@@ -162,6 +163,16 @@ read_at datetime NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 KEY conversation_id (conversation_id,id),
 UNIQUE KEY conversation_client (conversation_id,client_id)
+) {$collate};",
+
+			// One row per rate-limit bucket (action, subject and time window, hashed).
+			// Subjects such as IP addresses are never stored in readable form.
+			"CREATE TABLE {$rate_limits} (
+bucket char(64) NOT NULL,
+hits int(10) unsigned NOT NULL DEFAULT 0,
+expires_at int(10) unsigned NOT NULL,
+PRIMARY KEY  (bucket),
+KEY expires_at (expires_at)
 ) {$collate};",
 		);
 	}

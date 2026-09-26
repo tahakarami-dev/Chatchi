@@ -24,8 +24,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 8 | Chat Admin Panel (standalone SaaS-style app) | ✅ |
 | 9 | Agent Management | ✅ |
 | 10 | Welcome Message + Widget Display Rules + Shortcode | ✅ |
-| 11 | Rate Limiting + Anti-Spam + Security Hardening | ⏳ |
-| 12 | Plugin Settings | |
+| 11 | Rate Limiting + Anti-Spam + Security Hardening | ✅ |
+| 12 | Plugin Settings | ⏳ |
 | 13 | Integration + Testing + Optimization | |
 
 ## Architecture
@@ -55,6 +55,7 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   ├── DatabaseException.php
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
+├── Security/            Rate limiter, visitor IP detection, bot checks for the start form
 ├── Settings/            Settings store (one autoloaded option), validation, content lookup for display rules
 ├── Support/             Small shared helpers (plain-text cleaning)
 └── Visitors/            Identity (cookie token), start-form fields and validation
@@ -91,6 +92,14 @@ docs/                    Design and architecture documents
 | `chatchi_widget_config` | filter | Full widget configuration |
 | `chatchi_settings` | filter | Settings as the plugin uses them (not saved) |
 | `chatchi_settings_updated` | action | Settings were saved, with the validated changes |
+| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]` |
+| `chatchi_rate_limited` | action | A request was refused by a rate limit |
+| `chatchi_rate_limit_error` | action | The counter table failed; the request was allowed |
+| `chatchi_client_ip` | filter | The visitor IP used for rate limiting |
+| `chatchi_spam_protection` | filter | Turn the start-form bot checks on/off (e.g. for trusted API clients) |
+| `chatchi_spam_min_seconds` | filter | Minimum seconds between loading the widget and starting (default 2, 0–60) |
+| `chatchi_spam_blocked` | action | A bot filled in the honeypot |
+| `chatchi_panel_csp` | filter | Content-Security-Policy of the agent panel (empty string: none) |
 | `chatchi_avatar_max_bytes` | filter | Largest agent picture upload in bytes (default 2 MB, capped by the server upload limit) |
 
 ## Database
@@ -101,6 +110,7 @@ docs/                    Design and architecture documents
 | `{prefix}chatchi_agents` | Agents, one per WordPress user | `UNIQUE user_id`, `is_active` |
 | `{prefix}chatchi_conversations` | Conversation state and latest activity | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
 | `{prefix}chatchi_messages` | Messages and read state | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
+| `{prefix}chatchi_rate_limits` | Rate-limit counters; buckets are salted hashes, no IPs stored. Purged hourly | `bucket` (primary), `expires_at` |
 
 All datetimes are stored in UTC. Relations are enforced in the application layer.
 
@@ -114,8 +124,8 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/widget/session` | Visitor, open conversation, unread count, start-form config. Never sets a cookie |
-| POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url` → visitor + open conversation |
+| GET | `/widget/session` | Visitor, open conversation, unread count, start-form config, `form_token`. Never sets a cookie |
+| POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url`, `form_token`, `website` (honeypot, must be empty) → visitor + open conversation |
 | GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50 |
 | POST | `/widget/conversations/{id}/messages` | `body`, optional `client_id` (UUID, makes retries idempotent) |
 | POST | `/widget/conversations/{id}/read` | Mark agent messages read, optional `up_to_id` |
@@ -153,7 +163,7 @@ Administrators only (`manage_options`).
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/agent/settings` | Settings, the default welcome message, limits, available page types, and the chosen items with titles |
-| POST/PATCH | `/agent/settings` | Save any of `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
+| POST/PATCH | `/agent/settings` | Save any of `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
 | GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
 
 ## Agent panel
@@ -167,3 +177,10 @@ Administrators also get a **Settings** screen (`#/settings`):
 - **Welcome message**: shown in the widget as the first bubble from support, above the start form and at the top of every conversation. It is not stored as a message, so agents never see it in the inbox. On by default with a translated default text.
 - **Where the widget appears**: on every page, only on chosen page types and items, or everywhere except them. Page types are the home page, all pages, all blog posts, and WooCommerce products (single products, the shop, product categories and tags).
 - **Shortcode**: `[chatchi]` (alias `[hamyarchat]`) shows the floating widget on that page even where the rules hide it. It prints nothing itself and also works in widget areas and page builders (the widget then loads in the footer).
+
+## Security
+
+- **Rate limits** (sliding window, per visitor and per IP; IPv6 per /64): starting conversations 5/hour per visitor and 10/10 min per IP; messages 20/min per visitor and 60/min per IP; other writes 60/min and 180/min. Reads (polling) and agents are not limited. Refused requests get `429 chatchi_rate_limited` with `data.retry_after` and a `Retry-After` header; the widget shows "try again in N seconds/minutes". Counting is atomic, so parallel requests cannot get past a limit. If the counter table fails, requests are allowed.
+- **Visitor IP**: the connection address by default. Behind Cloudflare, `CF-Connecting-IP` is used only on connections from Cloudflare's published ranges; behind another CDN or proxy (e.g. ArvanCloud), the configured header is used only from the listed proxy addresses (`X-Forwarded-For` is read right to left, skipping trusted proxies).
+- **Bot checks on the start form**: a honeypot field, and a signed timestamp from `/widget/session` that must be at least 2 seconds and at most 1 day old. The widget retries too-early and expired starts by itself, so people never see these errors.
+- **Agent panel**: Content-Security-Policy with a per-view nonce (no injected scripts, `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: same-origin`, not cacheable.

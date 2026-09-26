@@ -7,6 +7,7 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Security\ClientIp;
 use ChatChi\Settings\ContentLookup;
 use ChatChi\Settings\Settings;
 use ChatChi\Settings\SettingsValidator;
@@ -25,13 +26,17 @@ final class SettingsController implements RouteProvider {
 
 	private ContentLookup $content;
 
+	private ClientIp $client_ip;
+
 	/**
-	 * @param Settings      $settings Plugin settings.
-	 * @param ContentLookup $content  Pages, posts and products.
+	 * @param Settings      $settings  Plugin settings.
+	 * @param ContentLookup $content   Pages, posts and products.
+	 * @param ClientIp      $client_ip Visitor address, to show the admin what is detected.
 	 */
-	public function __construct( Settings $settings, ContentLookup $content ) {
-		$this->settings = $settings;
-		$this->content  = $content;
+	public function __construct( Settings $settings, ContentLookup $content, ClientIp $client_ip ) {
+		$this->settings  = $settings;
+		$this->content   = $content;
+		$this->client_ip = $client_ip;
 	}
 
 	/**
@@ -80,6 +85,22 @@ final class SettingsController implements RouteProvider {
 							),
 							'maxItems' => SettingsValidator::MAX_DISPLAY_IDS,
 						),
+						'proxy_mode'      => array(
+							'type' => 'string',
+							'enum' => SettingsValidator::PROXY_MODES,
+						),
+						'proxy_header'    => array(
+							'type'      => 'string',
+							'maxLength' => 64,
+						),
+						'trusted_proxies' => array(
+							'type'     => 'array',
+							'items'    => array(
+								'type'      => 'string',
+								'maxLength' => 64,
+							),
+							'maxItems' => SettingsValidator::MAX_TRUSTED_PROXIES * 2,
+						),
 					),
 				),
 			)
@@ -119,7 +140,7 @@ final class SettingsController implements RouteProvider {
 	public function update( \WP_REST_Request $request ) {
 		$changes = array();
 
-		foreach ( array( 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ) as $key ) {
+		foreach ( array( 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids', 'proxy_mode', 'proxy_header', 'trusted_proxies' ) as $key ) {
 			if ( $request->has_param( $key ) && null !== $request[ $key ] ) {
 				$changes[ $key ] = $request[ $key ];
 			}
@@ -161,6 +182,8 @@ final class SettingsController implements RouteProvider {
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
 				'display_ids'     => SettingsValidator::MAX_DISPLAY_IDS,
 			),
+			// The admin's own address as the plugin sees it with these settings.
+			'your_ip'  => $this->client_ip->get(),
 			'targets'  => $targets,
 			// Chosen items that still exist, with titles for display.
 			'items'    => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['display_ids'] ) ),

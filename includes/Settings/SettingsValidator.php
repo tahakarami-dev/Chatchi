@@ -7,6 +7,7 @@
 
 namespace ChatChi\Settings;
 
+use ChatChi\Security\IpRange;
 use ChatChi\Support\PlainText;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,6 +25,10 @@ final class SettingsValidator {
 	public const DISPLAY_MODES = array( 'all', 'include', 'exclude' );
 
 	public const DISPLAY_TARGETS = array( 'home', 'pages', 'posts', 'products' );
+
+	public const PROXY_MODES = array( 'direct', 'cloudflare', 'custom' );
+
+	public const MAX_TRUSTED_PROXIES = 100;
 
 	private ContentLookup $content;
 
@@ -47,6 +52,9 @@ final class SettingsValidator {
 			'display_mode'    => 'all',
 			'display_targets' => array(),
 			'display_ids'     => array(),
+			'proxy_mode'      => 'direct',
+			'proxy_header'    => '',
+			'trusted_proxies' => array(),
 		);
 	}
 
@@ -77,18 +85,44 @@ final class SettingsValidator {
 			}
 		}
 
-		if ( $errors ) {
-			return new \WP_Error(
-				'chatchi_invalid_settings',
-				__( 'Some settings need your attention.', 'chatchi' ),
-				array(
-					'status' => 400,
-					'fields' => $errors,
-				)
-			);
+		// A custom proxy needs a header; reported together with other errors.
+		if ( 'custom' === ( $changes['proxy_mode'] ?? null ) && array_key_exists( 'proxy_header', $changes ) && ! isset( $errors['proxy_header'] ) && '' === ( $clean['proxy_header'] ?? '' ) ) {
+			$errors['proxy_header'] = $this->missing_header_message();
 		}
 
-		return $clean;
+		return $errors ? $this->invalid( $errors ) : $clean;
+	}
+
+	private function missing_header_message(): string {
+		return __( 'Enter the header your proxy puts the visitor address in.', 'chatchi' );
+	}
+
+	/**
+	 * @param array<string, string> $errors Messages keyed by setting.
+	 */
+	private function invalid( array $errors ): \WP_Error {
+		return new \WP_Error(
+			'chatchi_invalid_settings',
+			__( 'Some settings need your attention.', 'chatchi' ),
+			array(
+				'status' => 400,
+				'fields' => $errors,
+			)
+		);
+	}
+
+	/**
+	 * Checks rules that involve more than one setting, on the merged result.
+	 *
+	 * @param array<string, mixed> $settings All settings after the change.
+	 * @return \WP_Error|null
+	 */
+	public function validate_combined( array $settings ): ?\WP_Error {
+		if ( 'custom' === $settings['proxy_mode'] && '' === $settings['proxy_header'] ) {
+			return $this->invalid( array( 'proxy_header' => $this->missing_header_message() ) );
+		}
+
+		return null;
 	}
 
 	/**
@@ -130,6 +164,18 @@ final class SettingsValidator {
 				case 'display_ids':
 					$settings[ $key ] = is_array( $value ) ? $this->ids( $value ) : $default;
 					break;
+
+				case 'proxy_mode':
+					$settings[ $key ] = in_array( $value, self::PROXY_MODES, true ) ? $value : $default;
+					break;
+
+				case 'proxy_header':
+					$settings[ $key ] = is_string( $value ) && $this->is_header( $value ) ? $value : $default;
+					break;
+
+				case 'trusted_proxies':
+					$settings[ $key ] = is_array( $value ) ? array_values( array_filter( array_map( array( IpRange::class, 'range' ), array_filter( $value, 'is_string' ) ) ) ) : $default;
+					break;
 			}
 		}
 
@@ -159,6 +205,17 @@ final class SettingsValidator {
 
 			case 'display_ids':
 				return $this->display_ids( $value );
+
+			case 'proxy_mode':
+				return in_array( $value, self::PROXY_MODES, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose how visitors reach your site.', 'chatchi' ) );
+
+			case 'proxy_header':
+				return $this->proxy_header( $value );
+
+			case 'trusted_proxies':
+				return $this->trusted_proxies( $value );
 		}
 
 		return new \WP_Error( 'invalid', __( 'Unknown setting.', 'chatchi' ) );
@@ -229,6 +286,71 @@ final class SettingsValidator {
 		}
 
 		return $ids;
+	}
+
+	/**
+	 * @param mixed $value Raw value.
+	 * @return string|\WP_Error
+	 */
+	private function proxy_header( $value ) {
+		$value = is_string( $value ) ? trim( $value ) : null;
+
+		if ( null === $value || ( '' !== $value && ! $this->is_header( $value ) ) ) {
+			return new \WP_Error( 'invalid', __( 'Use a header name made of letters, digits and dashes, like X-Real-IP.', 'chatchi' ) );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * @param mixed $value Raw value.
+	 * @return string[]|\WP_Error
+	 */
+	private function trusted_proxies( $value ) {
+		if ( ! is_array( $value ) ) {
+			return new \WP_Error( 'invalid', __( 'Enter one address or range per line.', 'chatchi' ) );
+		}
+
+		$ranges = array();
+
+		foreach ( $value as $entry ) {
+			$entry = is_string( $entry ) ? trim( $entry ) : '';
+
+			if ( '' === $entry ) {
+				continue;
+			}
+
+			$range = IpRange::range( $entry );
+
+			if ( null === $range ) {
+				return new \WP_Error(
+					'invalid',
+					/* translators: %s: the invalid entry. */
+					sprintf( __( '“%s” is not an IP address or range.', 'chatchi' ), mb_substr( PlainText::line( $entry ), 0, 60 ) )
+				);
+			}
+
+			$ranges[ $range ] = $range;
+		}
+
+		if ( count( $ranges ) > self::MAX_TRUSTED_PROXIES ) {
+			return new \WP_Error(
+				'invalid',
+				/* translators: %d: maximum number of entries. */
+				sprintf( __( 'Enter at most %d addresses or ranges.', 'chatchi' ), self::MAX_TRUSTED_PROXIES )
+			);
+		}
+
+		return array_values( $ranges );
+	}
+
+	/**
+	 * Whether a string is a plausible HTTP header name.
+	 *
+	 * @param string $name Header name.
+	 */
+	private function is_header( string $name ): bool {
+		return '' === $name || 1 === preg_match( '/^[A-Za-z0-9-]{1,64}$/', $name );
 	}
 
 	/**

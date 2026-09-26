@@ -130,6 +130,17 @@ final class PanelStrings {
 			'shortcodeIntro'     => __( 'Put this shortcode in any page, post or widget area to show the chat widget there, even where the rules above hide it.', 'chatchi' ),
 			'copy'               => __( 'Copy', 'chatchi' ),
 			'copied'             => __( 'Copied.', 'chatchi' ),
+			'ipTitle'            => __( 'Visitor IP addresses', 'chatchi' ),
+			'ipIntro'            => __( 'Used to limit how often the same visitor can start chats and send messages. Change this only if your site is behind a CDN or proxy.', 'chatchi' ),
+			'ipDirect'           => __( 'Visitors connect to my server directly', 'chatchi' ),
+			'ipCloudflare'       => __( 'My site is behind Cloudflare', 'chatchi' ),
+			'ipCustom'           => __( 'My site is behind another CDN or proxy (such as ArvanCloud)', 'chatchi' ),
+			'proxyHeader'        => __( 'Header that carries the visitor address', 'chatchi' ),
+			'trustedProxies'     => __( 'Addresses of your CDN or proxy (one IP or range per line)', 'chatchi' ),
+			'trustedHint'        => __( 'The header is only believed on requests from these addresses. Your CDN publishes this list.', 'chatchi' ),
+			'trustedEmpty'       => __( 'Without this list, anyone who can reach your server directly can fake their address and get around the per-address limits.', 'chatchi' ),
+			/* translators: %s: IP address. */
+			'yourIp'             => __( 'Your address as ChatChi sees it now: %s', 'chatchi' ),
 		);
 	}
 }

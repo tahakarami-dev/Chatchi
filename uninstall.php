@@ -20,6 +20,7 @@ function chatchi_uninstall_site() {
 	global $wpdb;
 
 	$tables = array(
+		'chatchi_rate_limits',
 		'chatchi_messages',
 		'chatchi_conversations',
 		'chatchi_agents',

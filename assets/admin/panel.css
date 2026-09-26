@@ -1453,6 +1453,18 @@ label.cc-button {
 	cursor: not-allowed;
 }
 
+.cc-textarea--code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 13px;
+	text-align: left;
+}
+
+.cc-code-inline {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-weight: 500;
+	color: var(--chatchi-text);
+}
+
 .cc-counter {
 	flex-shrink: 0;
 	font-size: 12px;

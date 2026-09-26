@@ -81,6 +81,7 @@ final class AdminModule implements Module {
 
 		nocache_headers();
 		header( 'Content-Type: text/html; charset=' . get_bloginfo( 'charset' ) );
+		$this->page->send_headers();
 
 		$this->page->render();
 		exit;

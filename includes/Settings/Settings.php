@@ -80,6 +80,11 @@ final class Settings {
 
 		$stored   = $this->validator->repair( get_option( self::OPTION, array() ) );
 		$settings = array_merge( $stored, $clean );
+		$combined = $this->validator->validate_combined( $settings );
+
+		if ( $combined instanceof \WP_Error ) {
+			return $combined;
+		}
 
 		if ( $settings !== $stored ) {
 			update_option( self::OPTION, $settings, true );
