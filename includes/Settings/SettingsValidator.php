@@ -34,6 +34,22 @@ final class SettingsValidator {
 
 	public const SUBTITLE_MAX_LENGTH = 100;
 
+	public const FORM_INTRO_MAX_LENGTH = 200;
+
+	public const FIELD_MODES = array( 'off', 'optional', 'required' );
+
+	/**
+	 * Whole-number settings: name => array( min, max, default ).
+	 */
+	public const NUMBERS = array(
+		'visitor_cookie_days'    => array( 1, 400, 30 ),
+		'message_max_length'     => array( 100, 10000, 2000 ),
+		'limit_messages_visitor' => array( 1, 500, 20 ),
+		'limit_messages_ip'      => array( 1, 5000, 60 ),
+		'limit_starts_visitor'   => array( 1, 100, 5 ),
+		'limit_starts_ip'        => array( 1, 1000, 10 ),
+	);
+
 	public const MAX_TRUSTED_PROXIES = 100;
 
 	private ContentLookup $content;
@@ -67,7 +83,32 @@ final class SettingsValidator {
 			// Empty means "use the translated default text".
 			'widget_title'    => '',
 			'widget_subtitle' => '',
+		) + $this->general_defaults();
+	}
+
+	/**
+	 * Defaults of the general, start form and limit settings.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function general_defaults(): array {
+		$defaults = array(
+			'widget_enabled'           => true,
+			// Keeping conversations when the plugin is deleted is the safe default.
+			'delete_data_on_uninstall' => false,
+			'form_name'                => 'required',
+			'form_email'               => 'required',
+			'form_phone'               => 'optional',
+			// Empty means "use the translated default text".
+			'form_intro'               => '',
+			'spam_protection'          => true,
 		);
+
+		foreach ( self::NUMBERS as $key => $range ) {
+			$defaults[ $key ] = $range[2];
+		}
+
+		return $defaults;
 	}
 
 	/**
@@ -199,8 +240,27 @@ final class SettingsValidator {
 
 				case 'widget_title':
 				case 'widget_subtitle':
+				case 'form_intro':
 					$settings[ $key ] = is_string( $value ) ? PlainText::line( $value ) : $default;
 					break;
+
+				case 'widget_enabled':
+				case 'delete_data_on_uninstall':
+				case 'spam_protection':
+					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'form_name':
+				case 'form_email':
+				case 'form_phone':
+					$settings[ $key ] = in_array( $value, self::FIELD_MODES, true ) ? $value : $default;
+					break;
+
+				default:
+					if ( isset( self::NUMBERS[ $key ] ) ) {
+						$number           = $this->number( $key, $value );
+						$settings[ $key ] = null !== $number ? $number : $default;
+					}
 			}
 		}
 
@@ -259,6 +319,33 @@ final class SettingsValidator {
 
 			case 'widget_subtitle':
 				return $this->short_text( $value, self::SUBTITLE_MAX_LENGTH );
+
+			case 'form_intro':
+				return $this->short_text( $value, self::FORM_INTRO_MAX_LENGTH );
+
+			case 'widget_enabled':
+			case 'delete_data_on_uninstall':
+			case 'spam_protection':
+				return rest_sanitize_boolean( $value );
+
+			case 'form_name':
+			case 'form_email':
+			case 'form_phone':
+				return in_array( $value, self::FIELD_MODES, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose off, optional or required.', 'chatchi' ) );
+		}
+
+		if ( isset( self::NUMBERS[ $key ] ) ) {
+			$number = $this->number( $key, $value );
+
+			return null !== $number
+				? $number
+				: new \WP_Error(
+					'invalid',
+					/* translators: 1: smallest allowed number, 2: largest allowed number. */
+					sprintf( __( 'Enter a whole number from %1$d to %2$d.', 'chatchi' ), self::NUMBERS[ $key ][0], self::NUMBERS[ $key ][1] )
+				);
 		}
 
 		return new \WP_Error( 'invalid', __( 'Unknown setting.', 'chatchi' ) );
@@ -385,6 +472,26 @@ final class SettingsValidator {
 		}
 
 		return array_values( $ranges );
+	}
+
+	/**
+	 * Returns a whole number within the setting's range, or null.
+	 *
+	 * @param string $key   Setting name.
+	 * @param mixed  $value Raw value.
+	 */
+	private function number( string $key, $value ): ?int {
+		if ( is_string( $value ) && preg_match( '/^\s*\d+\s*$/', $value ) ) {
+			$value = (int) $value;
+		}
+
+		if ( ! is_int( $value ) ) {
+			return null;
+		}
+
+		list( $min, $max ) = self::NUMBERS[ $key ];
+
+		return $value >= $min && $value <= $max ? $value : null;
 	}
 
 	/**

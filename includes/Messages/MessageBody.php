@@ -7,6 +7,7 @@
 
 namespace ChatChi\Messages;
 
+use ChatChi\Settings\Settings;
 use ChatChi\Support\PlainText;
 
 defined( 'ABSPATH' ) || exit;
@@ -24,6 +25,15 @@ final class MessageBody {
 
 	private const DEFAULT_MAX_LENGTH = 2000;
 
+	private ?Settings $settings;
+
+	/**
+	 * @param Settings|null $settings Plugin settings; without them the built-in defaults apply.
+	 */
+	public function __construct( ?Settings $settings = null ) {
+		$this->settings = $settings;
+	}
+
 	/**
 	 * Returns the maximum message length in characters.
 	 */
@@ -33,7 +43,8 @@ final class MessageBody {
 		 *
 		 * @param int $length Maximum length. Clamped to 1–10000.
 		 */
-		$length = (int) apply_filters( 'chatchi_message_max_length', self::DEFAULT_MAX_LENGTH );
+		$default = $this->settings ? (int) $this->settings->get( 'message_max_length' ) : self::DEFAULT_MAX_LENGTH;
+		$length  = (int) apply_filters( 'chatchi_message_max_length', $default );
 
 		return min( 10000, max( 1, $length ) );
 	}

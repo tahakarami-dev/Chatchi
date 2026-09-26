@@ -32,7 +32,7 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 
 ```text
 chatchi.php              Bootstrap: constants, requirements check, autoloader, hooks
-uninstall.php            Removes all plugin data on delete
+uninstall.php            On delete: removes temporary data; removes everything only if Settings → General says so
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
 ├── Agents/              Agent management service, avatar uploads
@@ -76,8 +76,8 @@ docs/                    Design and architecture documents
 | `chatchi_loaded` | action | All modules are registered |
 | `chatchi_installed` | action | Install/upgrade finished on the current site |
 | `chatchi_activated` / `chatchi_deactivated` | action | Plugin lifecycle |
-| `chatchi_visitor_cookie_lifetime` | filter | Visitor identity lifetime in seconds (1 hour – 400 days, default 30 days) |
-| `chatchi_profile_fields` | filter | Start-form fields: `enabled` / `required` per field |
+| `chatchi_visitor_cookie_lifetime` | filter | Visitor identity lifetime in seconds (1 hour – 400 days); receives the days set in Settings (default 30) |
+| `chatchi_profile_fields` | filter | Start-form fields: `enabled` / `required` per field; receives the Settings choice |
 | `chatchi_normalize_phone` | filter | Accept or reject mobile numbers (default: Iranian mobiles) |
 | `chatchi_conversation_started` | action | A visitor opened a new conversation |
 | `chatchi_conversation_status_changed` | action | Status moved (`new` → `active` → `closed`) |
@@ -85,18 +85,18 @@ docs/                    Design and architecture documents
 | `chatchi_pre_send_message` | filter | Return a `WP_Error` to refuse a message before it is stored |
 | `chatchi_message_sent` | action | A new message was stored (not fired for retried duplicates) |
 | `chatchi_messages_read` | action | Messages were marked as read |
-| `chatchi_message_max_length` | filter | Maximum message length in characters (default 2000) |
-| `chatchi_widget_enabled` | filter | Final say on whether the widget loads on the current page; receives the display-rules/shortcode decision |
+| `chatchi_message_max_length` | filter | Maximum message length in characters; receives the Settings value (default 2000) |
+| `chatchi_widget_enabled` | filter | Final say on whether the widget loads on the current page; receives the master switch + display-rules/shortcode decision |
 | `chatchi_widget_position` | filter | `left` or `right`; receives the corner chosen in Settings (default `left`) |
 | `chatchi_primary_color` | filter | Primary color of the widget and panel; receives the color chosen in Settings. Hover, soft and text colors are derived (text switches to dark below 4.5:1 contrast) |
 | `chatchi_widget_config` | filter | Full widget configuration |
 | `chatchi_settings` | filter | Settings as the plugin uses them (not saved) |
 | `chatchi_settings_updated` | action | Settings were saved, with the validated changes |
-| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]` |
+| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]`; receives the Settings values |
 | `chatchi_rate_limited` | action | A request was refused by a rate limit |
 | `chatchi_rate_limit_error` | action | The counter table failed; the request was allowed |
 | `chatchi_client_ip` | filter | The visitor IP used for rate limiting |
-| `chatchi_spam_protection` | filter | Turn the start-form bot checks on/off (e.g. for trusted API clients) |
+| `chatchi_spam_protection` | filter | Turn the start-form bot checks on/off; receives the Settings switch |
 | `chatchi_spam_min_seconds` | filter | Minimum seconds between loading the widget and starting (default 2, 0–60) |
 | `chatchi_spam_blocked` | action | A bot filled in the honeypot |
 | `chatchi_panel_csp` | filter | Content-Security-Policy of the agent panel (empty string: none) |
@@ -172,7 +172,11 @@ Administrators only (`manage_options`).
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
 
-Administrators also get a **Settings** screen with three sections, each saved on its own (unsaved sections are marked in the sub-menu):
+Administrators also get a **Settings** screen with six sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
+
+- **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
+- **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
+- **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, and the longest allowed message (100–10000 characters).
 
 - **Appearance** (`#/settings/appearance`): brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
 - **Welcome & display** (`#/settings/display`) and **IP & security** (`#/settings/security`), described below.

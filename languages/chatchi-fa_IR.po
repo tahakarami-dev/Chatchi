@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-26T17:37:34+00:00\n"
+"POT-Creation-Date: 2026-09-26T17:59:43+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -399,8 +399,8 @@ msgid "Settings"
 msgstr "تنظیمات"
 
 #: includes/Admin/PanelStrings.php:104
-msgid "How the chat widget greets visitors and where it appears."
-msgstr "ویجت گفتگو چطور به بازدیدکننده‌ها خوش‌آمد بگوید و کجا نمایش داده شود."
+msgid "Everything about how ChatChi works on your site."
+msgstr "همه‌ی تنظیمات چت‌چی برای سایت تو، یک‌جا."
 
 #: includes/Admin/PanelStrings.php:105
 msgid "Could not load settings."
@@ -490,7 +490,7 @@ msgstr "هنوز چیزی انتخاب نشده؛ پس ویجت فقط در صف
 
 #. translators: %d: maximum number of items.
 #: includes/Admin/PanelStrings.php:128
-#: includes/Settings/SettingsValidator.php:323
+#: includes/Settings/SettingsValidator.php:410
 #, php-format
 msgid "You can choose at most %d items."
 msgstr "حداکثر %d مورد می‌توانی انتخاب کنی."
@@ -649,6 +649,154 @@ msgstr "سلام، یک سؤال داشتم 🙂"
 #: includes/Frontend/WidgetStrings.php:38
 msgid "Write a message…"
 msgstr "پیامت را بنویس…"
+
+#: includes/Admin/PanelStrings.php:169
+msgid "General"
+msgstr "عمومی"
+
+#: includes/Admin/PanelStrings.php:170
+msgid "Start form"
+msgstr "فرم شروع"
+
+#: includes/Admin/PanelStrings.php:171
+msgid "Spam & limits"
+msgstr "ضد اسپم و محدودیت‌ها"
+
+#: includes/Admin/PanelStrings.php:172
+msgid "Chat widget"
+msgstr "ویجت گفتگو"
+
+#: includes/Admin/PanelStrings.php:173
+msgid "Turn the widget off to hide it from your whole site, shortcodes included. The agent panel keeps working."
+msgstr "با خاموش کردن، ویجت از کل سایت (حتی صفحه‌های دارای شورت‌کد) پنهان می‌شود. پنل اپراتور همچنان کار می‌کند."
+
+#: includes/Admin/PanelStrings.php:174
+msgid "Show the chat widget"
+msgstr "نمایش ویجت گفتگو"
+
+#: includes/Admin/PanelStrings.php:175
+msgid "The widget is off: visitors cannot start new chats."
+msgstr "ویجت خاموش است؛ بازدیدکننده‌ها نمی‌توانند گفتگوی جدید شروع کنند."
+
+#: includes/Admin/PanelStrings.php:176
+msgid "Visitors"
+msgstr "بازدیدکننده‌ها"
+
+#: includes/Admin/PanelStrings.php:177
+msgid "Remember returning visitors for"
+msgstr "به‌خاطر سپردن بازدیدکننده‌ها به مدت"
+
+#: includes/Admin/PanelStrings.php:178
+msgid "days"
+msgstr "روز"
+
+#: includes/Admin/PanelStrings.php:179
+msgid "Visitors who come back within this time see their earlier conversation. The time restarts on every visit."
+msgstr "بازدیدکننده‌ای که در این مدت برگردد، گفتگوی قبلی‌اش را می‌بیند. این مدت با هر بازدید از نو شروع می‌شود."
+
+#: includes/Admin/PanelStrings.php:180
+msgid "Data when the plugin is deleted"
+msgstr "داده‌ها هنگام حذف افزونه"
+
+#: includes/Admin/PanelStrings.php:181
+msgid "By default conversations, visitors, agents and settings are kept, so reinstalling brings everything back."
+msgstr "به‌طور پیش‌فرض گفتگوها، بازدیدکننده‌ها، اپراتورها و تنظیمات نگه داشته می‌شوند تا با نصب دوباره همه‌چیز برگردد."
+
+#: includes/Admin/PanelStrings.php:182
+msgid "Delete all data"
+msgstr "حذف همه‌ی داده‌ها"
+
+#: includes/Admin/PanelStrings.php:183
+msgid "Deleting the plugin will permanently delete every conversation and all ChatChi data. This cannot be undone."
+msgstr "با حذف افزونه، همه‌ی گفتگوها و داده‌های چت‌چی برای همیشه پاک می‌شوند. این کار برگشت‌پذیر نیست."
+
+#: includes/Admin/PanelStrings.php:184
+msgid "Start form fields"
+msgstr "فیلدهای فرم شروع"
+
+#: includes/Admin/PanelStrings.php:185
+msgid "What visitors are asked before their first message."
+msgstr "اطلاعاتی که قبل از اولین پیام از بازدیدکننده پرسیده می‌شود."
+
+#: includes/Admin/PanelStrings.php:186
+msgid "Off"
+msgstr "خاموش"
+
+#: includes/Admin/PanelStrings.php:187
+msgid "Optional"
+msgstr "اختیاری"
+
+#: includes/Admin/PanelStrings.php:188
+msgid "Required"
+msgstr "اجباری"
+
+#: includes/Admin/PanelStrings.php:189
+msgid "Every field is off: visitors start chatting right away, without a form."
+msgstr "همه‌ی فیلدها خاموش‌اند؛ بازدیدکننده بدون فرم، مستقیم گفتگو را شروع می‌کند."
+
+#: includes/Admin/PanelStrings.php:190
+msgid "Text above the form"
+msgstr "متن بالای فرم"
+
+#: includes/Admin/PanelStrings.php:191
+msgid "Bot protection"
+msgstr "محافظت در برابر ربات"
+
+#: includes/Admin/PanelStrings.php:192
+msgid "Stops simple bots from starting chats, invisibly for people. Turn it off only if another program starts chats through the API."
+msgstr "جلوی شروع گفتگو توسط ربات‌های ساده را می‌گیرد، بدون اینکه آدم‌ها چیزی ببینند. فقط اگر برنامه‌ی دیگری از طریق API گفتگو شروع می‌کند خاموشش کن."
+
+#: includes/Admin/PanelStrings.php:193
+msgid "Protect the start form"
+msgstr "محافظت از فرم شروع"
+
+#: includes/Admin/PanelStrings.php:194
+msgid "Rate limits"
+msgstr "محدودیت ارسال"
+
+#: includes/Admin/PanelStrings.php:195
+msgid "How much one visitor or one IP address may send. Keep the per-address limits generous: offices and mobile networks put many people behind one address."
+msgstr "هر بازدیدکننده یا هر آدرس IP چقدر می‌تواند بفرستد. سقف هر IP را بالا نگه دار؛ در ادارات و اینترنت موبایل خیلی‌ها پشت یک آدرس هستند."
+
+#: includes/Admin/PanelStrings.php:196
+msgid "Messages per visitor"
+msgstr "پیام برای هر بازدیدکننده"
+
+#: includes/Admin/PanelStrings.php:197
+msgid "Messages per IP address"
+msgstr "پیام برای هر آدرس IP"
+
+#: includes/Admin/PanelStrings.php:198
+msgid "New chats per visitor"
+msgstr "گفتگوی جدید برای هر بازدیدکننده"
+
+#: includes/Admin/PanelStrings.php:199
+msgid "New chats per IP address"
+msgstr "گفتگوی جدید برای هر آدرس IP"
+
+#: includes/Admin/PanelStrings.php:200
+msgid "per minute"
+msgstr "در دقیقه"
+
+#: includes/Admin/PanelStrings.php:201
+msgid "per hour"
+msgstr "در ساعت"
+
+#: includes/Admin/PanelStrings.php:202
+msgid "per 10 minutes"
+msgstr "در ۱۰ دقیقه"
+
+#: includes/Admin/PanelStrings.php:203
+msgid "Messages"
+msgstr "پیام‌ها"
+
+#: includes/Admin/PanelStrings.php:204
+msgid "Longest message"
+msgstr "حداکثر طول پیام"
+
+#: includes/Admin/PanelStrings.php:205
+msgid "characters"
+msgstr "نویسه"
 
 #: includes/Agents/AgentService.php:83
 msgid "This user does not exist."
@@ -810,12 +958,12 @@ msgstr "پیام‌ها زیاد شد. %d ثانیه دیگر دوباره بف�
 msgid "Too many attempts. Try again in %d minutes."
 msgstr "تلاش‌ها زیاد شد. %d دقیقه دیگر دوباره امتحان کن."
 
-#: includes/Messages/MessageBody.php:53
+#: includes/Messages/MessageBody.php:64
 msgid "Type a message first."
 msgstr "اول پیامت را بنویس."
 
 #. translators: %d: maximum number of characters.
-#: includes/Messages/MessageBody.php:64
+#: includes/Messages/MessageBody.php:75
 #, php-format
 msgid "Messages can be at most %d characters."
 msgstr "پیام حداکثر می‌تواند %d حرف باشد."
@@ -845,7 +993,7 @@ msgstr "حساب اپراتوری‌ات غیرفعال است."
 msgid "This request was rejected."
 msgstr "این درخواست پذیرفته نشد."
 
-#: includes/Rest/SettingsController.php:237
+#: includes/Rest/SettingsController.php:253
 msgid "(no title)"
 msgstr "(بدون عنوان)"
 
@@ -853,19 +1001,19 @@ msgstr "(بدون عنوان)"
 msgid "Start a conversation first."
 msgstr "اول یک گفتگو شروع کن."
 
-#: includes/Security/RateLimiter.php:154
+#: includes/Security/RateLimiter.php:169
 msgid "Too many requests. Please wait a moment and try again."
 msgstr "درخواست‌ها زیاد است. کمی صبر کن و دوباره امتحان کن."
 
-#: includes/Security/SpamGuard.php:89
+#: includes/Security/SpamGuard.php:102
 msgid "We could not start the chat. Please try again."
 msgstr "گفتگو شروع نشد. لطفاً دوباره امتحان کن."
 
-#: includes/Security/SpamGuard.php:109
+#: includes/Security/SpamGuard.php:122
 msgid "Please take a moment before starting the chat."
 msgstr "کمی صبر کن و بعد گفتگو را شروع کن."
 
-#: includes/Security/SpamGuard.php:123
+#: includes/Security/SpamGuard.php:136
 msgid "The chat form expired. Please try again."
 msgstr "فرم گفتگو منقضی شده. لطفاً دوباره امتحان کن."
 
@@ -873,83 +1021,93 @@ msgstr "فرم گفتگو منقضی شده. لطفاً دوباره امتحا�
 msgid "Hi! 👋 How can we help you today?"
 msgstr "سلام! 👋 امروز چطور می‌تونیم کمکت کنیم؟"
 
-#: includes/Settings/SettingsValidator.php:109
+#: includes/Settings/SettingsValidator.php:150
 msgid "Enter the header your proxy puts the visitor address in."
 msgstr "نام هدری را که پراکسی آدرس بازدیدکننده را در آن می‌گذارد وارد کن."
 
-#: includes/Settings/SettingsValidator.php:118
+#: includes/Settings/SettingsValidator.php:159
 msgid "Some settings need your attention."
 msgstr "چند مورد از تنظیمات نیاز به اصلاح دارد."
 
-#: includes/Settings/SettingsValidator.php:226
+#: includes/Settings/SettingsValidator.php:286
 msgid "Choose where the widget appears."
 msgstr "محل نمایش ویجت را انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:237
+#: includes/Settings/SettingsValidator.php:297
 msgid "Choose how visitors reach your site."
 msgstr "مشخص کن بازدیدکننده‌ها چطور به سایتت وصل می‌شوند."
 
-#: includes/Settings/SettingsValidator.php:250
+#: includes/Settings/SettingsValidator.php:310
 msgid "Enter a color code like #5B5BD6."
 msgstr "کد رنگ را به شکل #5B5BD6 وارد کن."
 
-#: includes/Settings/SettingsValidator.php:255
+#: includes/Settings/SettingsValidator.php:315
 msgid "Choose a corner for the widget."
 msgstr "جایگاه ویجت را انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:264
+#: includes/Settings/SettingsValidator.php:336
+msgid "Choose off, optional or required."
+msgstr "یکی از خاموش، اختیاری یا اجباری را انتخاب کن."
+
+#. translators: 1: smallest allowed number, 2: largest allowed number.
+#: includes/Settings/SettingsValidator.php:347
+#, php-format
+msgid "Enter a whole number from %1$d to %2$d."
+msgstr "یک عدد صحیح از %1$d تا %2$d وارد کن."
+
+#: includes/Settings/SettingsValidator.php:351
 msgid "Unknown setting."
 msgstr "تنظیم ناشناخته."
 
-#: includes/Settings/SettingsValidator.php:273
+#: includes/Settings/SettingsValidator.php:360
 msgid "Enter the message as text."
 msgstr "پیام را به‌صورت متن وارد کن."
 
 #. translators: %d: maximum number of characters.
-#: includes/Settings/SettingsValidator.php:282
+#: includes/Settings/SettingsValidator.php:369
 #, php-format
 msgid "The welcome message can be at most %d characters."
 msgstr "پیام خوش‌آمد حداکثر می‌تواند %d نویسه باشد."
 
-#: includes/Settings/SettingsValidator.php:295
+#: includes/Settings/SettingsValidator.php:382
 msgid "Choose page types from the list."
 msgstr "نوع صفحه را از فهرست انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:308
-#: includes/Settings/SettingsValidator.php:313
+#: includes/Settings/SettingsValidator.php:395
+#: includes/Settings/SettingsValidator.php:400
 msgid "Choose items from the search results."
 msgstr "موردها را از نتایج جست‌وجو انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:328
+#: includes/Settings/SettingsValidator.php:415
 msgid "Some of the chosen items no longer exist or are not published."
 msgstr "بعضی از موردهای انتخاب‌شده دیگر وجود ندارند یا منتشر نشده‌اند."
 
-#: includes/Settings/SettingsValidator.php:342
+#: includes/Settings/SettingsValidator.php:429
 msgid "Use a header name made of letters, digits and dashes, like X-Real-IP."
 msgstr "نام هدر فقط می‌تواند حرف انگلیسی، عدد و خط تیره باشد؛ مثل X-Real-IP."
 
-#: includes/Settings/SettingsValidator.php:354
+#: includes/Settings/SettingsValidator.php:441
 msgid "Enter one address or range per line."
 msgstr "در هر خط یک آدرس یا بازه وارد کن."
 
 #. translators: %s: the invalid entry.
-#: includes/Settings/SettingsValidator.php:372
+#: includes/Settings/SettingsValidator.php:459
 #, php-format
 msgid "“%s” is not an IP address or range."
 msgstr "«%s» آدرس یا بازه‌ی IP معتبر نیست."
 
 #. translators: %d: maximum number of entries.
-#: includes/Settings/SettingsValidator.php:383
+#: includes/Settings/SettingsValidator.php:470
 #, php-format
 msgid "Enter at most %d addresses or ranges."
 msgstr "حداکثر %d آدرس یا بازه وارد کن."
 
-#: includes/Settings/SettingsValidator.php:423
+#: includes/Settings/SettingsValidator.php:530
 msgid "Enter the text as plain text."
 msgstr "متن را به‌صورت ساده وارد کن."
 
 #. translators: %d: maximum number of characters.
-#: includes/Settings/SettingsValidator.php:432
+#: includes/Settings/SettingsValidator.php:539
 #, php-format
 msgid "Use at most %d characters."
 msgstr "حداکثر %d نویسه مجاز است."

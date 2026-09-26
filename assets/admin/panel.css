@@ -2017,3 +2017,113 @@ label.cc-button {
 		position: static;
 	}
 }
+
+/* General, start form and limits sections */
+
+.cc-input--number {
+	width: 120px;
+	font-variant-numeric: tabular-nums;
+}
+
+.cc-unit {
+	color: var(--chatchi-text-muted);
+	font-size: 13px;
+}
+
+.cc-number-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.cc-number-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px 24px;
+}
+
+.cc-warning--danger {
+	background: var(--chatchi-error-soft);
+	color: var(--chatchi-error-text);
+}
+
+.cc-note {
+	padding: 10px 12px;
+	border-radius: var(--chatchi-radius-sm);
+	background: var(--chatchi-primary-soft);
+	color: var(--chatchi-text);
+}
+
+.cc-field-rows {
+	display: flex;
+	flex-direction: column;
+}
+
+.cc-field-row {
+	display: grid;
+	grid-template-columns: 140px minmax(0, 1fr);
+	align-items: center;
+	gap: 8px 16px;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--chatchi-border);
+}
+
+.cc-field-row:last-child {
+	border-bottom: 0;
+}
+
+.cc-field-row .cc-field-error {
+	grid-column: 2;
+}
+
+.cc-field-row__name {
+	font-weight: 500;
+}
+
+.cc-segmented {
+	display: inline-flex;
+	justify-self: start;
+	padding: 3px;
+	border-radius: var(--chatchi-radius-sm);
+	background: var(--chatchi-bg);
+	box-shadow: inset 0 0 0 1px var(--chatchi-border);
+}
+
+.cc-segmented__option {
+	position: relative;
+	padding: 6px 14px;
+	border-radius: 6px;
+	color: var(--chatchi-text-muted);
+	font-size: 13px;
+	cursor: pointer;
+	transition: background-color var(--chatchi-duration-fast), color var(--chatchi-duration-fast);
+}
+
+.cc-segmented__option input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.cc-segmented__option:has(input:checked) {
+	background: var(--chatchi-surface);
+	color: var(--chatchi-text);
+	font-weight: 500;
+	box-shadow: var(--chatchi-shadow-sm);
+}
+
+.cc-segmented__option:has(input:focus-visible) {
+	outline: 2px solid var(--chatchi-primary);
+	outline-offset: 1px;
+}
+
+@media (max-width: 767px) {
+	.cc-number-grid,
+	.cc-field-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.cc-field-row .cc-field-error {
+		grid-column: 1;
+	}
+}

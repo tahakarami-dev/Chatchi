@@ -1760,10 +1760,15 @@
 	 * errors and unsaved changes stay where they belong.
 	 */
 	var SETTINGS_SECTIONS = [
+		{ id: 'general', icon: 'power', keys: [ 'widget_enabled', 'visitor_cookie_days', 'delete_data_on_uninstall' ] },
 		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
+		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
+		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
+
+	var NUMBER_SETTINGS = [ 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip' ];
 
 	function settingsSection( id ) {
 		return SETTINGS_SECTIONS.filter( function ( section ) {
@@ -1860,6 +1865,15 @@
 			payload.primary_color = draft.primary_color.trim();
 		}
 
+		// Whole numbers go out as numbers; anything else is sent as typed so
+		// the server can say what is wrong with it.
+		NUMBER_SETTINGS.forEach( function ( key ) {
+			if ( key in payload ) {
+				var text = String( payload[ key ] ).trim();
+				payload[ key ] = /^\d+$/.test( text ) ? parseInt( text, 10 ) : text;
+			}
+		} );
+
 		return payload;
 	};
 
@@ -1942,7 +1956,14 @@
 
 	SettingsView.prototype.buildNav = function () {
 		var self = this;
-		var labels = { appearance: S.sectionAppearance, display: S.sectionDisplay, security: S.sectionSecurity };
+		var labels = {
+			general: S.sectionGeneral,
+			appearance: S.sectionAppearance,
+			form: S.sectionForm,
+			display: S.sectionDisplay,
+			limits: S.sectionLimits,
+			security: S.sectionSecurity
+		};
 
 		this.navLinks = {};
 
@@ -1987,8 +2008,14 @@
 		this.errors = {};
 		this.saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
 
-		if ( this.section === 'appearance' ) {
+		if ( this.section === 'general' ) {
+			children = [ this.buildGeneral() ];
+		} else if ( this.section === 'appearance' ) {
 			children = [ this.buildAppearance() ];
+		} else if ( this.section === 'form' ) {
+			children = [ this.buildStartForm() ];
+		} else if ( this.section === 'limits' ) {
+			children = [ this.buildLimits() ];
 		} else if ( this.section === 'security' ) {
 			children = [ this.buildProxy() ];
 		} else {
@@ -2313,6 +2340,194 @@
 		var welcomeOn = this.data.settings.welcome_enabled;
 		preview.welcome.hidden = ! welcomeOn;
 		preview.welcome.textContent = this.data.settings.welcome_message || defaults.welcome_message;
+	};
+
+	/* ------------------------------ general ---------------------------- */
+
+	/**
+	 * A labelled whole-number field with an optional unit after it.
+	 */
+	SettingsView.prototype.numberField = function ( key, label, unit, hint ) {
+		var self = this;
+		var draft = this.draft;
+		var range = this.data.ranges[ key ];
+		var id = 'cc-' + key.replace( /_/g, '-' );
+		var input = h( 'input', {
+			id: id,
+			className: 'cc-input cc-input--number',
+			type: 'number',
+			inputmode: 'numeric',
+			min: String( range[ 0 ] ),
+			max: String( range[ 1 ] ),
+			step: '1',
+			dir: 'ltr',
+			'aria-describedby': hint ? id + '-hint' : null
+		} );
+		input.value = String( draft[ key ] );
+		input.addEventListener( 'input', function () {
+			draft[ key ] = input.value;
+			self.clearError( key );
+		} );
+
+		return h( 'div', { className: 'cc-number-field' }, [
+			h( 'label', { className: 'cc-label', for: id, text: label } ),
+			h( 'div', { className: 'cc-inline' }, [ input, unit ? h( 'span', { className: 'cc-unit', text: unit } ) : null ] ),
+			hint ? h( 'p', { id: id + '-hint', className: 'cc-hint', text: hint } ) : null,
+			this.fieldError( key )
+		] );
+	};
+
+	SettingsView.prototype.buildGeneral = function () {
+		var draft = this.draft;
+		var offWarning = h( 'p', { className: 'cc-warning', role: 'status', text: S.widgetOffWarning } );
+		var deleteWarning = h( 'p', { className: 'cc-warning cc-warning--danger', role: 'status', text: S.deleteDataWarning } );
+
+		offWarning.hidden = draft.widget_enabled;
+		deleteWarning.hidden = ! draft.delete_data_on_uninstall;
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-widget-on-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-widget-on-title', text: S.widgetOnTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.widgetOnIntro } )
+					] ),
+					this.buildSwitch( 'cc-widget-enabled', S.widgetOn, draft.widget_enabled, function ( on ) {
+						draft.widget_enabled = on;
+						offWarning.hidden = on;
+					} )
+				] ),
+				offWarning,
+				this.fieldError( 'widget_enabled' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-visitors-title' }, [
+				h( 'h2', { id: 'cc-visitors-title', text: S.visitorsTitle } ),
+				this.numberField( 'visitor_cookie_days', S.visitorDays, S.days, S.visitorDaysHint )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-data-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-data-title', text: S.dataTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.dataIntro } )
+					] ),
+					this.buildSwitch( 'cc-delete-data', S.deleteData, draft.delete_data_on_uninstall, function ( on ) {
+						draft.delete_data_on_uninstall = on;
+						deleteWarning.hidden = ! on;
+					} )
+				] ),
+				deleteWarning,
+				this.fieldError( 'delete_data_on_uninstall' )
+			] )
+		] );
+	};
+
+	/* ----------------------------- start form -------------------------- */
+
+	SettingsView.prototype.buildStartForm = function () {
+		var self = this;
+		var draft = this.draft;
+		var modes = [ [ 'off', S.fieldOff ], [ 'optional', S.fieldOptional ], [ 'required', S.fieldRequired ] ];
+		var fields = [ [ 'form_name', S.name ], [ 'form_email', S.email ], [ 'form_phone', S.phone ] ];
+		var noForm = h( 'p', { className: 'cc-hint cc-note', role: 'status', text: S.formOffNote } );
+
+		function syncNoForm() {
+			noForm.hidden = fields.some( function ( field ) {
+				return draft[ field[ 0 ] ] !== 'off';
+			} );
+		}
+
+		var rows = fields.map( function ( field ) {
+			var key = field[ 0 ];
+
+			return h( 'div', { className: 'cc-field-row' }, [
+				h( 'span', { className: 'cc-field-row__name', id: 'cc-' + key + '-label', text: field[ 1 ] } ),
+				h( 'div', { className: 'cc-segmented', role: 'radiogroup', 'aria-labelledby': 'cc-' + key + '-label' }, modes.map( function ( mode ) {
+					var id = 'cc-' + key.replace( '_', '-' ) + '-' + mode[ 0 ];
+					var input = h( 'input', { id: id, type: 'radio', name: 'cc-' + key, value: mode[ 0 ], checked: draft[ key ] === mode[ 0 ] } );
+
+					input.addEventListener( 'change', function () {
+						if ( input.checked ) {
+							draft[ key ] = mode[ 0 ];
+							self.clearError( key );
+							syncNoForm();
+						}
+					} );
+
+					return h( 'label', { className: 'cc-segmented__option', for: id }, [ input, h( 'span', { text: mode[ 1 ] } ) ] );
+				} ) ),
+				self.fieldError( key )
+			] );
+		} );
+
+		var intro = h( 'input', {
+			id: 'cc-form-intro',
+			className: 'cc-input',
+			type: 'text',
+			placeholder: this.data.defaults.form_intro,
+			'aria-describedby': 'cc-form-intro-hint'
+		} );
+		intro.value = draft.form_intro;
+		intro.addEventListener( 'input', function () {
+			draft.form_intro = intro.value;
+			self.clearError( 'form_intro' );
+		} );
+
+		syncNoForm();
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-form-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-form-title', text: S.formTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.formIntroText } )
+				] ),
+				h( 'div', { className: 'cc-field-rows' }, rows ),
+				noForm
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-form-intro-title' }, [
+				h( 'h2', { id: 'cc-form-intro-title', text: S.formIntroTitle } ),
+				h( 'label', { className: 'cc-sr', for: 'cc-form-intro', text: S.formIntroTitle } ),
+				intro,
+				h( 'p', { id: 'cc-form-intro-hint', className: 'cc-hint', text: S.textDefault } ),
+				this.fieldError( 'form_intro' )
+			] )
+		] );
+	};
+
+	/* --------------------------- spam and limits ----------------------- */
+
+	SettingsView.prototype.buildLimits = function () {
+		var draft = this.draft;
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-spam-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-spam-title', text: S.spamTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.spamIntro } )
+					] ),
+					this.buildSwitch( 'cc-spam-protection', S.spamOn, draft.spam_protection, function ( on ) {
+						draft.spam_protection = on;
+					} )
+				] ),
+				this.fieldError( 'spam_protection' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-limits-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-limits-title', text: S.limitsTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.limitsIntro } )
+				] ),
+				h( 'div', { className: 'cc-number-grid' }, [
+					this.numberField( 'limit_messages_visitor', S.limitMessagesVisitor, S.perMinute ),
+					this.numberField( 'limit_messages_ip', S.limitMessagesIp, S.perMinute ),
+					this.numberField( 'limit_starts_visitor', S.limitStartsVisitor, S.perHour ),
+					this.numberField( 'limit_starts_ip', S.limitStartsIp, S.perTenMinutes )
+				] )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-length-title' }, [
+				h( 'h2', { id: 'cc-length-title', text: S.messagesTitle } ),
+				this.numberField( 'message_max_length', S.messageMaxLength, S.characters )
+			] )
+		] );
 	};
 
 	SettingsView.prototype.fieldError = function ( key ) {

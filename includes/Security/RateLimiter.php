@@ -8,6 +8,7 @@
 namespace ChatChi\Security;
 
 use ChatChi\Database\Repositories\RateLimitRepository;
+use ChatChi\Settings\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,13 +35,17 @@ final class RateLimiter {
 
 	private ClientIp $client_ip;
 
+	private ?Settings $settings;
+
 	/**
 	 * @param RateLimitRepository $counters  Hit counters.
 	 * @param ClientIp            $client_ip Visitor address.
+	 * @param Settings|null       $settings  Plugin settings; without them the built-in limits apply.
 	 */
-	public function __construct( RateLimitRepository $counters, ClientIp $client_ip ) {
+	public function __construct( RateLimitRepository $counters, ClientIp $client_ip, ?Settings $settings = null ) {
 		$this->counters  = $counters;
 		$this->client_ip = $client_ip;
+		$this->settings  = $settings;
 	}
 
 	/**
@@ -52,12 +57,12 @@ final class RateLimiter {
 		$defaults = array(
 			// Starting a conversation creates a visitor and a conversation.
 			'start'   => array(
-				'ip'      => array( 10, 10 * MINUTE_IN_SECONDS ),
-				'visitor' => array( 5, HOUR_IN_SECONDS ),
+				'ip'      => array( $this->setting( 'limit_starts_ip', 10 ), 10 * MINUTE_IN_SECONDS ),
+				'visitor' => array( $this->setting( 'limit_starts_visitor', 5 ), HOUR_IN_SECONDS ),
 			),
 			'message' => array(
-				'visitor' => array( 20, MINUTE_IN_SECONDS ),
-				'ip'      => array( 60, MINUTE_IN_SECONDS ),
+				'visitor' => array( $this->setting( 'limit_messages_visitor', 20 ), MINUTE_IN_SECONDS ),
+				'ip'      => array( $this->setting( 'limit_messages_ip', 60 ), MINUTE_IN_SECONDS ),
 			),
 			// Marking messages read and closing.
 			'write'   => array(
@@ -81,6 +86,16 @@ final class RateLimiter {
 		$limits = apply_filters( 'chatchi_rate_limits', $defaults );
 
 		return is_array( $limits ) ? $limits : $defaults;
+	}
+
+	/**
+	 * Returns a limit from the settings.
+	 *
+	 * @param string $key      Setting name.
+	 * @param int    $fallback Limit without settings.
+	 */
+	private function setting( string $key, int $fallback ): int {
+		return $this->settings ? (int) $this->settings->get( $key ) : $fallback;
 	}
 
 	/**

@@ -7,6 +7,8 @@
 
 namespace ChatChi\Visitors;
 
+use ChatChi\Settings\Settings;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -27,6 +29,15 @@ final class VisitorCookie {
 	 * Browsers cap cookie lifetime at 400 days.
 	 */
 	private const MAX_LIFETIME = 400 * DAY_IN_SECONDS;
+
+	private ?Settings $settings;
+
+	/**
+	 * @param Settings|null $settings Plugin settings; without them the built-in defaults apply.
+	 */
+	public function __construct( ?Settings $settings = null ) {
+		$this->settings = $settings;
+	}
 
 	/**
 	 * Returns the token from the request, or null when absent or malformed.
@@ -74,7 +85,8 @@ final class VisitorCookie {
 		 *
 		 * @param int $lifetime Seconds. Clamped to one hour – 400 days.
 		 */
-		$lifetime = (int) apply_filters( 'chatchi_visitor_cookie_lifetime', self::DEFAULT_LIFETIME );
+		$default  = $this->settings ? (int) $this->settings->get( 'visitor_cookie_days' ) * DAY_IN_SECONDS : self::DEFAULT_LIFETIME;
+		$lifetime = (int) apply_filters( 'chatchi_visitor_cookie_lifetime', $default );
 
 		return min( self::MAX_LIFETIME, max( self::MIN_LIFETIME, $lifetime ) );
 	}
