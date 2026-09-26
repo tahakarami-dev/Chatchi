@@ -18,8 +18,10 @@ defined( 'ABSPATH' ) || exit;
  *
  * - Guests are identified by the token in their cookie.
  * - Logged-in users are identified by their WordPress account, so their
- *   conversations follow them across devices. A guest identity is linked to
- *   the account the first time that guest logs in.
+ *   conversations follow them across devices. A guest identity is never
+ *   adopted at sign-in: on a shared browser the guest token may belong to
+ *   someone else, and linking it would hand that person's conversations and
+ *   contact details to the account.
  * - A guest cookie whose visitor is linked to an account is ignored while
  *   logged out, so on a shared computer the next guest cannot read the
  *   previous user's conversations.
@@ -66,7 +68,7 @@ final class VisitorIdentity {
 			return $this->resolved[ $user_id ];
 		}
 
-		$visitor = $user_id > 0 ? $this->for_user( $user_id ) : $this->for_guest();
+		$visitor = $user_id > 0 ? $this->visitors->find_by_user_id( $user_id ) : $this->for_guest();
 
 		if ( $visitor ) {
 			$this->keep_alive( $visitor, $user_id );
@@ -93,13 +95,7 @@ final class VisitorIdentity {
 		}
 
 		$user_id = get_current_user_id();
-		$token   = VisitorToken::generate();
-		$visitor = $this->visitors->create( VisitorToken::hash( $token ), $profile, $user_id );
-
-		// Logged-in users are identified by their account; only guests need the cookie.
-		if ( 0 === $user_id ) {
-			$this->cookie->write( $token );
-		}
+		$visitor = $user_id > 0 ? $this->create_for_user( $user_id, $profile ) : $this->create_for_guest( $profile );
 
 		$this->resolved[ $user_id ] = $visitor;
 
@@ -134,27 +130,48 @@ final class VisitorIdentity {
 	}
 
 	/**
-	 * Resolves a logged-in user, adopting their guest identity if they have one.
+	 * Creates a guest visitor and hands its token to the browser.
 	 *
-	 * @param int $user_id WordPress user ID.
+	 * @param array<string, string> $profile Sanitized profile.
+	 *
+	 * @throws DatabaseException When the visitor cannot be stored.
+	 * @throws \Exception        When no secure random source is available.
 	 */
-	private function for_user( int $user_id ): ?Visitor {
-		$visitor = $this->visitors->find_by_user_id( $user_id );
+	private function create_for_guest( array $profile ): Visitor {
+		$token   = VisitorToken::generate();
+		$visitor = $this->visitors->create( VisitorToken::hash( $token ), $profile );
 
-		if ( $visitor ) {
-			return $visitor;
+		$this->cookie->write( $token );
+
+		return $visitor;
+	}
+
+	/**
+	 * Creates the visitor of a logged-in user, or returns the one a concurrent
+	 * request just created.
+	 *
+	 * Logged-in users are identified by their account, so no cookie is set.
+	 *
+	 * @param int                   $user_id WordPress user ID.
+	 * @param array<string, string> $profile Sanitized profile.
+	 *
+	 * @throws DatabaseException When the visitor cannot be stored or found.
+	 */
+	private function create_for_user( int $user_id, array $profile ): Visitor {
+		$hash = VisitorToken::hash_for_user( $user_id );
+
+		try {
+			return $this->visitors->create( $hash, $profile, $user_id );
+		} catch ( DatabaseException $e ) {
+			// The unique token_hash index rejected a duplicate: another request won.
+			$existing = $this->visitors->find_by_token_hash( $hash );
+
+			if ( $existing ) {
+				return $existing;
+			}
+
+			throw $e;
 		}
-
-		$guest = $this->for_guest();
-
-		if ( ! $guest ) {
-			return null;
-		}
-
-		$this->visitors->link_user( $guest->id, $user_id );
-		$guest->user_id = $user_id;
-
-		return $guest;
 	}
 
 	/**

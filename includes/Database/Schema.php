@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '1';
+	public const VERSION = '2';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -100,6 +100,8 @@ final class Schema {
 		$messages      = $prefix . Table::MESSAGES;
 
 		// token_hash stores a hash of the visitor's cookie token, never the token itself.
+		// open_visitor_id equals visitor_id while a conversation is open and is NULL once
+		// closed; its unique key allows at most one open conversation per visitor.
 		return array(
 			"CREATE TABLE {$visitors} (
 id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -139,7 +141,9 @@ last_message_at datetime NOT NULL,
 created_at datetime NOT NULL,
 updated_at datetime NOT NULL,
 closed_at datetime NULL DEFAULT NULL,
+open_visitor_id bigint(20) unsigned NULL DEFAULT NULL,
 PRIMARY KEY  (id),
+UNIQUE KEY open_visitor (open_visitor_id),
 KEY visitor_status (visitor_id,status),
 KEY status_activity (status,last_message_at),
 KEY last_message_at (last_message_at),
