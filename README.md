@@ -186,6 +186,12 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 - **Where the widget appears**: on every page, only on chosen page types and items, or everywhere except them. Page types are the home page, all pages, all blog posts, and WooCommerce products (single products, the shop, product categories and tags).
 - **Shortcode**: `[chatchi]` (alias `[hamyarchat]`) shows the floating widget on that page even where the rules hide it. It prints nothing itself and also works in widget areas and page builders (the widget then loads in the footer).
 
+## Troubleshooting
+
+- **"Not sent" in the widget:** when a site administrator is logged in, the widget shows the technical cause under a failed message (HTTP status, error code, and the server's explanation). Visitors never see it. The same message is always written to the server's PHP error log as `[ChatChi] … error: …`.
+- **Unfinished database upgrades** repair themselves: an error about a missing table or column makes the installer run again on the next request. The installer also checks that required columns exist, and shows an admin notice when it cannot fix them (for example when the database user may not `ALTER` tables).
+- **Other plugins printing into responses** (PHP notices, stray whitespace) no longer break the chat: that output is removed from ChatChi's REST responses, and the widget can read the JSON even when something was printed before it.
+
 ## Security
 
 - **Rate limits** (sliding window, per visitor and per IP; IPv6 per /64): starting conversations 5/hour per visitor and 10/10 min per IP; messages 20/min per visitor and 60/min per IP; other writes 60/min and 180/min. Reads (polling) and agents are not limited. Refused requests get `429 chatchi_rate_limited` with `data.retry_after` and a `Retry-After` header; the widget shows "try again in N seconds/minutes". Counting is atomic, so parallel requests cannot get past a limit. If the counter table fails, requests are allowed.

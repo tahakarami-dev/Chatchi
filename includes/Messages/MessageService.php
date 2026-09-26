@@ -14,6 +14,7 @@ use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Models\Conversation;
 use ChatChi\Models\Message;
+use ChatChi\Support\Failure;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -296,13 +297,6 @@ final class MessageService {
 	 * @param \Throwable $error Failure.
 	 */
 	private function failure( \Throwable $error ): \WP_Error {
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Unexpected failures must reach the server log.
-		error_log( '[ChatChi] Message error: ' . $error->getMessage() );
-
-		return new \WP_Error(
-			'chatchi_message_unavailable',
-			__( 'Something went wrong. Please try again.', 'chatchi' ),
-			array( 'status' => 500 )
-		);
+		return Failure::report( $error, 'Message', 'chatchi_message_unavailable' );
 	}
 }

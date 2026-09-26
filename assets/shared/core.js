@@ -330,11 +330,16 @@
 			} ).then( function ( response ) {
 				return response.text().catch( function () {
 					return '';
-				} ).then( parseJson ).then( function ( data ) {
+				} ).then( function ( text ) {
+					var data = parseJson( text );
+					// A short, tag-free excerpt of an unreadable body (e.g. a PHP fatal
+					// error page), for administrators' diagnostics.
+					var raw = data === null ? String( text ).replace( /<[^>]*>/g, ' ' ).replace( /\s+/g, ' ' ).trim().slice( 0, 300 ) : '';
+
 					if ( response.ok ) {
 						if ( data === null && response.status !== 204 ) {
 							// Unreadable success: never pretend it worked; retries are safe (client_id).
-							throw new ApiError( response.status, 'invalid_response', options.networkError );
+							throw new ApiError( response.status, 'invalid_response', options.networkError, { raw: raw } );
 						}
 						return data;
 					}
@@ -346,7 +351,7 @@
 						return request( method, path, opts, true );
 					}
 
-					throw new ApiError( response.status, code, data && data.message ? data.message : options.networkError, data && data.data );
+					throw new ApiError( response.status, code, data && data.message ? data.message : options.networkError, data ? data.data : { raw: raw } );
 				} );
 			}, function () {
 				throw new ApiError( 0, 'network', options.networkError );

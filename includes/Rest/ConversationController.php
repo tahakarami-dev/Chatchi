@@ -11,6 +11,7 @@ use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Messages\MessageService;
 use ChatChi\Models\Conversation;
+use ChatChi\Support\Failure;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -330,13 +331,6 @@ abstract class ConversationController implements RouteProvider {
 	 * @param \Throwable $error Failure.
 	 */
 	protected function failure( \Throwable $error ): \WP_Error {
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Unexpected failures must reach the server log.
-		error_log( '[ChatChi] REST error: ' . $error->getMessage() );
-
-		return new \WP_Error(
-			'chatchi_unavailable',
-			__( 'Something went wrong. Please try again.', 'chatchi' ),
-			array( 'status' => 500 )
-		);
+		return Failure::report( $error, 'REST', 'chatchi_unavailable' );
 	}
 }

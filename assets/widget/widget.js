@@ -395,6 +395,7 @@
 			// Say why when the server refused the message itself (e.g. too long);
 			// connection problems keep the generic "tap to retry".
 			pending.reason = pending.limited ? self.waitMessage( error ) : ( error.status >= 400 && error.status < 500 && error.message ? error.message : '' );
+			pending.debug = self.debugDetails( error );
 			self.render();
 		} );
 	};
@@ -471,6 +472,27 @@
 	};
 
 	/**
+	 * Technical details of a failed request, for administrators only: the
+	 * HTTP status, the error code and the server's own explanation.
+	 */
+	Widget.prototype.debugDetails = function ( error ) {
+		if ( ! config.debug || ! error ) {
+			return '';
+		}
+
+		var data = error.data || {};
+		var parts = [ error.status ? 'HTTP ' + error.status : 'HTTP —', error.code || '' ];
+
+		if ( data.details ) {
+			parts.push( data.details );
+		} else if ( data.raw ) {
+			parts.push( data.raw );
+		}
+
+		return parts.filter( Boolean ).join( ' · ' );
+	};
+
+	/**
 	 * Turns a rate-limit error into "try again in N seconds/minutes".
 	 */
 	Widget.prototype.waitMessage = function ( error ) {
@@ -511,7 +533,7 @@
 		} ).catch( function ( error ) {
 			var fields = ( error.data && error.data.fields ) || {};
 			var alert = error.code === 'chatchi_rate_limited' ? self.waitMessage( error ) : error.message;
-			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : alert } );
+			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : alert, formDebug: self.debugDetails( error ) } );
 			var invalid = self.panel.querySelector( '[aria-invalid="true"]' );
 			if ( invalid ) {
 				invalid.focus();
@@ -900,6 +922,9 @@
 
 		if ( state.formAlert ) {
 			form.appendChild( h( 'p', { className: 'chatchi-alert', role: 'alert', text: state.formAlert } ) );
+			if ( state.formDebug ) {
+				form.appendChild( h( 'p', { className: 'chatchi-debug', dir: 'ltr', text: state.formDebug } ) );
+			}
 		}
 
 		form.appendChild( h( 'button', { type: 'submit', className: 'chatchi-button', disabled: state.submitting, text: state.submitting ? S.loading : S.start } ) );
@@ -1041,6 +1066,9 @@
 					self.focusDefault();
 				}
 			} ) );
+			if ( entry.ref.debug ) {
+				stack.appendChild( h( 'p', { className: 'chatchi-debug', dir: 'ltr', text: entry.ref.debug } ) );
+			}
 		} else if ( groupEnd && entry.type !== 'welcome' ) {
 			stack.appendChild( this.renderMeta( entry ) );
 		}

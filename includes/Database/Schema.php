@@ -27,6 +27,18 @@ final class Schema {
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
+	/**
+	 * Columns added after the first release, checked after every upgrade:
+	 * dbDelta() does not report when it fails to add one.
+	 */
+	private const REQUIRED_COLUMNS = array(
+		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url' ),
+		Table::MESSAGES      => array( 'client_id', 'read_at' ),
+		Table::AGENTS        => array( 'avatar_id', 'is_active' ),
+		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone' ),
+		Table::RATE_LIMITS   => array( 'bucket', 'hits', 'expires_at' ),
+	);
+
 	private \wpdb $db;
 
 	/**
@@ -50,11 +62,15 @@ final class Schema {
 		$error   = $this->db->last_error;
 		$missing = $this->missing_tables();
 
+		if ( ! $missing ) {
+			$missing = $this->missing_columns();
+		}
+
 		if ( $missing ) {
 			throw new DatabaseException(
 				trim(
 					sprintf(
-						'Could not create the tables %s. %s',
+						'Could not create or upgrade %s. %s',
 						implode( ', ', $missing ),
 						$error
 					)
@@ -79,6 +95,28 @@ final class Schema {
 
 			if ( $found !== $name ) {
 				$missing[] = $name;
+			}
+		}
+
+		return $missing;
+	}
+
+	/**
+	 * Returns "table.column" for every required column that does not exist.
+	 *
+	 * @return string[]
+	 */
+	public function missing_columns(): array {
+		$missing = array();
+
+		foreach ( self::REQUIRED_COLUMNS as $table => $columns ) {
+			$name     = $this->db->prefix . $table;
+			$existing = array_map( 'strtolower', (array) $this->db->get_col( "SHOW COLUMNS FROM {$name}", 0 ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed table name.
+
+			foreach ( $columns as $column ) {
+				if ( ! in_array( $column, $existing, true ) ) {
+					$missing[] = $name . '.' . $column;
+				}
 			}
 		}
 
