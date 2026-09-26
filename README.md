@@ -17,7 +17,8 @@ The plugin is built in phases. Each phase is designed, implemented, tested and a
 | 1 | Plugin Foundation + Architecture | ✅ |
 | 2 | Database Layer | ✅ |
 | 3 | User / Visitor Identity | ✅ |
-| 4 | Conversation System | ⏳ |
+| 4 | Conversation System | ✅ |
+| 5 | Message System | ⏳ |
 
 ## Architecture
 
@@ -26,6 +27,7 @@ chatchi.php              Bootstrap: constants, requirements check, autoloader, h
 uninstall.php            Removes all plugin data on delete
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
+├── Conversations/       Conversation service, access policy (Actor), inbox summaries
 ├── Core/
 │   ├── Container.php    Lazy service container
 │   ├── Contracts/       Interfaces (Module)
@@ -57,6 +59,9 @@ docs/                    Design and architecture documents
 | `chatchi_visitor_cookie_lifetime` | filter | Visitor identity lifetime in seconds (1 hour – 400 days, default 30 days) |
 | `chatchi_profile_fields` | filter | Start-form fields: `enabled` / `required` per field |
 | `chatchi_normalize_phone` | filter | Accept or reject mobile numbers (default: Iranian mobiles) |
+| `chatchi_conversation_started` | action | A visitor opened a new conversation |
+| `chatchi_conversation_status_changed` | action | Status moved (`new` → `active` → `closed`) |
+| `chatchi_conversation_closed` | action | A conversation was closed, with the actor who closed it |
 
 ## Database
 
@@ -64,7 +69,7 @@ docs/                    Design and architecture documents
 |---|---|---|
 | `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token) and contact info | `UNIQUE token_hash`, `user_id` |
 | `{prefix}chatchi_agents` | Agents, one per WordPress user | `UNIQUE user_id`, `is_active` |
-| `{prefix}chatchi_conversations` | Conversation state and latest activity | `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
+| `{prefix}chatchi_conversations` | Conversation state and latest activity | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
 | `{prefix}chatchi_messages` | Messages and read state | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
 
 All datetimes are stored in UTC. Relations are enforced in the application layer.

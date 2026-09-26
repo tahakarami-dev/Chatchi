@@ -46,6 +46,7 @@ final class ConversationRepository extends Repository {
 			'created_at'      => '%s',
 			'updated_at'      => '%s',
 			'closed_at'       => '%s',
+			'open_visitor_id' => '%d',
 		);
 	}
 
@@ -58,6 +59,9 @@ final class ConversationRepository extends Repository {
 
 	/**
 	 * Opens a new conversation for a visitor.
+	 *
+	 * Fails with a DatabaseException when the visitor already has an open
+	 * conversation (unique open_visitor key), which makes concurrent starts safe.
 	 *
 	 * @param int    $visitor_id Visitor ID.
 	 * @param string $page_url   Page the chat was started from.
@@ -82,6 +86,7 @@ final class ConversationRepository extends Repository {
 				'created_at'      => $now,
 				'updated_at'      => $now,
 				'closed_at'       => null,
+				'open_visitor_id' => $visitor_id,
 			)
 		);
 
@@ -118,27 +123,89 @@ final class ConversationRepository extends Repository {
 	/**
 	 * Changes the status. Closing stamps closed_at; reopening clears it.
 	 *
+	 * Keeps open_visitor_id in sync, so reopening fails with a
+	 * DatabaseException when the visitor already has another open conversation.
+	 *
 	 * @param int    $id     Conversation ID.
 	 * @param string $status One of Conversation::statuses().
 	 * @return bool Whether the row changed.
 	 *
 	 * @throws \InvalidArgumentException When the status is unknown.
+	 * @throws DatabaseException         When the update fails.
 	 */
 	public function update_status( int $id, string $status ): bool {
 		if ( ! in_array( $status, Conversation::statuses(), true ) ) {
 			throw new \InvalidArgumentException( sprintf( 'Unknown conversation status "%s".', $status ) );
 		}
 
+		if ( $id <= 0 ) {
+			return false;
+		}
+
 		$now = $this->now();
 
-		return $this->update_row(
-			$id,
-			array(
-				'status'     => $status,
-				'closed_at'  => Conversation::STATUS_CLOSED === $status ? $now : null,
-				'updated_at' => $now,
+		if ( Conversation::STATUS_CLOSED === $status ) {
+			$sql = $this->db->prepare(
+				"UPDATE {$this->table()} SET status = %s, closed_at = %s, updated_at = %s, open_visitor_id = NULL WHERE id = %d",
+				$status,
+				$now,
+				$now,
+				$id
+			);
+		} else {
+			$sql = $this->db->prepare(
+				"UPDATE {$this->table()} SET status = %s, closed_at = NULL, updated_at = %s, open_visitor_id = visitor_id WHERE id = %d",
+				$status,
+				$now,
+				$id
+			);
+		}
+
+		return $this->execute( $sql ) > 0;
+	}
+
+	/**
+	 * Moves a conversation from new to active, only if it is still new.
+	 *
+	 * @param int $id Conversation ID.
+	 * @return bool Whether this call made the transition.
+	 */
+	public function activate_if_new( int $id ): bool {
+		if ( $id <= 0 ) {
+			return false;
+		}
+
+		return $this->execute(
+			$this->db->prepare(
+				"UPDATE {$this->table()} SET status = %s, updated_at = %s WHERE id = %d AND status = %s",
+				Conversation::STATUS_ACTIVE,
+				$this->now(),
+				$id,
+				Conversation::STATUS_NEW
 			)
-		);
+		) > 0;
+	}
+
+	/**
+	 * Assigns an agent only when nobody is assigned yet.
+	 *
+	 * @param int $id       Conversation ID.
+	 * @param int $agent_id Agent ID.
+	 * @return bool Whether this call assigned the agent.
+	 */
+	public function assign_if_unassigned( int $id, int $agent_id ): bool {
+		if ( $id <= 0 || $agent_id <= 0 ) {
+			return false;
+		}
+
+		return $this->execute(
+			$this->db->prepare(
+				"UPDATE {$this->table()} SET agent_id = %d, updated_at = %s WHERE id = %d AND agent_id = 0",
+				$agent_id,
+				$this->now(),
+				$id
+			)
+		) > 0;
 	}
 
 	/**

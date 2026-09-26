@@ -7,6 +7,8 @@
 
 namespace ChatChi;
 
+use ChatChi\Conversations\ConversationPolicy;
+use ChatChi\Conversations\ConversationService;
 use ChatChi\Core\Container;
 use ChatChi\Core\Contracts\Module;
 use ChatChi\Core\I18n;
@@ -149,6 +151,7 @@ final class Plugin {
 		}
 
 		$this->register_visitor_services();
+		$this->register_conversation_services();
 
 		$this->container->singleton(
 			I18n::class,
@@ -205,6 +208,31 @@ final class Plugin {
 					$c->get( VisitorRepository::class ),
 					$c->get( ProfileFields::class ),
 					$c->get( ProfileValidator::class )
+				);
+			}
+		);
+	}
+
+	/**
+	 * Registers conversation access rules and use cases.
+	 */
+	private function register_conversation_services(): void {
+		$this->container->singleton(
+			ConversationPolicy::class,
+			static function (): ConversationPolicy {
+				return new ConversationPolicy();
+			}
+		);
+
+		$this->container->singleton(
+			ConversationService::class,
+			static function ( Container $c ): ConversationService {
+				return new ConversationService(
+					$c->get( ConversationRepository::class ),
+					$c->get( VisitorRepository::class ),
+					$c->get( AgentRepository::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( ConversationPolicy::class )
 				);
 			}
 		);
