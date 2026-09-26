@@ -99,6 +99,7 @@ docs/                    Design and architecture documents
 | `chatchi_spam_protection` | filter | Turn the start-form bot checks on/off; receives the Settings switch |
 | `chatchi_spam_min_seconds` | filter | Minimum seconds between loading the widget and starting (default 2, 0–60) |
 | `chatchi_spam_blocked` | action | A bot filled in the honeypot |
+| `chatchi_stray_output` | action | Output printed by other code (PHP notices, stray whitespace) was removed from a ChatChi REST response |
 | `chatchi_panel_csp` | filter | Content-Security-Policy of the agent panel (empty string: none) |
 | `chatchi_avatar_max_bytes` | filter | Largest agent picture upload in bytes (default 2 MB, capped by the server upload limit) |
 

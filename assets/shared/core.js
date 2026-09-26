@@ -242,6 +242,40 @@
 		};
 	}
 
+	/**
+	 * Reads a JSON response body.
+	 *
+	 * Other plugins or themes may print PHP notices or stray characters
+	 * before the JSON (for example when display_errors is on). The JSON is
+	 * then found inside the text instead of failing the whole request.
+	 */
+	function parseJson( text ) {
+		if ( ! text ) {
+			return null;
+		}
+
+		try {
+			return JSON.parse( text );
+		} catch ( e ) {
+			// Fall through to the search below.
+		}
+
+		var end = Math.max( text.lastIndexOf( '}' ), text.lastIndexOf( ']' ) );
+		var pattern = /[{[]/g;
+		var match;
+		var tries = 0;
+
+		while ( end > 0 && ( match = pattern.exec( text ) ) !== null && match.index < end && tries++ < 100 ) {
+			try {
+				return JSON.parse( text.slice( match.index, end + 1 ) );
+			} catch ( e ) {
+				// Not the start of the JSON; try the next brace.
+			}
+		}
+
+		return null;
+	}
+
 	function ApiError( status, code, message, data ) {
 		this.status = status;
 		this.code = code;
@@ -294,10 +328,14 @@
 				cache: 'no-store',
 				body: opts.body ? JSON.stringify( opts.body ) : undefined
 			} ).then( function ( response ) {
-				return response.json().catch( function () {
-					return null;
-				} ).then( function ( data ) {
+				return response.text().catch( function () {
+					return '';
+				} ).then( parseJson ).then( function ( data ) {
 					if ( response.ok ) {
+						if ( data === null && response.status !== 204 ) {
+							// Unreadable success: never pretend it worked; retries are safe (client_id).
+							throw new ApiError( response.status, 'invalid_response', options.networkError );
+						}
 						return data;
 					}
 
@@ -315,7 +353,7 @@
 			} );
 		}
 
-		return { request: request, endpoint: endpoint };
+		return { request: request, endpoint: endpoint, parseJson: parseJson };
 	}
 
 	window.ChatChiCore = {

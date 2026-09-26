@@ -392,7 +392,9 @@
 			}
 			pending.failed = true;
 			pending.limited = error.code === 'chatchi_rate_limited';
-			pending.error = pending.limited ? self.waitMessage( error ) : error.message;
+			// Say why when the server refused the message itself (e.g. too long);
+			// connection problems keep the generic "tap to retry".
+			pending.reason = pending.limited ? self.waitMessage( error ) : ( error.status >= 400 && error.status < 500 && error.message ? error.message : '' );
 			self.render();
 		} );
 	};
@@ -1033,7 +1035,7 @@
 			stack.appendChild( h( 'button', {
 				type: 'button',
 				className: 'chatchi-retry',
-				text: entry.ref.limited ? entry.ref.error : S.sendFailed,
+				text: entry.ref.reason || S.sendFailed,
 				onClick: function () {
 					self.deliver( entry.ref );
 					self.focusDefault();

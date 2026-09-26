@@ -94,10 +94,10 @@
 				headers: { Accept: 'application/json', 'X-WP-Nonce': config.nonce },
 				body: form
 			} ).then( function ( response ) {
-				return response.json().catch( function () {
-					return null;
-				} ).then( function ( data ) {
-					if ( response.ok ) {
+				return response.text().catch( function () {
+					return '';
+				} ).then( client.parseJson ).then( function ( data ) {
+					if ( response.ok && data ) {
 						return data;
 					}
 					throw new Core.ApiError( response.status, data && data.code, data && data.message ? data.message : S.networkError, data && data.data );
