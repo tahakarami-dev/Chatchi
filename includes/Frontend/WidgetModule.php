@@ -8,6 +8,7 @@
 namespace ChatChi\Frontend;
 
 use ChatChi\Core\Contracts\Module;
+use ChatChi\Settings\ProactiveRules;
 use ChatChi\Settings\Settings;
 
 defined( 'ABSPATH' ) || exit;
@@ -172,6 +173,10 @@ final class WidgetModule implements Module {
 			'dir'       => is_rtl() ? 'rtl' : 'ltr',
 			'welcome'   => $this->settings->welcome_message(),
 			'sound'     => (bool) $this->settings->get( 'widget_sound' ),
+			'rating'    => (bool) $this->settings->get( 'rating_enabled' ),
+			// Chat invitations; the widget matches them against this page.
+			'proactive' => ProactiveRules::active( (array) $this->settings->get( 'proactive' ) ),
+			'pageType'  => $this->page_type(),
 			// Administrators see technical details of failed requests in the
 			// widget. Pages of logged-in users are not cached.
 			'debug'     => is_user_logged_in() && current_user_can( 'manage_options' ),
@@ -217,6 +222,30 @@ final class WidgetModule implements Module {
 		}
 
 		return $strings;
+	}
+
+	/**
+	 * What kind of page this is, for chat invitations. The same for every
+	 * visitor, so it is safe in cached pages.
+	 */
+	private function page_type(): string {
+		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+			return 'checkout';
+		}
+		if ( function_exists( 'is_cart' ) && is_cart() ) {
+			return 'cart';
+		}
+		if ( function_exists( 'is_product' ) && is_product() ) {
+			return 'product';
+		}
+		if ( function_exists( 'is_shop' ) && ( is_shop() || is_product_taxonomy() ) ) {
+			return 'shop';
+		}
+		if ( is_front_page() || is_home() ) {
+			return 'home';
+		}
+
+		return 'other';
 	}
 
 	/**

@@ -8,6 +8,8 @@
 namespace ChatChi\Rest;
 
 use ChatChi\Attachments\AttachmentService;
+use ChatChi\Commerce\CustomerContext;
+use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Database\Repositories\AgentRepository;
@@ -31,24 +33,32 @@ final class AgentController extends ConversationController {
 
 	private ?Transcript $transcript;
 
+	private ?CustomerContext $context;
+
+	private ?VisitorRepository $visitors;
+
 	/**
 	 * Agent whose presence was already recorded in this request.
 	 */
 	private int $touched = 0;
 
 	/**
-	 * @param ConversationService $conversations Conversation use cases.
-	 * @param MessageService      $messages      Message use cases.
-	 * @param Presenter           $presenter     Response shapes.
-	 * @param AgentRepository     $agents        Agent storage.
-	 * @param AttachmentService   $attachments   Files in conversations.
-	 * @param Transcript|null     $transcript    Transcript emails.
+	 * @param ConversationService    $conversations Conversation use cases.
+	 * @param MessageService         $messages      Message use cases.
+	 * @param Presenter              $presenter     Response shapes.
+	 * @param AgentRepository        $agents        Agent storage.
+	 * @param AttachmentService      $attachments   Files in conversations.
+	 * @param Transcript|null        $transcript    Transcript emails.
+	 * @param CustomerContext|null   $context       Page, cart and orders.
+	 * @param VisitorRepository|null $visitors      Visitor storage.
 	 */
-	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null ) {
+	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null, ?CustomerContext $context = null, ?VisitorRepository $visitors = null ) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
 		$this->agents     = $agents;
 		$this->transcript = $transcript;
+		$this->context    = $context;
+		$this->visitors   = $visitors;
 	}
 
 	/**
@@ -221,6 +231,17 @@ final class AgentController extends ConversationController {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/agent/conversations/(?P<id>\d+)/customer',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'customer' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => $this->id_arg(),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/agent/tags',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -347,6 +368,47 @@ final class AgentController extends ConversationController {
 		$to = $this->transcript->send_for( $actor, (int) $request['id'] );
 
 		return $to instanceof \WP_Error ? $to : $this->respond( array( 'sent_to' => $to ) );
+	}
+
+	/**
+	 * GET …/customer: the visitor's current page and, on WooCommerce shops,
+	 * their cart and orders. Orders are only shown to people who may manage
+	 * them (filter chatchi_agent_can_see_orders).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function customer( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$conversation = $this->conversations->get( $actor, (int) $request['id'] );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		if ( ! $this->context || ! $this->visitors ) {
+			return new \WP_Error( 'chatchi_unavailable', __( 'This is not available right now.', 'chatchi' ), array( 'status' => 503 ) );
+		}
+
+		try {
+			$visitor = $this->visitors->find( $conversation->visitor_id );
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		/**
+		 * Filters whether the current agent may see the visitor's orders.
+		 *
+		 * @param bool $allowed Default: administrators and shop managers.
+		 */
+		$with_orders = (bool) apply_filters( 'chatchi_agent_can_see_orders', current_user_can( 'manage_options' ) || current_user_can( 'edit_shop_orders' ) );
+
+		return $this->respond( $this->context->for_agent( $visitor, $with_orders ) );
 	}
 
 	/**

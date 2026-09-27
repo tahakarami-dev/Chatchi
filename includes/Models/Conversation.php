@@ -63,6 +63,15 @@ final class Conversation {
 	public ?string $agent_typing_at = null;
 
 	/**
+	 * The visitor's rating, 1–5, once the conversation ended; null if none.
+	 */
+	public ?int $rating = null;
+
+	public string $rating_comment = '';
+
+	public ?string $rated_at = null;
+
+	/**
 	 * Returns every valid status.
 	 *
 	 * @return string[]
@@ -90,6 +99,11 @@ final class Conversation {
 		// Columns added in schema 4; absent while an upgrade is pending.
 		$conversation->visitor_typing_at = empty( $row['visitor_typing_at'] ) ? null : (string) $row['visitor_typing_at'];
 		$conversation->agent_typing_at   = empty( $row['agent_typing_at'] ) ? null : (string) $row['agent_typing_at'];
+
+		// Columns added in schema 7.
+		$conversation->rating         = isset( $row['rating'] ) && null !== $row['rating'] ? (int) $row['rating'] : null;
+		$conversation->rating_comment = (string) ( $row['rating_comment'] ?? '' );
+		$conversation->rated_at       = empty( $row['rated_at'] ) ? null : (string) $row['rated_at'];
 
 		return $conversation;
 	}
@@ -135,6 +149,9 @@ final class Conversation {
 			'closed_at'         => $this->closed_at,
 			'visitor_typing_at' => $this->visitor_typing_at,
 			'agent_typing_at'   => $this->agent_typing_at,
+			'rating'            => $this->rating,
+			'rating_comment'    => $this->rating_comment,
+			'rated_at'          => $this->rated_at,
 		);
 	}
 }

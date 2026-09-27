@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '6';
+	public const VERSION = '7';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -32,10 +32,10 @@ final class Schema {
 	 * dbDelta() does not report when it fails to add one.
 	 */
 	private const REQUIRED_COLUMNS = array(
-		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url', 'visitor_typing_at', 'agent_typing_at' ),
+		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url', 'visitor_typing_at', 'agent_typing_at', 'rating', 'rated_at' ),
 		Table::MESSAGES      => array( 'client_id', 'read_at', 'attachment_id', 'internal' ),
 		Table::AGENTS        => array( 'avatar_id', 'is_active', 'status', 'last_seen_at' ),
-		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone' ),
+		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone', 'current_url', 'cart', 'context_at' ),
 		Table::RATE_LIMITS   => array( 'bucket', 'hits', 'expires_at' ),
 		Table::ATTACHMENTS   => array( 'conversation_id', 'message_id', 'path' ),
 		Table::TAGS          => array( 'conversation_id', 'tag' ),
@@ -287,6 +287,10 @@ email varchar(100) NOT NULL DEFAULT '',
 phone varchar(20) NOT NULL DEFAULT '',
 created_at datetime NOT NULL,
 last_seen_at datetime NOT NULL,
+current_url varchar(2048) NOT NULL DEFAULT '',
+current_title varchar(255) NOT NULL DEFAULT '',
+cart text NULL,
+context_at datetime NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY token_hash (token_hash),
 KEY user_id (user_id)
@@ -320,13 +324,17 @@ updated_at datetime NOT NULL,
 closed_at datetime NULL DEFAULT NULL,
 visitor_typing_at datetime NULL DEFAULT NULL,
 agent_typing_at datetime NULL DEFAULT NULL,
+rating tinyint(1) unsigned NULL DEFAULT NULL,
+rating_comment text NULL,
+rated_at datetime NULL DEFAULT NULL,
 open_visitor_id bigint(20) unsigned NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY open_visitor (open_visitor_id),
 KEY visitor_status (visitor_id,status),
 KEY status_activity (status,last_message_at),
 KEY last_message_at (last_message_at),
-KEY agent_id (agent_id)
+KEY agent_id (agent_id),
+KEY created_at (created_at)
 ) {$collate};",
 
 			"CREATE TABLE {$messages} (

@@ -166,6 +166,7 @@ final class Presenter {
 			'created_at'      => $this->date( $conversation->created_at ),
 			'last_message_at' => $this->date( $conversation->last_message_at ),
 			'closed_at'       => $this->date( $conversation->closed_at ),
+			'rating'          => $conversation->rating,
 		);
 	}
 
@@ -192,6 +193,11 @@ final class Presenter {
 			'created_at'      => $this->date( $conversation->created_at ),
 			'last_message_at' => $this->date( $conversation->last_message_at ),
 			'closed_at'       => $this->date( $conversation->closed_at ),
+			'rating'          => null === $conversation->rating ? null : array(
+				'score'   => $conversation->rating,
+				'comment' => $conversation->rating_comment,
+				'at'      => $this->date( $conversation->rated_at ),
+			),
 		);
 	}
 

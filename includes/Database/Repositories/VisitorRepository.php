@@ -42,13 +42,17 @@ final class VisitorRepository extends Repository {
 	 */
 	protected function columns(): array {
 		return array(
-			'token_hash'   => '%s',
-			'user_id'      => '%d',
-			'name'         => '%s',
-			'email'        => '%s',
-			'phone'        => '%s',
-			'created_at'   => '%s',
-			'last_seen_at' => '%s',
+			'token_hash'    => '%s',
+			'user_id'       => '%d',
+			'name'          => '%s',
+			'email'         => '%s',
+			'phone'         => '%s',
+			'created_at'    => '%s',
+			'last_seen_at'  => '%s',
+			'current_url'   => '%s',
+			'current_title' => '%s',
+			'cart'          => '%s',
+			'context_at'    => '%s',
 		);
 	}
 
@@ -136,6 +140,29 @@ final class VisitorRepository extends Repository {
 	 */
 	public function update_profile( int $id, array $profile ): bool {
 		return $this->update_row( $id, $this->profile_fields( $profile ) );
+	}
+
+	/**
+	 * Records the page the visitor is on and, with WooCommerce, their cart.
+	 *
+	 * @param int                       $id    Visitor ID.
+	 * @param string                    $url   Page address.
+	 * @param string                    $title Page title.
+	 * @param array<string, mixed>|null $cart  Cart summary; null leaves it unchanged.
+	 */
+	public function set_context( int $id, string $url, string $title, ?array $cart ): bool {
+		$data = array(
+			'current_url'   => $this->fit( $url, 2048 ),
+			'current_title' => $this->fit( $title, 255 ),
+			'context_at'    => $this->now(),
+			'last_seen_at'  => $this->now(),
+		);
+
+		if ( null !== $cart ) {
+			$data['cart'] = (string) wp_json_encode( $cart );
+		}
+
+		return $this->update_row( $id, $data );
 	}
 
 	/**

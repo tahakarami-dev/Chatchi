@@ -56,11 +56,12 @@
 	var request = client.request;
 
 	var api = {
-		session: function () {
-			return request( 'GET', '/widget/session' );
+		// withPage: tell the server which page this is (shown to agents).
+		session: function ( withPage ) {
+			return request( 'GET', '/widget/session', withPage ? { query: { url: window.location.href, title: document.title.slice( 0, 300 ) } } : undefined );
 		},
 		start: function ( profile ) {
-			var body = Object.assign( { page_url: window.location.href }, profile );
+			var body = Object.assign( { page_url: window.location.href, page_title: document.title.slice( 0, 300 ) }, profile );
 			return request( 'POST', '/widget/conversations', { body: body } );
 		},
 		messages: function ( id, query ) {
@@ -74,6 +75,9 @@
 		},
 		close: function ( id ) {
 			return request( 'POST', '/widget/conversations/' + id + '/close' );
+		},
+		rate: function ( id, score, comment ) {
+			return request( 'POST', '/widget/conversations/' + id + '/rating', { body: { score: score, comment: comment } } );
 		},
 		typing: function ( id, typing ) {
 			return request( 'POST', '/widget/conversations/' + id + '/typing', { body: { typing: typing } } );
@@ -349,6 +353,148 @@
 		if ( config.nonce || /(?:^|;\s*)chatchi_active=1/.test( document.cookie ) ) {
 			this.boot();
 		}
+
+		this.scheduleInvitation();
+	};
+
+	/* --------------------------- invitations --------------------------- */
+
+	/**
+	 * Picks the first chat invitation that fits this page and has not been
+	 * shown too recently, and shows it after its delay, unless the visitor
+	 * is already chatting.
+	 */
+	Widget.prototype.scheduleInvitation = function () {
+		var self = this;
+		var rules = config.proactive || [];
+		var here = '';
+
+		try {
+			here = decodeURIComponent( window.location.href ).toLowerCase();
+		} catch ( e ) {
+			here = window.location.href.toLowerCase();
+		}
+
+		var rule = rules.filter( function ( candidate ) {
+			if ( candidate.target === 'url' ) {
+				return here.indexOf( String( candidate.url ).toLowerCase() ) !== -1;
+			}
+			return candidate.target === 'all' || candidate.target === config.pageType;
+		} ).filter( function ( candidate ) {
+			return ! self.invitationSeen( candidate );
+		} )[ 0 ];
+
+		if ( ! rule ) {
+			return;
+		}
+
+		window.setTimeout( function () {
+			var chatting = self.state.conversation && ! self.state.closed;
+			// A visitor whose session is still loading may be chatting already.
+			if ( self.booting ) {
+				window.setTimeout( function () {
+					self.scheduleInvitationNow( rule );
+				}, 1000 );
+				return;
+			}
+			if ( ! chatting ) {
+				self.scheduleInvitationNow( rule );
+			}
+		}, Math.max( 0, rule.delay ) * 1000 );
+	};
+
+	Widget.prototype.scheduleInvitationNow = function ( rule ) {
+		if ( this.state.open || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
+			return;
+		}
+		this.markInvitationSeen( rule );
+		this.showTeaser( rule );
+	};
+
+	Widget.prototype.invitationStore = function ( rule ) {
+		try {
+			return rule.frequency === 'session' ? window.sessionStorage : window.localStorage;
+		} catch ( e ) {
+			return null;
+		}
+	};
+
+	Widget.prototype.invitationSeen = function ( rule ) {
+		if ( rule.frequency === 'always' ) {
+			return false;
+		}
+		try {
+			var store = this.invitationStore( rule );
+			var at = store ? parseInt( store.getItem( 'chatchi_invite_' + rule.id ) || '0', 10 ) : 0;
+			return rule.frequency === 'session' ? at > 0 : Date.now() - at < 24 * 60 * 60 * 1000;
+		} catch ( e ) {
+			return false;
+		}
+	};
+
+	Widget.prototype.markInvitationSeen = function ( rule ) {
+		try {
+			var store = this.invitationStore( rule );
+			if ( store ) {
+				store.setItem( 'chatchi_invite_' + rule.id, String( Date.now() ) );
+			}
+		} catch ( e ) {
+			// Storage may be blocked; the invitation may then show again.
+		}
+	};
+
+	/**
+	 * A speech bubble next to the launcher. Clicking it opens the chat
+	 * with the invitation as the first message from support.
+	 */
+	Widget.prototype.showTeaser = function ( rule ) {
+		var self = this;
+
+		this.teaser = h( 'div', { className: 'chatchi-teaser', role: 'status' }, [
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-teaser__close',
+				'aria-label': S.dismiss,
+				title: S.dismiss,
+				onClick: function () {
+					self.hideTeaser();
+				}
+			}, [ icon( 'close' ) ] ),
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-teaser__body',
+				onClick: function () {
+					self.acceptInvite();
+				}
+			}, [
+				h( 'span', { className: 'chatchi-avatar chatchi-avatar--sm', 'aria-hidden': 'true' }, [ icon( 'headset' ) ] ),
+				h( 'span', { className: 'chatchi-teaser__text' }, [
+					h( 'strong', { text: S.support } ),
+					h( 'span', { text: rule.message } )
+				] )
+			] )
+		] );
+
+		this.teaserMessage = rule.message;
+		this.root.classList.add( 'has-font' );
+		this.root.appendChild( this.teaser );
+		this.render();
+		chime.play();
+	};
+
+	Widget.prototype.hideTeaser = function () {
+		if ( this.teaser ) {
+			this.teaser.remove();
+			this.teaser = null;
+			this.render();
+		}
+	};
+
+	Widget.prototype.acceptInvite = function () {
+		this.invite = this.teaserMessage;
+		this.shellKey = null;
+		this.hideTeaser();
+		this.open();
 	};
 
 	/* ---------------------------- state flow --------------------------- */
@@ -363,7 +509,7 @@
 
 		this.booting = true;
 
-		return api.session().then( function ( session ) {
+		return api.session( true ).then( function ( session ) {
 			self.sessionAt = Date.now();
 			self.booted = true;
 			self.booting = false;
@@ -423,6 +569,10 @@
 	};
 
 	Widget.prototype.toggle = function () {
+		if ( ! this.state.open && this.teaser ) {
+			this.acceptInvite();
+			return;
+		}
 		if ( this.state.open ) {
 			this.close();
 		} else {
@@ -1166,10 +1316,12 @@
 
 		this.root.classList.toggle( 'is-open', state.open );
 
-		var showBadge = ! state.open && state.unread > 0;
+		// An invitation on screen counts as one message waiting.
+		var waiting = state.unread > 0 ? state.unread : ( this.teaser ? 1 : 0 );
+		var showBadge = ! state.open && waiting > 0;
 		this.badge.hidden = ! showBadge;
-		this.badge.textContent = showBadge ? formatNumber( Math.min( state.unread, 99 ) ) : '';
-		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : S.openChat ) + ( showBadge ? ' — ' + format( S.unread, state.unread ) : '' ) );
+		this.badge.textContent = showBadge ? formatNumber( Math.min( waiting, 99 ) ) : '';
+		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : S.openChat ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
 
 		var agent = state.conversation && state.conversation.agent;
 		var shellKey = JSON.stringify( [
@@ -1181,7 +1333,8 @@
 			state.view === 'form' ? [ state.formErrors, state.formAlert, state.submitting ] : null,
 			state.view === 'error' ? state.errorMessage : null,
 			this.availability() ? [ this.availability().mode, this.availability().offline_form, this.availability().opens_at ] : null,
-			!! state.offlineSent
+			!! state.offlineSent,
+			state.closed ? state.rated : null
 		] );
 
 		if ( shellKey !== this.shellKey ) {
@@ -1430,7 +1583,7 @@
 			this.renderMessage( { key: 'offline', mine: false, type: 'welcome', sender: { name: S.support, avatar_url: null }, body: availability.offline_message, date: new Date() }, true, true ),
 			this.backAt() ? h( 'p', { className: 'chatchi-form__intro chatchi-form__back' }, [ icon( 'clock' ), this.backAt() ] ) : null
 		] : [
-			config.welcome ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			this.welcomeText() ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
 			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
 		] );
 
@@ -1542,7 +1695,7 @@
 		} ) );
 
 		// The welcome message opens the conversation once its start is loaded.
-		if ( config.welcome && ! state.hasMore ) {
+		if ( this.welcomeText() && ! state.hasMore ) {
 			var started = state.conversation && state.conversation.created_at ? new Date( state.conversation.created_at ) : null;
 			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
 		}
@@ -1610,9 +1763,17 @@
 			mine: false,
 			type: 'welcome',
 			sender: { name: S.support, avatar_url: null },
-			body: config.welcome,
+			body: this.welcomeText(),
 			date: date
 		};
+	};
+
+	/**
+	 * The first bubble from support: the invitation the visitor accepted,
+	 * or the welcome message.
+	 */
+	Widget.prototype.welcomeText = function () {
+		return this.invite || config.welcome || '';
 	};
 
 	Widget.prototype.sameGroup = function ( a, b ) {
@@ -1808,6 +1969,96 @@
 		] );
 	};
 
+	/**
+	 * "How was your chat?" with five stars and an optional comment, shown
+	 * once the conversation has ended (when rating is turned on).
+	 */
+	Widget.prototype.renderRating = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! config.rating || ! conversation ) {
+			return null;
+		}
+
+		if ( this.state.rated === conversation.id ) {
+			return h( 'div', { className: 'chatchi-rating chatchi-rating--done', role: 'status' }, [
+				icon( 'check' ),
+				h( 'p', { text: S.ratingThanks } )
+			] );
+		}
+
+		var score = 0;
+		var stars = [];
+		var error = h( 'p', { className: 'chatchi-rating__error', role: 'alert', hidden: true } );
+		var comment = h( 'textarea', { className: 'chatchi-rating__comment', rows: '2', placeholder: S.ratingComment, 'aria-label': S.ratingComment } );
+		var send = h( 'button', { type: 'submit', className: 'chatchi-button', text: S.ratingSend } );
+		var more = h( 'div', { className: 'chatchi-rating__more', hidden: true }, [ comment, send ] );
+		var label = h( 'p', { className: 'chatchi-rating__label', 'aria-live': 'polite', text: '' } );
+		var labels = [ S.rating1, S.rating2, S.rating3, S.rating4, S.rating5 ];
+
+		function paint( upTo ) {
+			stars.forEach( function ( star, index ) {
+				star.classList.toggle( 'is-on', index < upTo );
+			} );
+			label.textContent = upTo ? labels[ upTo - 1 ] : '';
+		}
+
+		for ( var i = 1; i <= 5; i++ ) {
+			( function ( value ) {
+				var star = h( 'button', {
+					type: 'button',
+					className: 'chatchi-star',
+					role: 'radio',
+					'aria-checked': 'false',
+					'aria-label': format( S.ratingStars, value ),
+					title: labels[ value - 1 ],
+					onClick: function () {
+						score = value;
+						stars.forEach( function ( other, index ) {
+							other.setAttribute( 'aria-checked', index === value - 1 ? 'true' : 'false' );
+						} );
+						paint( value );
+						more.hidden = false;
+						error.hidden = true;
+					},
+					onMouseenter: function () {
+						paint( value );
+					},
+					onMouseleave: function () {
+						paint( score );
+					}
+				}, [ icon( 'star' ) ] );
+				stars.push( star );
+			}( i ) );
+		}
+
+		return h( 'form', {
+			className: 'chatchi-rating',
+			noValidate: true,
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				if ( ! score ) {
+					return;
+				}
+				send.disabled = true;
+				api.rate( conversation.id, score, comment.value.trim() ).then( function () {
+					self.set( { rated: conversation.id } );
+				} ).catch( function ( failure ) {
+					send.disabled = false;
+					error.textContent = failure.message || S.loadError;
+					error.hidden = false;
+				} );
+			}
+		}, [
+			h( 'p', { className: 'chatchi-rating__title', text: S.ratingTitle } ),
+			h( 'div', { className: 'chatchi-rating__stars', role: 'radiogroup', 'aria-label': S.ratingTitle }, stars ),
+			label,
+			more,
+			error
+		] );
+	};
+
 	Widget.prototype.renderFooter = function () {
 		var self = this;
 		var state = this.state;
@@ -1815,6 +2066,7 @@
 
 		if ( state.closed ) {
 			return h( 'div', { className: 'chatchi-footer' }, [
+				this.renderRating(),
 				h( 'div', { className: 'chatchi-notice', role: 'status' }, [
 					h( 'p', { text: S.closed } ),
 					h( 'button', {

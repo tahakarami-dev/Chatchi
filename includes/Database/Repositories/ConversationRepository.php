@@ -49,6 +49,9 @@ final class ConversationRepository extends Repository {
 			'open_visitor_id'   => '%d',
 			'visitor_typing_at' => '%s',
 			'agent_typing_at'   => '%s',
+			'rating'            => '%d',
+			'rating_comment'    => '%s',
+			'rated_at'          => '%s',
 		);
 	}
 
@@ -164,6 +167,24 @@ final class ConversationRepository extends Repository {
 		}
 
 		return $this->execute( $sql ) > 0;
+	}
+
+	/**
+	 * Saves the visitor's rating of a conversation.
+	 *
+	 * @param int    $id      Conversation ID.
+	 * @param int    $score   1–5.
+	 * @param string $comment Optional comment, already cleaned.
+	 */
+	public function set_rating( int $id, int $score, string $comment ): bool {
+		return $this->update_row(
+			$id,
+			array(
+				'rating'         => max( 1, min( 5, $score ) ),
+				'rating_comment' => $comment,
+				'rated_at'       => $this->now(),
+			)
+		);
 	}
 
 	/**

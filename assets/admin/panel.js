@@ -130,6 +130,9 @@
 		canned: function () {
 			return request( 'GET', '/agent/canned' );
 		},
+		reports: function ( range ) {
+			return request( 'GET', '/agent/reports', { query: { range: range } } );
+		},
 		saveCanned: function ( id, data ) {
 			return id ? request( 'PATCH', '/agent/canned/' + id, { body: data } ) : request( 'POST', '/agent/canned', { body: data } );
 		},
@@ -159,6 +162,9 @@
 		},
 		botTest: function ( data ) {
 			return request( 'POST', '/agent/settings/bot-test', { body: data } );
+		},
+		customer: function ( id ) {
+			return request( 'GET', '/agent/conversations/' + id + '/customer' );
 		},
 		transcript: function ( id ) {
 			return request( 'POST', '/agent/conversations/' + id + '/transcript' );
@@ -353,6 +359,7 @@
 		this.agentsView = config.canManageAgents ? new AgentsView( this ) : null;
 		this.settingsView = config.canManageSettings ? new SettingsView( this ) : null;
 		this.cannedView = config.canManageSettings ? new CannedView( this ) : null;
+		this.reportsView = config.canManageSettings ? new ReportsView( this ) : null;
 		this.canned = [];
 		this.toast = h( 'div', { className: 'cc-toast', role: 'status', 'aria-live': 'polite', hidden: true } );
 		root.appendChild( this.toast );
@@ -430,6 +437,7 @@
 				hasUnread ? h( 'span', { className: 'cc-rail-dot' } ) : null
 			] ),
 			this.agentsView ? railLink( 'agents', '#/agents', S.agents, 'users' ) : null,
+			this.reportsView ? railLink( 'reports', '#/reports', S.reports, 'chart' ) : null,
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
@@ -834,6 +842,7 @@
 				h( 'span', { className: 'cc-item__bottom' }, [
 					h( 'span', { className: 'cc-status-dot cc-status-dot--' + item.status, title: STATUS_LABELS[ item.status ] } ),
 					h( 'span', { className: 'cc-item__preview', text: preview } ),
+					item.rating ? h( 'span', { className: 'cc-item__rating cc-item__rating--' + ( item.rating.score >= 4 ? 'good' : item.rating.score === 3 ? 'ok' : 'bad' ), title: fmt.format( S.ratedStars, item.rating.score ), 'aria-label': fmt.format( S.ratedStars, item.rating.score ) }, [ icon( 'star' ), fmt.number( item.rating.score ) ] ) : null,
 					item.unread_count > 0 ? h( 'span', { className: 'cc-count', 'aria-label': fmt.format( S.unread, item.unread_count ), text: fmt.number( item.unread_count ) } ) : null
 				] ),
 				item.tags && item.tags.length ? h( 'span', { className: 'cc-item__tags' }, item.tags.slice( 0, 3 ).map( function ( tag ) {
@@ -870,6 +879,8 @@
 			page = 'agents';
 		} else if ( this.cannedView && hash === '#/canned' ) {
 			page = 'canned';
+		} else if ( this.reportsView && hash === '#/reports' ) {
+			page = 'reports';
 		} else if ( settings ) {
 			page = 'settings';
 		}
@@ -884,6 +895,10 @@
 		}
 		if ( page === 'canned' ) {
 			this.cannedView.show();
+			return;
+		}
+		if ( page === 'reports' ) {
+			this.reportsView.show();
 			return;
 		}
 		if ( page === 'settings' ) {
@@ -2127,6 +2142,13 @@
 			row( 'user', S.assignedTo, conv.agent ? document.createTextNode( conv.agent.name ) : muted( S.unassigned ) )
 		];
 
+		if ( conv.rating ) {
+			rows.push( row( 'star', S.rating, h( 'div', { className: 'cc-info-rating' }, [
+				h( 'span', { className: 'cc-info-rating__stars', 'aria-label': fmt.format( S.ratedStars, conv.rating.score ), text: '★★★★★'.slice( 0, conv.rating.score ) + '☆☆☆☆☆'.slice( 0, 5 - conv.rating.score ) } ),
+				conv.rating.comment ? h( 'p', { className: 'cc-info-rating__comment', text: conv.rating.comment } ) : null
+			] ) ) );
+		}
+
 		if ( visitor.user_id ) {
 			rows.push( row( 'user', S.wpUser, h( 'a', { href: config.userEditUrl + '?user_id=' + encodeURIComponent( visitor.user_id ), text: S.viewProfile } ) ) );
 		}
@@ -2163,8 +2185,88 @@
 					}
 				}, [ icon( 'mail' ), S.sendTranscript ] )
 			] ) : null,
+			this.buildCustomer( conv ),
 			this.buildTagEditor( conv )
 		);
+	};
+
+	/**
+	 * Where the visitor is and, on WooCommerce shops, their cart and
+	 * orders. Loaded when the details open and refreshed with them.
+	 */
+	Panel.prototype.buildCustomer = function ( conv ) {
+		var self = this;
+		var section = h( 'section', { className: 'cc-info-shop', 'aria-live': 'polite' } );
+		var cached = this.customerCache && this.customerCache.id === conv.id ? this.customerCache.data : null;
+
+		function render( data ) {
+			var nodes = [];
+
+			if ( data.page ) {
+				nodes.push( h( 'h3', {}, [ icon( 'eye' ), S.currentPage ] ) );
+				nodes.push( h( 'a', { className: 'cc-shop-page', href: data.page.url, target: '_blank', rel: 'noopener noreferrer', dir: 'auto', text: data.page.title || decodeSafe( data.page.url ) } ) );
+				if ( data.page.at ) {
+					nodes.push( h( 'p', { className: 'cc-hint', text: fmt.ago( new Date( data.page.at ) ) } ) );
+				}
+			}
+
+			if ( data.shop ) {
+				var cart = data.cart;
+				nodes.push( h( 'h3', {}, [ icon( 'cart' ), cart && cart.count ? S.cartCount.replace( '%s', fmt.number( cart.count ) ) : S.cart ] ) );
+				if ( cart && cart.items.length ) {
+					nodes.push( h( 'ul', { className: 'cc-shop-list' }, cart.items.map( function ( item ) {
+						return h( 'li', {}, [
+							item.url ? h( 'a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', text: item.name } ) : h( 'span', { text: item.name } ),
+							h( 'span', { className: 'cc-shop-qty', text: '× ' + fmt.number( item.quantity ) } ),
+							h( 'span', { className: 'cc-shop-price', text: item.total } )
+						] );
+					} ) ) );
+					nodes.push( h( 'p', { className: 'cc-shop-total' }, [ h( 'span', { text: S.cartTotal } ), h( 'strong', { text: cart.total } ) ] ) );
+				} else {
+					nodes.push( h( 'p', { className: 'cc-muted', text: S.cartEmpty } ) );
+				}
+
+				if ( data.can_orders && data.orders ) {
+					nodes.push( h( 'h3', {}, [ icon( 'clipboard' ), S.orders ] ) );
+					if ( data.orders.count ) {
+						nodes.push( h( 'p', { className: 'cc-hint', text: S.ordersSummary.replace( '%1$s', fmt.number( data.orders.count ) ).replace( '%2$s', data.orders.spent ) } ) );
+						nodes.push( h( 'ul', { className: 'cc-shop-orders' }, data.orders.items.map( function ( order ) {
+							var head = [
+								h( 'strong', { text: '#' + order.number } ),
+								h( 'span', { className: 'cc-order-status cc-order-status--' + order.status, text: order.status_label } ),
+								h( 'span', { className: 'cc-shop-price', text: order.total } )
+							];
+							return h( 'li', {}, [
+								order.url ? h( 'a', { className: 'cc-order-head', href: order.url, target: '_blank', rel: 'noopener noreferrer' }, head ) : h( 'div', { className: 'cc-order-head' }, head ),
+								h( 'p', { className: 'cc-hint', text: ( order.date ? fmt.ago( new Date( order.date ) ) + ' · ' : '' ) + order.items.join( '، ' ) } )
+							] );
+						} ) ) );
+					} else {
+						nodes.push( h( 'p', { className: 'cc-muted', text: S.noOrders } ) );
+					}
+				}
+			}
+
+			section.hidden = ! nodes.length;
+			section.replaceChildren.apply( section, nodes );
+		}
+
+		if ( cached ) {
+			render( cached );
+		} else {
+			section.hidden = true;
+		}
+
+		api.customer( conv.id ).then( function ( data ) {
+			self.customerCache = { id: conv.id, data: data };
+			if ( self.state.conv && self.state.conv.id === conv.id ) {
+				render( data );
+			}
+		} ).catch( function () {
+			// The rest of the details still work.
+		} );
+
+		return section;
 	};
 
 	/**
@@ -2963,6 +3065,461 @@
 	};
 
 	/* ------------------------------------------------------------------ *
+	 * Reports (site administrators only)
+	 * ------------------------------------------------------------------ */
+
+	var SVG_NS = 'http://www.w3.org/2000/svg';
+
+	function svg( tag, attrs, children ) {
+		var el = document.createElementNS( SVG_NS, tag );
+		Object.keys( attrs || {} ).forEach( function ( key ) {
+			el.setAttribute( key, String( attrs[ key ] ) );
+		} );
+		( children || [] ).forEach( function ( child ) {
+			if ( child ) {
+				el.appendChild( child );
+			}
+		} );
+		return el;
+	}
+
+	/**
+	 * "45 s", "3 min", "1.5 h" in the panel's language.
+	 */
+	function formatDuration( seconds ) {
+		var locale = /^fa/i.test( config.locale || '' ) ? 'fa-IR' : ( config.locale || undefined );
+		var value;
+		var unit;
+
+		if ( seconds < 60 ) {
+			value = seconds;
+			unit = 'second';
+		} else if ( seconds < 3600 ) {
+			value = seconds / 60;
+			value = value < 10 ? Math.round( value * 10 ) / 10 : Math.round( value );
+			unit = 'minute';
+		} else {
+			value = Math.round( seconds / 360 ) / 10;
+			unit = 'hour';
+		}
+
+		try {
+			return new Intl.NumberFormat( locale, { style: 'unit', unit: unit, unitDisplay: 'short' } ).format( value );
+		} catch ( e ) {
+			return fmt.number( value ) + ' ' + unit.charAt( 0 );
+		}
+	}
+
+	function ReportsView( panel ) {
+		this.panel = panel;
+		this.el = panel.page;
+		this.range = 30;
+		this.data = null;
+		this.state = { loading: true, error: '' };
+		this.ticket = 0;
+	}
+
+	ReportsView.prototype.show = function () {
+		if ( ! this.data || this.data.range !== this.range ) {
+			this.load();
+			return;
+		}
+		this.render();
+	};
+
+	ReportsView.prototype.load = function () {
+		var self = this;
+		var ticket = ++this.ticket;
+
+		this.state = { loading: true, error: '' };
+		this.render();
+
+		api.reports( this.range ).then( function ( data ) {
+			if ( ticket !== self.ticket ) {
+				return;
+			}
+			self.data = data;
+			self.state = { loading: false, error: '' };
+			self.render();
+		} ).catch( function ( error ) {
+			if ( ticket !== self.ticket ) {
+				return;
+			}
+			self.state = { loading: false, error: error.message || S.reportsError };
+			self.render();
+		} );
+	};
+
+	ReportsView.prototype.render = function () {
+		var self = this;
+
+		if ( this.panel.view !== 'reports' ) {
+			return;
+		}
+
+		var ranges = h( 'div', { className: 'cc-segmented', role: 'radiogroup', 'aria-label': S.reportsRange }, [ 7, 30, 90 ].map( function ( days ) {
+			return h( 'button', {
+				type: 'button',
+				role: 'radio',
+				className: 'cc-segmented__item' + ( days === self.range ? ' is-active' : '' ),
+				'aria-checked': days === self.range ? 'true' : 'false',
+				text: fmt.format( S.reportsDays, days ),
+				onClick: function () {
+					if ( days !== self.range ) {
+						self.range = days;
+						self.load();
+					}
+				}
+			} );
+		} ) );
+
+		var header = h( 'header', { className: 'cc-page-head' }, [
+			h( 'div', {}, [
+				h( 'h1', { text: S.reports } ),
+				h( 'p', { text: S.reportsIntro } )
+			] ),
+			ranges
+		] );
+
+		var body;
+		var data = this.data;
+
+		if ( this.state.loading ) {
+			body = h( 'div', { className: 'cc-report', 'aria-busy': 'true' }, [
+				h( 'div', { className: 'cc-kpis' }, [ 1, 2, 3, 4 ].map( function () {
+					return h( 'div', { className: 'cc-card cc-kpi' }, [
+						h( 'span', { className: 'cc-skeleton', style: 'display:block;width:50%;height:12px;margin-bottom:12px' } ),
+						h( 'span', { className: 'cc-skeleton', style: 'display:block;width:40%;height:28px' } )
+					] );
+				} ) ),
+				h( 'div', { className: 'cc-card' }, [ h( 'span', { className: 'cc-skeleton', style: 'display:block;width:100%;height:220px' } ) ] )
+			] );
+		} else if ( this.state.error ) {
+			body = h( 'div', { className: 'cc-state', role: 'alert' }, [
+				icon( 'alert' ),
+				h( 'p', { text: this.state.error } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary',
+					text: S.retry,
+					onClick: function () {
+						self.load();
+					}
+				} )
+			] );
+		} else if ( ! data.kpis.conversations.value ) {
+			body = h( 'div', { className: 'cc-state' }, [
+				icon( 'chart' ),
+				h( 'h2', { text: S.reportsEmpty } ),
+				h( 'p', { text: S.reportsEmptyHint } )
+			] );
+		} else {
+			body = h( 'div', { className: 'cc-report' }, [
+				this.buildKpis(),
+				h( 'div', { className: 'cc-report__row cc-report__row--wide' }, [ this.buildDaily(), this.buildRatings() ] ),
+				this.buildAgents(),
+				h( 'div', { className: 'cc-report__row' }, [ this.buildHeatmap(), this.buildTags() ] ),
+				this.buildComments()
+			] );
+		}
+
+		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner cc-page-inner--wide' }, [ header, body ] ) );
+	};
+
+	/**
+	 * A change against the previous period, e.g. "▲ 12% vs. the previous 30 days".
+	 *
+	 * @param {string} kind "percent" (relative change), "points" (percentage
+	 *                      points), "stars" (absolute) or "time" (lower is better).
+	 */
+	ReportsView.prototype.delta = function ( current, previous, kind ) {
+		if ( current === null || previous === null || previous === undefined || ( kind === 'percent' && previous === 0 ) ) {
+			return h( 'p', { className: 'cc-kpi__delta', text: S.reportsNoPrevious } );
+		}
+
+		var change = current - previous;
+		var text;
+
+		if ( kind === 'percent' ) {
+			text = fmt.number( Math.round( Math.abs( change ) / previous * 100 ) ) + '٪';
+		} else if ( kind === 'points' ) {
+			text = fmt.number( Math.abs( change ) ) + '٪';
+		} else if ( kind === 'stars' ) {
+			text = fmt.number( Math.round( Math.abs( change ) * 100 ) / 100 );
+		} else {
+			text = formatDuration( Math.abs( change ) );
+		}
+
+		if ( ! /^fa/i.test( config.locale || '' ) ) {
+			text = text.replace( '٪', '%' );
+		}
+
+		var better = kind === 'time' ? change < 0 : change > 0;
+		var tone = change === 0 ? 'flat' : ( kind === 'percent' ? 'neutral' : ( better ? 'up' : 'down' ) );
+
+		return h( 'p', { className: 'cc-kpi__delta cc-kpi__delta--' + tone }, [
+			h( 'span', { className: 'cc-kpi__arrow', 'aria-hidden': 'true', text: change === 0 ? '–' : ( change > 0 ? '▲' : '▼' ) } ),
+			h( 'span', { text: ( change === 0 ? S.reportsSame : text ) + ' ' + fmt.format( S.reportsVsPrevious, this.data.range ) } )
+		] );
+	};
+
+	ReportsView.prototype.buildKpis = function () {
+		var k = this.data.kpis;
+		var satisfaction = k.satisfaction.value;
+
+		function tile( iconName, label, value, sub, delta, hint ) {
+			return h( 'div', { className: 'cc-card cc-kpi' }, [
+				h( 'div', { className: 'cc-kpi__head' }, [ icon( iconName ), h( 'span', { text: label } ) ] ),
+				h( 'p', { className: 'cc-kpi__value', text: value } ),
+				sub ? h( 'p', { className: 'cc-kpi__sub', text: sub } ) : null,
+				delta,
+				hint ? h( 'p', { className: 'cc-kpi__hint', text: hint } ) : null
+			] );
+		}
+
+		var percentSign = /^fa/i.test( config.locale || '' ) ? '٪' : '%';
+
+		return h( 'div', { className: 'cc-kpis' }, [
+			tile( 'message', S.kpiConversations, fmt.number( k.conversations.value ),
+				S.kpiMessages.replace( '%1$s', fmt.number( k.messages.visitor ) ).replace( '%2$s', fmt.number( k.messages.agent ) ),
+				this.delta( k.conversations.value, k.conversations.previous, 'percent' ) ),
+			tile( 'check', S.kpiAnswered, k.answered.value === null ? '—' : fmt.number( k.answered.value ) + percentSign,
+				k.answered.missed ? fmt.format( S.kpiMissed, k.answered.missed ) : S.kpiNoMissed,
+				this.delta( k.answered.value, k.answered.previous, 'points' ) ),
+			tile( 'clock', S.kpiFirstResponse, k.first_response.value === null ? '—' : formatDuration( k.first_response.value ),
+				k.first_response.average === null ? '' : S.kpiAverage.replace( '%s', formatDuration( k.first_response.average ) ),
+				this.delta( k.first_response.value, k.first_response.previous, 'time' ),
+				S.kpiFirstResponseHint ),
+			tile( 'star', S.kpiSatisfaction, satisfaction === null ? '—' : fmt.number( satisfaction.toFixed( 1 ) ) + ' / ' + fmt.number( 5 ),
+				k.satisfaction.count ? fmt.format( S.kpiRatings, k.satisfaction.count ) + ' · ' + S.kpiSatisfied.replace( '%s', fmt.number( k.satisfaction.satisfied ) + percentSign ) : S.reportsNoRatings,
+				this.delta( satisfaction, k.satisfaction.previous, 'stars' ) )
+		] );
+	};
+
+	/**
+	 * Conversations per day as bars; the answered part is filled.
+	 */
+	ReportsView.prototype.buildDaily = function () {
+		var days = this.data.daily;
+		var width = 640;
+		var height = 220;
+		var pad = { top: 12, right: 8, bottom: 26, left: 34 };
+		var plotW = width - pad.left - pad.right;
+		var plotH = height - pad.top - pad.bottom;
+		var max = Math.max.apply( null, days.map( function ( d ) {
+			return d.conversations;
+		} ).concat( [ 1 ] ) );
+		var step = Math.max( 1, Math.ceil( max / 4 ) );
+		var top = step * Math.ceil( max / step );
+		var slot = plotW / days.length;
+		var barW = Math.max( 2, Math.min( 22, slot * 0.66 ) );
+		var dayFormat = new Intl.DateTimeFormat( /^fa/i.test( config.locale || '' ) ? 'fa-IR-u-ca-persian' : config.locale, { day: 'numeric', month: 'short' } );
+		var tooltip = h( 'div', { className: 'cc-chart__tip', hidden: true } );
+
+		function y( value ) {
+			return pad.top + plotH - ( value / top ) * plotH;
+		}
+
+		var grid = [];
+		for ( var v = 0; v <= top; v += step ) {
+			grid.push( svg( 'line', { x1: pad.left, x2: width - pad.right, y1: y( v ), y2: y( v ), class: v === 0 ? 'cc-chart__axis' : 'cc-chart__grid' } ) );
+			grid.push( svg( 'text', { x: pad.left - 8, y: y( v ) + 4, 'text-anchor': 'end', class: 'cc-chart__label' }, [ document.createTextNode( fmt.number( v ) ) ] ) );
+		}
+
+		var every = Math.ceil( days.length / 7 );
+		var bars = days.map( function ( d, i ) {
+			var x = pad.left + slot * i + ( slot - barW ) / 2;
+			var date = new Date( d.date + 'T12:00:00' );
+			var label = dayFormat.format( date );
+			var group = svg( 'g', { class: 'cc-chart__bar', tabindex: '0', role: 'img', 'aria-label': label + ': ' + fmt.format( S.chartConversationsCount, d.conversations ) + ', ' + fmt.format( S.chartAnsweredCount, d.answered ) }, [
+				svg( 'rect', { x: x - ( slot - barW ) / 2, y: pad.top, width: slot, height: plotH, class: 'cc-chart__hit' } ),
+				d.conversations ? svg( 'rect', { x: x, y: y( d.conversations ), width: barW, height: plotH - ( y( d.conversations ) - pad.top ), rx: Math.min( 3, barW / 3 ), class: 'cc-chart__total' } ) : null,
+				d.answered ? svg( 'rect', { x: x, y: y( d.answered ), width: barW, height: plotH - ( y( d.answered ) - pad.top ), rx: Math.min( 3, barW / 3 ), class: 'cc-chart__answered' } ) : null,
+				( days.length - 1 - i ) % every === 0 ? svg( 'text', { x: x + barW / 2, y: height - 6, 'text-anchor': 'middle', class: 'cc-chart__label' }, [ document.createTextNode( label ) ] ) : null
+			] );
+
+			function showTip() {
+				tooltip.replaceChildren(
+					h( 'strong', { text: label } ),
+					h( 'span', { text: fmt.format( S.chartConversationsCount, d.conversations ) } ),
+					h( 'span', { text: fmt.format( S.chartAnsweredCount, d.answered ) } )
+				);
+				tooltip.hidden = false;
+				var box = chart.getBoundingClientRect();
+				var cx = ( x + barW / 2 ) / width * box.width;
+				tooltip.style.left = Math.max( 0, Math.min( box.width - 140, cx - 70 ) ) + 'px';
+				tooltip.style.top = Math.max( 0, y( d.conversations ) / height * box.height - 70 ) + 'px';
+			}
+
+			group.addEventListener( 'mouseenter', showTip );
+			group.addEventListener( 'focus', showTip );
+			group.addEventListener( 'mouseleave', function () {
+				tooltip.hidden = true;
+			} );
+			group.addEventListener( 'blur', function () {
+				tooltip.hidden = true;
+			} );
+			return group;
+		} );
+
+		var chart = h( 'div', { className: 'cc-chart' }, [
+			svg( 'svg', { viewBox: '0 0 ' + width + ' ' + height, class: 'cc-chart__svg', role: 'group', 'aria-label': S.chartDaily, direction: 'ltr' }, grid.concat( bars ) ),
+			tooltip
+		] );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [
+				h( 'h2', { text: S.chartDaily } ),
+				h( 'div', { className: 'cc-legend' }, [
+					h( 'span', { className: 'cc-legend__item' }, [ h( 'span', { className: 'cc-legend__swatch cc-legend__swatch--answered' } ), S.legendAnswered ] ),
+					h( 'span', { className: 'cc-legend__item' }, [ h( 'span', { className: 'cc-legend__swatch cc-legend__swatch--total' } ), S.legendUnanswered ] )
+				] )
+			] ),
+			chart
+		] );
+	};
+
+	ReportsView.prototype.buildRatings = function () {
+		var ratings = this.data.ratings;
+		var total = [ 1, 2, 3, 4, 5 ].reduce( function ( sum, n ) {
+			return sum + ratings[ n ];
+		}, 0 );
+
+		var content = total ? h( 'ul', { className: 'cc-hbars' }, [ 5, 4, 3, 2, 1 ].map( function ( n ) {
+			var share = Math.round( ratings[ n ] / total * 100 );
+			return h( 'li', { className: 'cc-hbar', 'aria-label': fmt.format( S.ratedStars, n ) + ': ' + fmt.number( ratings[ n ] ) }, [
+				h( 'span', { className: 'cc-hbar__label cc-hbar__label--stars', 'aria-hidden': 'true' }, [ fmt.number( n ), icon( 'star' ) ] ),
+				h( 'span', { className: 'cc-hbar__track' }, [ h( 'span', { className: 'cc-hbar__fill cc-hbar__fill--r' + n, style: 'width:' + share + '%' } ) ] ),
+				h( 'span', { className: 'cc-hbar__value', text: fmt.number( ratings[ n ] ) } )
+			] );
+		} ) ) : h( 'p', { className: 'cc-report__empty', text: S.reportsNoRatings } );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.chartRatings } ) ] ),
+			content
+		] );
+	};
+
+	ReportsView.prototype.buildAgents = function () {
+		var agents = this.data.agents;
+		var rows = agents.rows;
+		var maxConversations = Math.max.apply( null, rows.map( function ( row ) {
+			return row.conversations;
+		} ).concat( [ 1 ] ) );
+
+		var table = rows.length ? h( 'div', { className: 'cc-table-wrap' }, [ h( 'table', { className: 'cc-table' }, [
+			h( 'thead', {}, [ h( 'tr', {}, [ S.colAgent, S.colConversations, S.colReplies, S.colFirstResponse, S.colRating ].map( function ( label, i ) {
+				return h( 'th', { scope: 'col', className: i ? 'is-num' : '', text: label } );
+			} ) ) ] ),
+			h( 'tbody', {}, rows.map( function ( row ) {
+				return h( 'tr', {}, [
+					h( 'th', { scope: 'row' }, [ h( 'span', { className: 'cc-table__agent' }, [ avatar( row.name, 'sm' ), h( 'span', { text: row.name } ) ] ) ] ),
+					h( 'td', { className: 'is-num' }, [ h( 'span', { className: 'cc-table__count' }, [
+						h( 'span', { className: 'cc-table__bar' }, [
+							h( 'span', { className: 'cc-table__bar-fill', style: 'width:' + Math.round( row.conversations / maxConversations * 100 ) + '%' } )
+						] ),
+						h( 'span', { text: fmt.number( row.conversations ) } )
+					] ) ] ),
+					h( 'td', { className: 'is-num', text: fmt.number( row.replies ) } ),
+					h( 'td', { className: 'is-num', text: row.first_response === null ? '—' : formatDuration( row.first_response ) } ),
+					h( 'td', { className: 'is-num' }, [ row.rating === null ? '—' : h( 'span', { className: 'cc-table__rating' }, [ icon( 'star' ), fmt.number( row.rating.toFixed( 1 ) ), h( 'small', { text: '(' + fmt.number( row.rating_count ) + ')' } ) ] ) ] )
+				] );
+			} ) )
+		] ) ] ) : h( 'p', { className: 'cc-report__empty', text: S.reportsNoAgents } );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.tableAgents } ) ] ),
+			table,
+			agents.unassigned ? h( 'p', { className: 'cc-hint', text: fmt.format( S.reportsUnassigned, agents.unassigned ) } ) : null
+		] );
+	};
+
+	/**
+	 * When conversations start, by weekday and hour.
+	 */
+	ReportsView.prototype.buildHeatmap = function () {
+		var grid = this.data.heatmap;
+		var max = 1;
+
+		grid.forEach( function ( hours ) {
+			hours.forEach( function ( n ) {
+				max = Math.max( max, n );
+			} );
+		} );
+
+		var hoursRow = h( 'div', { className: 'cc-heat__hours', 'aria-hidden': 'true' }, [ h( 'span' ) ].concat( Array.from( { length: 24 }, function ( _, hour ) {
+			return h( 'span', { text: hour % 6 === 0 ? fmt.number( hour ) : '' } );
+		} ) ) );
+
+		var rows = weekOrder().map( function ( day ) {
+			var hours = grid[ parseInt( day, 10 ) ];
+			var name = dayName( day );
+			return h( 'div', { className: 'cc-heat__row' }, [ h( 'span', { className: 'cc-heat__day', text: name } ) ].concat( hours.map( function ( n, hour ) {
+				var level = n ? Math.max( 0.12, n / max ) : 0;
+				return h( 'span', {
+					className: 'cc-heat__cell' + ( n ? '' : ' is-empty' ),
+					style: n ? '--level:' + level.toFixed( 2 ) : null,
+					title: name + ' ' + fmt.time( new Date( 2024, 0, 7, hour, 0 ) ) + ' — ' + fmt.format( S.chartConversationsCount, n )
+				} );
+			} ) ) );
+		} );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [
+				h( 'h2', { text: S.chartHours } ),
+				h( 'p', { className: 'cc-hint', text: S.chartHoursHint } )
+			] ),
+			h( 'div', { className: 'cc-heat', role: 'img', 'aria-label': S.chartHours }, [ hoursRow ].concat( rows ) ),
+			h( 'div', { className: 'cc-heat__scale', 'aria-hidden': 'true' }, [
+				h( 'span', { text: S.heatLess } ),
+				[ 0.15, 0.4, 0.7, 1 ].map( function ( level ) {
+					return h( 'span', { className: 'cc-heat__cell', style: '--level:' + level } );
+				} ),
+				h( 'span', { text: S.heatMore } )
+			].reduce( function ( all, item ) {
+				return all.concat( item );
+			}, [] ) )
+		] );
+	};
+
+	ReportsView.prototype.buildTags = function () {
+		var tags = this.data.tags;
+		var max = tags.length ? tags[ 0 ].count : 1;
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.chartTags } ) ] ),
+			tags.length ? h( 'ul', { className: 'cc-hbars' }, tags.map( function ( tag ) {
+				return h( 'li', { className: 'cc-hbar' }, [
+					h( 'span', { className: 'cc-hbar__label', dir: 'auto', text: '#' + tag.tag } ),
+					h( 'span', { className: 'cc-hbar__track' }, [ h( 'span', { className: 'cc-hbar__fill', style: 'width:' + Math.round( tag.count / max * 100 ) + '%' } ) ] ),
+					h( 'span', { className: 'cc-hbar__value', text: fmt.number( tag.count ) } )
+				] );
+			} ) ) : h( 'p', { className: 'cc-report__empty', text: S.reportsNoTags } )
+		] );
+	};
+
+	ReportsView.prototype.buildComments = function () {
+		var comments = this.data.comments;
+
+		if ( ! comments.length ) {
+			return null;
+		}
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.reportsComments } ) ] ),
+			h( 'ul', { className: 'cc-comments' }, comments.map( function ( item ) {
+				return h( 'li', {}, [
+					h( 'a', { className: 'cc-comment', href: '#/conversations/' + item.conversation_id }, [
+						h( 'span', { className: 'cc-comment__stars cc-comment__stars--' + ( item.score >= 4 ? 'good' : item.score === 3 ? 'ok' : 'bad' ), 'aria-label': fmt.format( S.ratedStars, item.score ), text: '★★★★★'.slice( 0, item.score ) + '☆☆☆☆☆'.slice( 0, 5 - item.score ) } ),
+						h( 'p', { className: 'cc-comment__text', text: item.comment } ),
+						h( 'span', { className: 'cc-comment__meta', text: ( item.visitor || S.visitor ) + ( item.at ? ' · ' + fmt.ago( new Date( item.at ) ) : '' ) } )
+					] )
+				] );
+			} ) )
+		] );
+	};
+
+	/* ------------------------------------------------------------------ *
 	 * Settings screen (site administrators only)
 	 * ------------------------------------------------------------------ */
 
@@ -2997,6 +3554,7 @@
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
 		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
 		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
+		{ id: 'sales', icon: 'message', keys: [ 'proactive', 'rating_enabled' ] },
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
@@ -3097,6 +3655,16 @@
 		}
 		if ( id === 'appearance' ) {
 			payload.primary_color = draft.primary_color.trim();
+		}
+		if ( id === 'sales' ) {
+			payload.proactive = draft.proactive.map( function ( rule ) {
+				var delay = String( rule.delay ).trim();
+				return Object.assign( {}, rule, {
+					url: rule.target === 'url' ? String( rule.url ).trim() : '',
+					message: String( rule.message ).trim(),
+					delay: /^\d+$/.test( delay ) ? parseInt( delay, 10 ) : delay
+				} );
+			} );
 		}
 		if ( id === 'notifications' ) {
 			[ 'notify_email', 'bale_token', 'bale_chat_id', 'telegram_token', 'telegram_chat_id', 'telegram_api_url' ].forEach( function ( key ) {
@@ -3203,6 +3771,7 @@
 			hours: S.sectionHours,
 			notifications: S.sectionNotifications,
 			limits: S.sectionLimits,
+			sales: S.sectionSales,
 			security: S.sectionSecurity
 		};
 
@@ -3263,6 +3832,8 @@
 			children = [ this.buildHours() ];
 		} else if ( this.section === 'notifications' ) {
 			children = [ this.buildNotifications() ];
+		} else if ( this.section === 'sales' ) {
+			children = [ this.buildSales() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -4067,6 +4638,175 @@
 			h( 'div', { className: 'cc-bot-test' }, [ test, result ] ),
 			this.fieldError( service + '_enabled' )
 		] );
+	};
+
+	/**
+	 * Sales: chat invitations shown on chosen pages, and the rating asked
+	 * for when a chat ends.
+	 */
+	SettingsView.prototype.buildSales = function () {
+		var self = this;
+		var draft = this.draft;
+		var max = this.data.limits.proactive;
+		var list = h( 'div', { className: 'cc-invites' } );
+		var add = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			onClick: function () {
+				draft.proactive.push( { id: '', enabled: true, target: 'product', url: '', delay: 20, message: '', frequency: 'session' } );
+				self.clearError( 'proactive' );
+				fill();
+				var fields = list.querySelectorAll( 'textarea' );
+				if ( fields.length ) {
+					fields[ fields.length - 1 ].focus();
+				}
+			}
+		}, [ icon( 'plus' ), h( 'span', { text: S.inviteAdd } ) ] );
+
+		function fill() {
+			list.replaceChildren.apply( list, draft.proactive.length ? draft.proactive.map( function ( rule, index ) {
+				return self.buildInvite( rule, index, function () {
+					draft.proactive.splice( index, 1 );
+					self.clearError( 'proactive' );
+					fill();
+					self.syncNav();
+				} );
+			} ) : [ h( 'p', { className: 'cc-invites__empty', text: S.inviteEmpty } ) ] );
+			add.hidden = draft.proactive.length >= max;
+		}
+
+		fill();
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-invites-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-invites-title', text: S.invitesTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.invitesIntro } )
+				] ),
+				list,
+				this.fieldError( 'proactive' ),
+				h( 'div', {}, [ add ] )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-rating-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-rating-title', text: S.ratingTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.ratingIntro } )
+					] ),
+					this.buildSwitch( 'cc-rating-enabled', S.ratingOn, draft.rating_enabled, function ( on ) {
+						draft.rating_enabled = on;
+					} )
+				] ),
+				this.fieldError( 'rating_enabled' )
+			] )
+		] );
+	};
+
+	/**
+	 * One invitation in the editor.
+	 */
+	SettingsView.prototype.buildInvite = function ( rule, index, onRemove ) {
+		var self = this;
+		var limit = this.data.limits.proactive_text;
+		var prefix = 'cc-invite-' + index;
+		var targets = [ [ 'all', S.inviteAll ], [ 'home', S.inviteHome ], [ 'product', S.inviteProduct ], [ 'shop', S.inviteShop ], [ 'cart', S.inviteCart ], [ 'checkout', S.inviteCheckout ], [ 'url', S.inviteUrl ] ];
+		var frequencies = [ [ 'session', S.inviteOncePerVisit ], [ 'day', S.inviteOncePerDay ], [ 'always', S.inviteEveryPage ] ];
+
+		function changed() {
+			self.clearError( 'proactive' );
+		}
+
+		function select( id, options, value, onChange ) {
+			var field = h( 'select', { id: id, className: 'cc-input cc-select' }, options.map( function ( option ) {
+				return h( 'option', { value: option[ 0 ], text: option[ 1 ], selected: option[ 0 ] === value } );
+			} ) );
+			field.addEventListener( 'change', function () {
+				onChange( field.value );
+				changed();
+			} );
+			return field;
+		}
+
+		var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+		var message = h( 'textarea', { id: prefix + '-message', className: 'cc-input cc-textarea', rows: '2', placeholder: S.invitePlaceholder } );
+		message.value = rule.message;
+
+		function count() {
+			var used = Array.from( message.value ).length;
+			counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limit );
+			counter.classList.toggle( 'is-over', used > limit );
+		}
+
+		message.addEventListener( 'input', function () {
+			rule.message = message.value;
+			count();
+			changed();
+		} );
+		count();
+
+		var url = h( 'input', { id: prefix + '-url', className: 'cc-input', type: 'text', dir: 'ltr', placeholder: '/product/shoes', 'aria-label': S.inviteUrlLabel, hidden: rule.target !== 'url' } );
+		url.value = rule.url;
+		url.addEventListener( 'input', function () {
+			rule.url = url.value;
+			changed();
+		} );
+
+		var delay = h( 'input', { id: prefix + '-delay', className: 'cc-input cc-input--number', type: 'number', min: '0', max: '600', step: '1', inputMode: 'numeric', dir: 'ltr' } );
+		delay.value = String( rule.delay );
+		delay.addEventListener( 'input', function () {
+			rule.delay = delay.value;
+			changed();
+		} );
+
+		var target = select( prefix + '-target', targets, rule.target, function ( value ) {
+			rule.target = value;
+			url.hidden = value !== 'url';
+			if ( value === 'url' ) {
+				url.focus();
+			}
+		} );
+
+		var enabled = this.buildSwitch( prefix + '-enabled', S.inviteOn, rule.enabled, function ( on ) {
+			rule.enabled = on;
+			item.classList.toggle( 'is-off', ! on );
+		} );
+
+		var item = h( 'div', { className: 'cc-invite' + ( rule.enabled ? '' : ' is-off' ) }, [
+			h( 'div', { className: 'cc-invite__head' }, [
+				h( 'strong', { text: String( S.inviteNumber ).replace( '%s', fmt.number( index + 1 ) ) } ),
+				enabled,
+				h( 'button', {
+					type: 'button',
+					className: 'cc-icon-button',
+					title: S.inviteRemove,
+					'aria-label': S.inviteRemove,
+					onClick: onRemove
+				}, [ icon( 'trash' ) ] )
+			] ),
+			h( 'div', { className: 'cc-field' }, [
+				h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: message.id, text: S.inviteMessage } ), counter ] ),
+				message
+			] ),
+			h( 'div', { className: 'cc-invite__grid' }, [
+				h( 'div', { className: 'cc-field' }, [
+					h( 'label', { className: 'cc-label', for: target.id, text: S.inviteWhere } ),
+					target,
+					url
+				] ),
+				h( 'div', { className: 'cc-field' }, [
+					h( 'label', { className: 'cc-label', for: delay.id, text: S.inviteDelay } ),
+					delay
+				] ),
+				h( 'div', { className: 'cc-field' }, [
+					h( 'label', { className: 'cc-label', for: prefix + '-frequency', text: S.inviteFrequency } ),
+					select( prefix + '-frequency', frequencies, rule.frequency, function ( value ) {
+						rule.frequency = value;
+					} )
+				] )
+			] )
+		] );
+
+		return item;
 	};
 
 	SettingsView.prototype.fieldError = function ( key ) {

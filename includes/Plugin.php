@@ -14,12 +14,14 @@ use ChatChi\Attachments\AttachmentService;
 use ChatChi\Attachments\FileStore;
 use ChatChi\Availability\Availability;
 use ChatChi\Availability\OfflineNotifier;
+use ChatChi\Commerce\CustomerContext;
 use ChatChi\Canned\CannedResponses;
 use ChatChi\Admin\PanelAccess;
 use ChatChi\Admin\PanelPage;
 use ChatChi\Admin\PanelStrings;
 use ChatChi\Conversations\ConversationPolicy;
 use ChatChi\Conversations\ConversationService;
+use ChatChi\Conversations\RatingService;
 use ChatChi\Core\Container;
 use ChatChi\Core\Contracts\Module;
 use ChatChi\Core\I18n;
@@ -41,6 +43,7 @@ use ChatChi\Frontend\WidgetModule;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
+use ChatChi\Reports\ReportService;
 use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
 use ChatChi\Rest\BotTestController;
@@ -49,6 +52,7 @@ use ChatChi\Notifications\Transcript;
 use ChatChi\Rest\CannedController;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
+use ChatChi\Rest\ReportsController;
 use ChatChi\Rest\RestModule;
 use ChatChi\Rest\SettingsController;
 use ChatChi\Rest\WidgetController;
@@ -371,6 +375,18 @@ final class Plugin {
 				);
 			}
 		);
+
+		$this->container->singleton(
+			RatingService::class,
+			static function ( Container $c ): RatingService {
+				return new RatingService(
+					$c->get( Settings::class ),
+					$c->get( ConversationService::class ),
+					$c->get( ConversationRepository::class ),
+					$c->get( MessageService::class )
+				);
+			}
+		);
 	}
 
 	/**
@@ -405,7 +421,9 @@ final class Plugin {
 					$c->get( RateLimiter::class ),
 					$c->get( SpamGuard::class ),
 					$c->get( Availability::class ),
-					$c->get( AttachmentService::class )
+					$c->get( AttachmentService::class ),
+					$c->get( CustomerContext::class ),
+					$c->get( RatingService::class )
 				);
 			}
 		);
@@ -419,7 +437,9 @@ final class Plugin {
 					$c->get( Presenter::class ),
 					$c->get( AgentRepository::class ),
 					$c->get( AttachmentService::class ),
-					$c->get( Transcript::class )
+					$c->get( Transcript::class ),
+					$c->get( CustomerContext::class ),
+					$c->get( VisitorRepository::class )
 				);
 			}
 		);
@@ -494,6 +514,20 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ReportService::class,
+			static function ( Container $c ): ReportService {
+				return new ReportService( $c->get( \wpdb::class ), $c->get( AgentRepository::class ), $c->get( VisitorRepository::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			ReportsController::class,
+			static function ( Container $c ): ReportsController {
+				return new ReportsController( $c->get( ReportService::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			RestModule::class,
 			static function ( Container $c ): RestModule {
 				return new RestModule(
@@ -502,7 +536,8 @@ final class Plugin {
 					$c->get( AgentManagementController::class ),
 					$c->get( SettingsController::class ),
 					$c->get( CannedController::class ),
-					$c->get( BotTestController::class )
+					$c->get( BotTestController::class ),
+					$c->get( ReportsController::class )
 				);
 			}
 		);
@@ -581,6 +616,13 @@ final class Plugin {
 					$c->get( MessageRepository::class ),
 					$c->get( VisitorRepository::class )
 				);
+			}
+		);
+
+		$this->container->singleton(
+			CustomerContext::class,
+			static function ( Container $c ): CustomerContext {
+				return new CustomerContext( $c->get( VisitorRepository::class ) );
 			}
 		);
 

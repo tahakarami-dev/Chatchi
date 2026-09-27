@@ -73,6 +73,18 @@ final class WidgetStrings {
 			'dropFiles'      => __( 'Drop files here to send them', 'chatchi' ),
 			/* translators: %s: maximum file size, e.g. "5 MB". */
 			'fileTooLarge'   => __( 'Too large to send (the limit is %s). Tap to remove.', 'chatchi' ),
+			'dismiss'        => __( 'Close', 'chatchi' ),
+			'ratingTitle'    => __( 'How was your chat?', 'chatchi' ),
+			'ratingComment'  => __( 'Anything to add? (optional)', 'chatchi' ),
+			'ratingSend'     => __( 'Send', 'chatchi' ),
+			'ratingThanks'   => __( 'Thanks for your feedback!', 'chatchi' ),
+			/* translators: %d: number of stars. */
+			'ratingStars'    => __( '%d stars', 'chatchi' ),
+			'rating1'        => __( 'Very bad', 'chatchi' ),
+			'rating2'        => __( 'Bad', 'chatchi' ),
+			'rating3'        => __( 'OK', 'chatchi' ),
+			'rating4'        => __( 'Good', 'chatchi' ),
+			'rating5'        => __( 'Excellent', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
 			'yesterday'      => __( 'Yesterday', 'chatchi' ),
 			/* translators: %d: number of unread messages. */

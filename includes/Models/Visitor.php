@@ -37,6 +37,25 @@ final class Visitor {
 	public string $last_seen_at = '';
 
 	/**
+	 * Page the visitor is on, as last reported by the widget.
+	 */
+	public string $current_url = '';
+
+	public string $current_title = '';
+
+	/**
+	 * WooCommerce cart when last reported, decoded; null when unknown.
+	 *
+	 * @var array<string, mixed>|null
+	 */
+	public ?array $cart = null;
+
+	/**
+	 * When the page and cart were last reported (UTC), or null.
+	 */
+	public ?string $context_at = null;
+
+	/**
 	 * @param array<string, mixed> $row Database row.
 	 */
 	public static function from_row( array $row ): self {
@@ -49,6 +68,13 @@ final class Visitor {
 		$visitor->phone        = (string) $row['phone'];
 		$visitor->created_at   = (string) $row['created_at'];
 		$visitor->last_seen_at = (string) $row['last_seen_at'];
+
+		// Columns added in schema 7; absent while an upgrade is pending.
+		$visitor->current_url   = (string) ( $row['current_url'] ?? '' );
+		$visitor->current_title = (string) ( $row['current_title'] ?? '' );
+		$cart                   = isset( $row['cart'] ) ? json_decode( (string) $row['cart'], true ) : null;
+		$visitor->cart          = is_array( $cart ) ? $cart : null;
+		$visitor->context_at    = empty( $row['context_at'] ) ? null : (string) $row['context_at'];
 
 		return $visitor;
 	}

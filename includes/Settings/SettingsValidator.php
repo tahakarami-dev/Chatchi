@@ -136,6 +136,10 @@ final class SettingsValidator {
 			'bot_notify'               => 'new',
 			// Email visitors a copy of the chat when it ends.
 			'transcript_enabled'       => false,
+			// Chat invitations (see ProactiveRules).
+			'proactive'                => array(),
+			// Ask visitors to rate the chat when it ends.
+			'rating_enabled'           => true,
 		);
 
 		foreach ( self::NUMBERS as $key => $range ) {
@@ -307,7 +311,12 @@ final class SettingsValidator {
 				case 'telegram_enabled':
 				case 'bale_enabled':
 				case 'transcript_enabled':
+				case 'rating_enabled':
 					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'proactive':
+					$settings[ $key ] = ProactiveRules::repair( $value );
 					break;
 
 				case 'telegram_token':
@@ -428,7 +437,11 @@ final class SettingsValidator {
 			case 'telegram_enabled':
 			case 'bale_enabled':
 			case 'transcript_enabled':
+			case 'rating_enabled':
 				return rest_sanitize_boolean( $value );
+
+			case 'proactive':
+				return ProactiveRules::clean( $value );
 
 			case 'telegram_token':
 			case 'bale_token':

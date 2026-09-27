@@ -36,8 +36,10 @@ uninstall.php            On delete: removes temporary data; removes everything o
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
 ├── Agents/              Agent management service, avatar uploads
-├── Conversations/       Conversation service, access policy (Actor), inbox summaries
+├── Commerce/           WooCommerce customer context for agents (current page, cart, orders)
+├── Conversations/       Conversation service, access policy (Actor), inbox summaries, ratings
 ├── Messages/            Message service, text rules, paging
+├── Reports/             Report figures for administrators
 ├── Rest/                chatchi/v1 controllers (widget, agent, agent management, settings), presenter, CSRF guard
 ├── Frontend/            Widget loader, display rules, [chatchi] shortcode, color tokens, font face, interface strings
 ├── Admin/               Standalone agent panel page, access capability, menu entry
@@ -113,14 +115,16 @@ docs/                    Design and architecture documents
 | `chatchi_bot_api_url` | filter | Bot API address per service (e.g. a relay) |
 | `chatchi_transcript_email` | filter | The transcript email (`to`, `subject`, HTML `message`, `headers`); falsy cancels |
 | `chatchi_canned_responses_updated` | action | The saved replies changed |
+| `chatchi_agent_can_see_orders` | filter | Whether the current agent sees the visitor's WooCommerce orders (default: `manage_options` or `edit_shop_orders`) |
+| `chatchi_conversation_rated` | action | A visitor rated (or re-rated) an ended conversation |
 
 ## Database
 
 | Table | Purpose | Key indexes |
 |---|---|---|
-| `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token) and contact info | `UNIQUE token_hash`, `user_id` |
+| `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token), contact info, and the page they are on with a summary of their WooCommerce cart (for agents) | `UNIQUE token_hash`, `user_id` |
 | `{prefix}chatchi_agents` | Agents, one per WordPress user, with their chosen status (online / away) and when their panel last talked to the server | `UNIQUE user_id`, `is_active` |
-| `{prefix}chatchi_conversations` | Conversation state, latest activity, and when each side last reported typing | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
+| `{prefix}chatchi_conversations` | Conversation state, latest activity, when each side last reported typing, and the visitor's rating (1–5) and comment | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id`, `created_at` |
 | `{prefix}chatchi_messages` | Messages and read state; `attachment_id` links a sent file; `internal` marks agent-only notes and events, never sent to visitors | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
 | `{prefix}chatchi_attachments` | Files sent in conversations: original name, type, size, picture size, and the path of the stored file | `conversation_id`, `message_id` |
 | `{prefix}chatchi_conversation_tags` | Tags agents put on conversations | `(conversation_id,tag)` primary, `tag` |
@@ -138,7 +142,7 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/widget/session` | Visitor, open conversation, unread count, start-form config (and the leave-a-message fields), `form_token`, `availability` (`mode`: online / away / offline, `opens_at`, `offline_form`, `offline_message`) and `attachments` (`enabled`, `max_bytes`, `accept`). Never sets a cookie |
+| GET | `/widget/session` | Optional `url` and `title` of the current page (recorded, with the WooCommerce cart, only for visitors who already chatted). Visitor, open conversation, unread count, start-form config (and the leave-a-message fields), `form_token`, `availability` (`mode`: online / away / offline, `opens_at`, `offline_form`, `offline_message`) and `attachments` (`enabled`, `max_bytes`, `accept`). Never sets a cookie |
 | POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url`, `form_token`, `website` (honeypot, must be empty), `offline` (leave-a-message form: email required) → visitor + open conversation |
 | GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50. Also returns `typing`: whether the other side is typing |
 | POST | `/widget/conversations/{id}/messages` | `body`, optional `client_id` (UUID, makes retries idempotent) |
@@ -147,6 +151,7 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 | POST | `/widget/conversations/{id}/attachments` | Send a file: multipart field `file`, optional `client_id`. Pictures (JPG, PNG, GIF, WebP), PDF, Word, Excel, text, CSV and ZIP, checked by content; SVG, HTML and scripts are always refused. Returns the new message with `attachment` |
 | GET | `/widget/conversations/{id}/attachments/{attachment_id}` | The file, after an access check. Pictures inline, everything else as a download (`download=1` forces it); sandboxing CSP and `nosniff` always |
 | POST | `/widget/conversations/{id}/close` | Close own conversation |
+| POST | `/widget/conversations/{id}/rating` | `score` 1–5, optional `comment` (≤ 500 characters): rate own ended conversation. Can be changed for 7 days after it ends; `403 chatchi_rating_disabled` when rating is off, `409` while open or once too old |
 
 ### Agent panel
 
@@ -166,6 +171,7 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | POST | `/agent/conversations/{id}/assign` | `agent_id` (0 unassigns): hand the conversation to an active agent; an internal event line records it |
 | PUT/PATCH/POST | `/agent/conversations/{id}/tags` | `tags`: replaces the tags (≤ 10; cleaned: one line, no `#`, ≤ 40 characters, Latin in lower case) |
 | POST | `/agent/conversations/{id}/transcript` | Email the visitor a copy of the conversation (notes excluded) |
+| GET | `/agent/conversations/{id}/customer` | What the visitor is viewing now and, on WooCommerce shops, their cart and (for agents allowed by `chatchi_agent_can_see_orders`) their recent orders and total spent |
 | GET | `/agent/tags` | The 50 most used tags with counts |
 | GET | `/agent/team` | Active agents (`id`, `name`, `avatar_url`, `online`, `is_me`), for transfers |
 | GET | `/agent/canned` | Saved replies (`id`, `title`, `shortcut`, `body`); any active agent |
@@ -194,6 +200,7 @@ Administrators only (`manage_options`).
 | GET | `/agent/settings` | Settings, the default welcome message, limits, available page types, and the chosen items with titles |
 | POST/PATCH | `/agent/settings` | Save any of `primary_color` (`#RRGGBB`, `#RGB`; empty = default), `widget_position` (`left` / `right`), `widget_title` (≤ 60 characters), `widget_subtitle` (≤ 100; empty = translated default), `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
 | GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
+| GET | `/agent/reports` | `range` 7, 30 or 90 days (site time zone): KPIs with the previous period (`conversations`, `answered` %, median `first_response` in seconds, `satisfaction`), `daily`, `ratings`, `agents`, `heatmap` (weekday × hour, 0 = Sunday), `tags`, `comments` |
 | POST | `/agent/settings/bot-test` | `service` (`telegram` / `bale`), `token`, `chat_id`, `api_url`: sends a test message with these values (saved or not) and reports the service's answer |
 
 ## Agent panel
@@ -202,8 +209,9 @@ Administrators only (`manage_options`).
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
 
-Administrators also get a **Settings** screen with six sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
+Administrators also get a **Settings** screen with nine sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
 
+- **Sales** (`#/settings/sales`): chat invitations (up to 10) and the post-chat rating. Each invitation has a message (≤ 300 characters), where it shows (all pages, home, product pages, shop and categories, cart, checkout, or pages whose address contains a text), a delay (0–600 seconds) and how often (once per visit, once a day, every page view). The first matching invitation appears as a bubble by the launcher; clicking it opens the chat with the invitation as support's first message. Invitations never show to a visitor who is already chatting.
 - **Notifications** (`#/settings/notifications`): the email about unanswered messages, Telegram and Bale bots (token, chat ID, an optional relay address for Telegram, "send a test message"), whether bots write for every new chat or only when nobody is online, and automatic transcripts for visitors when a conversation ends.
 - **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, and the offline text.
 - **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), the notification sound for new replies, how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
@@ -233,6 +241,13 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 - **Alerts**: the 🔔 button in the rail turns new-message alerts on or off for the agent's browser: a chime and, with the browser's permission, a desktop notification that opens the conversation. Alerts skip the conversation the agent is looking at.
 - **Telegram / Bale**: one message per new conversation (its first visitor message), sent without delaying the visitor; filters `chatchi_bot_message` and `chatchi_bot_api_url`. Bale's bot API is Telegram-compatible (`tapi.bale.ai`). Many servers in Iran cannot reach `api.telegram.org`; use Bale or a relay address.
 - **Transcripts**: plain, escaped RTL HTML email of the visitor-facing messages; sent on close (setting) or from the details pane. Filter `chatchi_transcript_email`.
+
+## Sales tools
+
+- **Customer context**: the details pane shows the page the visitor is on now and, with WooCommerce, their cart (items, quantities, total) and recent orders with status and total spent. The cart is read on the server from the visitor's own WooCommerce session when the widget loads; it is never put into the page's HTML, so page caches cannot leak one shopper's cart to another. Orders are found by the visitor's account or email address and are only shown to agents allowed by `chatchi_agent_can_see_orders`.
+- **Chat invitations**: see Settings → Sales above.
+- **Ratings**: when a conversation ends, the widget asks "How was your chat?" with five stars and an optional comment. Agents see the rating as an internal event line, in the inbox (★) and in the details pane.
+- **Reports** (`#/reports`, administrators): conversations, answer rate, median first response time and satisfaction, each compared with the previous period; conversations per day, rating distribution, each agent's conversations, replies, response time and rating, the busiest hours, the most used tags and the latest comments.
 
 ## Chat widget
 
