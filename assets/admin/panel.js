@@ -3080,6 +3080,7 @@
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
 		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
 		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
+		{ id: 'sales', icon: 'message', keys: [ 'proactive', 'rating_enabled' ] },
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
@@ -3180,6 +3181,16 @@
 		}
 		if ( id === 'appearance' ) {
 			payload.primary_color = draft.primary_color.trim();
+		}
+		if ( id === 'sales' ) {
+			payload.proactive = draft.proactive.map( function ( rule ) {
+				var delay = String( rule.delay ).trim();
+				return Object.assign( {}, rule, {
+					url: rule.target === 'url' ? String( rule.url ).trim() : '',
+					message: String( rule.message ).trim(),
+					delay: /^\d+$/.test( delay ) ? parseInt( delay, 10 ) : delay
+				} );
+			} );
 		}
 		if ( id === 'notifications' ) {
 			[ 'notify_email', 'bale_token', 'bale_chat_id', 'telegram_token', 'telegram_chat_id', 'telegram_api_url' ].forEach( function ( key ) {
@@ -3286,6 +3297,7 @@
 			hours: S.sectionHours,
 			notifications: S.sectionNotifications,
 			limits: S.sectionLimits,
+			sales: S.sectionSales,
 			security: S.sectionSecurity
 		};
 
@@ -3346,6 +3358,8 @@
 			children = [ this.buildHours() ];
 		} else if ( this.section === 'notifications' ) {
 			children = [ this.buildNotifications() ];
+		} else if ( this.section === 'sales' ) {
+			children = [ this.buildSales() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -4150,6 +4164,175 @@
 			h( 'div', { className: 'cc-bot-test' }, [ test, result ] ),
 			this.fieldError( service + '_enabled' )
 		] );
+	};
+
+	/**
+	 * Sales: chat invitations shown on chosen pages, and the rating asked
+	 * for when a chat ends.
+	 */
+	SettingsView.prototype.buildSales = function () {
+		var self = this;
+		var draft = this.draft;
+		var max = this.data.limits.proactive;
+		var list = h( 'div', { className: 'cc-invites' } );
+		var add = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			onClick: function () {
+				draft.proactive.push( { id: '', enabled: true, target: 'product', url: '', delay: 20, message: '', frequency: 'session' } );
+				self.clearError( 'proactive' );
+				fill();
+				var fields = list.querySelectorAll( 'textarea' );
+				if ( fields.length ) {
+					fields[ fields.length - 1 ].focus();
+				}
+			}
+		}, [ icon( 'plus' ), h( 'span', { text: S.inviteAdd } ) ] );
+
+		function fill() {
+			list.replaceChildren.apply( list, draft.proactive.length ? draft.proactive.map( function ( rule, index ) {
+				return self.buildInvite( rule, index, function () {
+					draft.proactive.splice( index, 1 );
+					self.clearError( 'proactive' );
+					fill();
+					self.syncNav();
+				} );
+			} ) : [ h( 'p', { className: 'cc-invites__empty', text: S.inviteEmpty } ) ] );
+			add.hidden = draft.proactive.length >= max;
+		}
+
+		fill();
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-invites-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-invites-title', text: S.invitesTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.invitesIntro } )
+				] ),
+				list,
+				this.fieldError( 'proactive' ),
+				h( 'div', {}, [ add ] )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-rating-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-rating-title', text: S.ratingTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.ratingIntro } )
+					] ),
+					this.buildSwitch( 'cc-rating-enabled', S.ratingOn, draft.rating_enabled, function ( on ) {
+						draft.rating_enabled = on;
+					} )
+				] ),
+				this.fieldError( 'rating_enabled' )
+			] )
+		] );
+	};
+
+	/**
+	 * One invitation in the editor.
+	 */
+	SettingsView.prototype.buildInvite = function ( rule, index, onRemove ) {
+		var self = this;
+		var limit = this.data.limits.proactive_text;
+		var prefix = 'cc-invite-' + index;
+		var targets = [ [ 'all', S.inviteAll ], [ 'home', S.inviteHome ], [ 'product', S.inviteProduct ], [ 'shop', S.inviteShop ], [ 'cart', S.inviteCart ], [ 'checkout', S.inviteCheckout ], [ 'url', S.inviteUrl ] ];
+		var frequencies = [ [ 'session', S.inviteOncePerVisit ], [ 'day', S.inviteOncePerDay ], [ 'always', S.inviteEveryPage ] ];
+
+		function changed() {
+			self.clearError( 'proactive' );
+		}
+
+		function select( id, options, value, onChange ) {
+			var field = h( 'select', { id: id, className: 'cc-input cc-select' }, options.map( function ( option ) {
+				return h( 'option', { value: option[ 0 ], text: option[ 1 ], selected: option[ 0 ] === value } );
+			} ) );
+			field.addEventListener( 'change', function () {
+				onChange( field.value );
+				changed();
+			} );
+			return field;
+		}
+
+		var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+		var message = h( 'textarea', { id: prefix + '-message', className: 'cc-input cc-textarea', rows: '2', placeholder: S.invitePlaceholder } );
+		message.value = rule.message;
+
+		function count() {
+			var used = Array.from( message.value ).length;
+			counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limit );
+			counter.classList.toggle( 'is-over', used > limit );
+		}
+
+		message.addEventListener( 'input', function () {
+			rule.message = message.value;
+			count();
+			changed();
+		} );
+		count();
+
+		var url = h( 'input', { id: prefix + '-url', className: 'cc-input', type: 'text', dir: 'ltr', placeholder: '/product/shoes', 'aria-label': S.inviteUrlLabel, hidden: rule.target !== 'url' } );
+		url.value = rule.url;
+		url.addEventListener( 'input', function () {
+			rule.url = url.value;
+			changed();
+		} );
+
+		var delay = h( 'input', { id: prefix + '-delay', className: 'cc-input cc-input--number', type: 'number', min: '0', max: '600', step: '1', inputMode: 'numeric', dir: 'ltr' } );
+		delay.value = String( rule.delay );
+		delay.addEventListener( 'input', function () {
+			rule.delay = delay.value;
+			changed();
+		} );
+
+		var target = select( prefix + '-target', targets, rule.target, function ( value ) {
+			rule.target = value;
+			url.hidden = value !== 'url';
+			if ( value === 'url' ) {
+				url.focus();
+			}
+		} );
+
+		var enabled = this.buildSwitch( prefix + '-enabled', S.inviteOn, rule.enabled, function ( on ) {
+			rule.enabled = on;
+			item.classList.toggle( 'is-off', ! on );
+		} );
+
+		var item = h( 'div', { className: 'cc-invite' + ( rule.enabled ? '' : ' is-off' ) }, [
+			h( 'div', { className: 'cc-invite__head' }, [
+				h( 'strong', { text: String( S.inviteNumber ).replace( '%s', fmt.number( index + 1 ) ) } ),
+				enabled,
+				h( 'button', {
+					type: 'button',
+					className: 'cc-icon-button',
+					title: S.inviteRemove,
+					'aria-label': S.inviteRemove,
+					onClick: onRemove
+				}, [ icon( 'trash' ) ] )
+			] ),
+			h( 'div', { className: 'cc-field' }, [
+				h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: message.id, text: S.inviteMessage } ), counter ] ),
+				message
+			] ),
+			h( 'div', { className: 'cc-invite__grid' }, [
+				h( 'div', { className: 'cc-field' }, [
+					h( 'label', { className: 'cc-label', for: target.id, text: S.inviteWhere } ),
+					target,
+					url
+				] ),
+				h( 'div', { className: 'cc-field' }, [
+					h( 'label', { className: 'cc-label', for: delay.id, text: S.inviteDelay } ),
+					delay
+				] ),
+				h( 'div', { className: 'cc-field' }, [
+					h( 'label', { className: 'cc-label', for: prefix + '-frequency', text: S.inviteFrequency } ),
+					select( prefix + '-frequency', frequencies, rule.frequency, function ( value ) {
+						rule.frequency = value;
+					} )
+				] )
+			] )
+		] );
+
+		return item;
 	};
 
 	SettingsView.prototype.fieldError = function ( key ) {

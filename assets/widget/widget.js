@@ -350,6 +350,148 @@
 		if ( config.nonce || /(?:^|;\s*)chatchi_active=1/.test( document.cookie ) ) {
 			this.boot();
 		}
+
+		this.scheduleInvitation();
+	};
+
+	/* --------------------------- invitations --------------------------- */
+
+	/**
+	 * Picks the first chat invitation that fits this page and has not been
+	 * shown too recently, and shows it after its delay, unless the visitor
+	 * is already chatting.
+	 */
+	Widget.prototype.scheduleInvitation = function () {
+		var self = this;
+		var rules = config.proactive || [];
+		var here = '';
+
+		try {
+			here = decodeURIComponent( window.location.href ).toLowerCase();
+		} catch ( e ) {
+			here = window.location.href.toLowerCase();
+		}
+
+		var rule = rules.filter( function ( candidate ) {
+			if ( candidate.target === 'url' ) {
+				return here.indexOf( String( candidate.url ).toLowerCase() ) !== -1;
+			}
+			return candidate.target === 'all' || candidate.target === config.pageType;
+		} ).filter( function ( candidate ) {
+			return ! self.invitationSeen( candidate );
+		} )[ 0 ];
+
+		if ( ! rule ) {
+			return;
+		}
+
+		window.setTimeout( function () {
+			var chatting = self.state.conversation && ! self.state.closed;
+			// A visitor whose session is still loading may be chatting already.
+			if ( self.booting ) {
+				window.setTimeout( function () {
+					self.scheduleInvitationNow( rule );
+				}, 1000 );
+				return;
+			}
+			if ( ! chatting ) {
+				self.scheduleInvitationNow( rule );
+			}
+		}, Math.max( 0, rule.delay ) * 1000 );
+	};
+
+	Widget.prototype.scheduleInvitationNow = function ( rule ) {
+		if ( this.state.open || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
+			return;
+		}
+		this.markInvitationSeen( rule );
+		this.showTeaser( rule );
+	};
+
+	Widget.prototype.invitationStore = function ( rule ) {
+		try {
+			return rule.frequency === 'session' ? window.sessionStorage : window.localStorage;
+		} catch ( e ) {
+			return null;
+		}
+	};
+
+	Widget.prototype.invitationSeen = function ( rule ) {
+		if ( rule.frequency === 'always' ) {
+			return false;
+		}
+		try {
+			var store = this.invitationStore( rule );
+			var at = store ? parseInt( store.getItem( 'chatchi_invite_' + rule.id ) || '0', 10 ) : 0;
+			return rule.frequency === 'session' ? at > 0 : Date.now() - at < 24 * 60 * 60 * 1000;
+		} catch ( e ) {
+			return false;
+		}
+	};
+
+	Widget.prototype.markInvitationSeen = function ( rule ) {
+		try {
+			var store = this.invitationStore( rule );
+			if ( store ) {
+				store.setItem( 'chatchi_invite_' + rule.id, String( Date.now() ) );
+			}
+		} catch ( e ) {
+			// Storage may be blocked; the invitation may then show again.
+		}
+	};
+
+	/**
+	 * A speech bubble next to the launcher. Clicking it opens the chat
+	 * with the invitation as the first message from support.
+	 */
+	Widget.prototype.showTeaser = function ( rule ) {
+		var self = this;
+
+		this.teaser = h( 'div', { className: 'chatchi-teaser', role: 'status' }, [
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-teaser__close',
+				'aria-label': S.dismiss,
+				title: S.dismiss,
+				onClick: function () {
+					self.hideTeaser();
+				}
+			}, [ icon( 'close' ) ] ),
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-teaser__body',
+				onClick: function () {
+					self.acceptInvite();
+				}
+			}, [
+				h( 'span', { className: 'chatchi-avatar chatchi-avatar--sm', 'aria-hidden': 'true' }, [ icon( 'headset' ) ] ),
+				h( 'span', { className: 'chatchi-teaser__text' }, [
+					h( 'strong', { text: S.support } ),
+					h( 'span', { text: rule.message } )
+				] )
+			] )
+		] );
+
+		this.teaserMessage = rule.message;
+		this.root.classList.add( 'has-font' );
+		this.root.appendChild( this.teaser );
+		this.render();
+		chime.play();
+	};
+
+	Widget.prototype.hideTeaser = function () {
+		if ( this.teaser ) {
+			this.teaser.remove();
+			this.teaser = null;
+			this.render();
+		}
+	};
+
+	Widget.prototype.acceptInvite = function () {
+		this.invite = this.teaserMessage;
+		this.shellKey = null;
+		this.hideTeaser();
+		this.open();
 	};
 
 	/* ---------------------------- state flow --------------------------- */
@@ -424,6 +566,10 @@
 	};
 
 	Widget.prototype.toggle = function () {
+		if ( ! this.state.open && this.teaser ) {
+			this.acceptInvite();
+			return;
+		}
 		if ( this.state.open ) {
 			this.close();
 		} else {
@@ -1167,10 +1313,12 @@
 
 		this.root.classList.toggle( 'is-open', state.open );
 
-		var showBadge = ! state.open && state.unread > 0;
+		// An invitation on screen counts as one message waiting.
+		var waiting = state.unread > 0 ? state.unread : ( this.teaser ? 1 : 0 );
+		var showBadge = ! state.open && waiting > 0;
 		this.badge.hidden = ! showBadge;
-		this.badge.textContent = showBadge ? formatNumber( Math.min( state.unread, 99 ) ) : '';
-		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : S.openChat ) + ( showBadge ? ' — ' + format( S.unread, state.unread ) : '' ) );
+		this.badge.textContent = showBadge ? formatNumber( Math.min( waiting, 99 ) ) : '';
+		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : S.openChat ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
 
 		var agent = state.conversation && state.conversation.agent;
 		var shellKey = JSON.stringify( [
@@ -1431,7 +1579,7 @@
 			this.renderMessage( { key: 'offline', mine: false, type: 'welcome', sender: { name: S.support, avatar_url: null }, body: availability.offline_message, date: new Date() }, true, true ),
 			this.backAt() ? h( 'p', { className: 'chatchi-form__intro chatchi-form__back' }, [ icon( 'clock' ), this.backAt() ] ) : null
 		] : [
-			config.welcome ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			this.welcomeText() ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
 			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
 		] );
 
@@ -1543,7 +1691,7 @@
 		} ) );
 
 		// The welcome message opens the conversation once its start is loaded.
-		if ( config.welcome && ! state.hasMore ) {
+		if ( this.welcomeText() && ! state.hasMore ) {
 			var started = state.conversation && state.conversation.created_at ? new Date( state.conversation.created_at ) : null;
 			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
 		}
@@ -1611,9 +1759,17 @@
 			mine: false,
 			type: 'welcome',
 			sender: { name: S.support, avatar_url: null },
-			body: config.welcome,
+			body: this.welcomeText(),
 			date: date
 		};
+	};
+
+	/**
+	 * The first bubble from support: the invitation the visitor accepted,
+	 * or the welcome message.
+	 */
+	Widget.prototype.welcomeText = function () {
+		return this.invite || config.welcome || '';
 	};
 
 	Widget.prototype.sameGroup = function ( a, b ) {

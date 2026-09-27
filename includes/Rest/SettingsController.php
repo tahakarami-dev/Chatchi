@@ -11,6 +11,7 @@ use ChatChi\Frontend\ColorPalette;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Security\ClientIp;
 use ChatChi\Settings\ContentLookup;
+use ChatChi\Settings\ProactiveRules;
 use ChatChi\Settings\Settings;
 use ChatChi\Settings\SettingsValidator;
 use ChatChi\Support\PlainText;
@@ -166,6 +167,12 @@ final class SettingsController implements RouteProvider {
 			'bale_chat_id'             => $text( 100 ),
 			'bot_notify'               => $enum( SettingsValidator::BOT_NOTIFY ),
 			'transcript_enabled'       => $flag,
+			'rating_enabled'           => $flag,
+			// Rules are checked by the validator (ProactiveRules::clean()).
+			'proactive'                => array(
+				'type'     => 'array',
+				'maxItems' => 50,
+			),
 		);
 
 		// Numbers arrive as JSON numbers or numeric strings; ranges are the validator's job.
@@ -243,6 +250,8 @@ final class SettingsController implements RouteProvider {
 				'widget_subtitle' => SettingsValidator::SUBTITLE_MAX_LENGTH,
 				'form_intro'      => SettingsValidator::FORM_INTRO_MAX_LENGTH,
 				'offline_message' => SettingsValidator::OFFLINE_MESSAGE_MAX_LENGTH,
+				'proactive'       => ProactiveRules::MAX_RULES,
+				'proactive_text'  => ProactiveRules::MESSAGE_MAX_LENGTH,
 				// The server's own upload limit caps attachment_max_mb.
 				'upload_max_mb'   => max( 1, (int) floor( wp_max_upload_size() / MB_IN_BYTES ) ),
 			),

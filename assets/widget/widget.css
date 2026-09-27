@@ -1379,3 +1379,91 @@
 	font-weight: 700;
 	pointer-events: none;
 }
+
+/* Chat invitation next to the launcher */
+
+.chatchi-teaser {
+	position: fixed;
+	bottom: 96px;
+	z-index: 2147483000;
+	width: min(290px, calc(100vw - 32px));
+	animation: chatchi-in var(--chatchi-duration-slow) var(--chatchi-ease-out);
+}
+
+.chatchi--left .chatchi-teaser { left: 24px; }
+.chatchi--right .chatchi-teaser { right: 24px; }
+
+.chatchi.is-open .chatchi-teaser {
+	display: none;
+}
+
+.chatchi-teaser__body {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	width: 100%;
+	padding: 14px 16px;
+	border-radius: 18px;
+	background: var(--chatchi-surface) !important;
+	box-shadow: var(--chatchi-shadow-lg), 0 0 0 1px var(--chatchi-border);
+	text-align: start;
+	transition: transform var(--chatchi-duration-fast);
+}
+
+.chatchi--left .chatchi-teaser__body { border-bottom-left-radius: 6px; }
+.chatchi--right .chatchi-teaser__body { border-bottom-right-radius: 6px; }
+
+.chatchi-teaser__body:hover {
+	transform: translateY(-2px);
+}
+
+.chatchi-teaser__body .chatchi-avatar svg {
+	width: 16px;
+	height: 16px;
+}
+
+.chatchi-teaser__text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	font-size: 14px;
+	line-height: 1.7;
+	color: var(--chatchi-text);
+	white-space: pre-line;
+	unicode-bidi: plaintext;
+}
+
+.chatchi-teaser__text strong {
+	font-size: 12px;
+	color: var(--chatchi-text-muted);
+}
+
+.chatchi-teaser__close {
+	position: absolute;
+	top: -10px;
+	inset-inline-end: -8px;
+	z-index: 1;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	background: var(--chatchi-surface) !important;
+	color: var(--chatchi-text-muted);
+	box-shadow: var(--chatchi-shadow-md), 0 0 0 1px var(--chatchi-border);
+}
+
+.chatchi-teaser__close svg {
+	width: 14px;
+	height: 14px;
+}
+
+@media (max-width: 639px) {
+	.chatchi-teaser {
+		bottom: 88px;
+	}
+
+	.chatchi--left .chatchi-teaser { left: 16px; }
+	.chatchi--right .chatchi-teaser { right: 16px; }
+}

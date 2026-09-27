@@ -73,6 +73,7 @@ final class WidgetStrings {
 			'dropFiles'      => __( 'Drop files here to send them', 'chatchi' ),
 			/* translators: %s: maximum file size, e.g. "5 MB". */
 			'fileTooLarge'   => __( 'Too large to send (the limit is %s). Tap to remove.', 'chatchi' ),
+			'dismiss'        => __( 'Close', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
 			'yesterday'      => __( 'Yesterday', 'chatchi' ),
 			/* translators: %d: number of unread messages. */

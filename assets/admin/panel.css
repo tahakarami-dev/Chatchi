@@ -3189,3 +3189,97 @@ a.cc-order-head:hover strong {
 	background: var(--chatchi-error-soft);
 	color: var(--chatchi-error-text);
 }
+
+/* Sales: chat invitations */
+
+.cc-invites {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.cc-invites__empty {
+	margin: 0;
+	padding: 20px;
+	border: 1px dashed var(--chatchi-border-strong);
+	border-radius: var(--chatchi-radius-sm);
+	text-align: center;
+	color: var(--chatchi-text-subtle);
+	font-size: 13px;
+}
+
+.cc-invite {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px;
+	border: 1px solid var(--chatchi-border);
+	border-radius: var(--chatchi-radius-md, 12px);
+	background: var(--chatchi-surface-muted);
+	transition: opacity var(--chatchi-duration-fast);
+}
+
+.cc-invite.is-off .cc-field {
+	opacity: .6;
+}
+
+.cc-invite__head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.cc-invite__head strong {
+	flex: 1;
+	font-size: 14px;
+}
+
+.cc-invite .cc-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.cc-invite .cc-label {
+	margin: 0;
+}
+
+.cc-invite .cc-textarea {
+	background: var(--chatchi-surface);
+}
+
+.cc-invite__grid {
+	display: grid;
+	grid-template-columns: 2fr 1fr 1.4fr;
+	gap: 12px;
+	align-items: start;
+}
+
+.cc-invite__grid .cc-input--number {
+	width: 100%;
+}
+
+.cc-label-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.cc-select {
+	font: inherit;
+	color: inherit;
+	padding-inline-end: 8px;
+	cursor: pointer;
+}
+
+@media (max-width: 767px) {
+	.cc-invite__grid {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.cc-invite__grid .cc-field:first-child {
+		grid-column: 1 / -1;
+	}
+}
