@@ -4,12 +4,19 @@
  * Design tokens come from assets/shared/tokens.css.
  */
 
+/* The bundled font is only applied once the chat is opened, so pages whose
+   visitors never chat do not download it. Before that only the launcher
+   shows, which has no text. */
 .chatchi {
-	font-family: var(--chatchi-font);
+	font-family: inherit;
 	font-size: 14px;
 	line-height: 1.7;
 	color: var(--chatchi-text);
 	-webkit-font-smoothing: antialiased;
+}
+
+.chatchi.has-font {
+	font-family: var(--chatchi-font);
 }
 
 .chatchi *,

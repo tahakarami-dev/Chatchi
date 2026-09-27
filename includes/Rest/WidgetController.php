@@ -175,7 +175,14 @@ final class WidgetController extends ConversationController {
 
 		return $this->once(
 			$request,
-			function () {
+			function () use ( $request ) {
+				// A merely quick person is asked to wait without using up their allowance.
+				$too_fast = $this->spam->too_fast( (string) $request->get_param( 'form_token' ) );
+
+				if ( $too_fast instanceof \WP_Error ) {
+					return $too_fast;
+				}
+
 				$visitor = $this->visitors->current();
 
 				return $this->limiter->check( 'start', $visitor instanceof Visitor ? $visitor->id : null );

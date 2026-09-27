@@ -25,6 +25,7 @@
 	var SESSION_EVERY = 5;
 	var GROUP_GAP_MS = 2 * 60 * 1000;
 	var TRAP_FIELD = 'website';
+	var MIN_FORM_MS = 2100;
 	var PAGE_SIZE = 30;
 
 	var Core = window.ChatChiCore;
@@ -186,7 +187,14 @@
 		} );
 
 		this.render();
-		this.boot();
+
+		// Visitors who never chatted have nothing to restore: skip the session
+		// request (a full WordPress load on the server) until they open the
+		// chat. The readable marker cookie is set with the visitor identity;
+		// logged-in users are identified by their account.
+		if ( config.nonce || /(?:^|;\s*)chatchi_active=1/.test( document.cookie ) ) {
+			this.boot();
+		}
 	};
 
 	/* ---------------------------- state flow --------------------------- */
@@ -199,8 +207,12 @@
 	Widget.prototype.boot = function () {
 		var self = this;
 
+		this.booting = true;
+
 		return api.session().then( function ( session ) {
+			self.sessionAt = Date.now();
 			self.booted = true;
+			self.booting = false;
 			self.state.session = session;
 			self.state.visitor = session.visitor;
 			self.state.conversation = session.conversation;
@@ -216,6 +228,7 @@
 
 			self.set( { view: self.needsForm() ? 'form' : 'chat' } );
 		} ).catch( function ( error ) {
+			self.booting = false;
 			self.set( { view: 'error', errorMessage: error.message || S.loadError } );
 		} );
 	};
@@ -234,6 +247,9 @@
 	};
 
 	Widget.prototype.open = function () {
+		// The bundled font is applied (and so downloaded) only once the chat
+		// is used, not on every page view.
+		this.root.classList.add( 'has-font' );
 		this.set( { open: true } );
 		this.launcher.setAttribute( 'aria-expanded', 'true' );
 		this.launcher.setAttribute( 'aria-label', S.closeChat );
@@ -241,6 +257,8 @@
 
 		if ( this.state.view === 'error' ) {
 			this.set( { view: 'loading' } );
+			this.boot();
+		} else if ( ! this.booted && ! this.booting ) {
 			this.boot();
 		}
 
@@ -457,7 +475,16 @@
 
 		attempt = attempt || 0;
 
-		return api.start( body ).catch( function ( error ) {
+		// The form token must be a couple of seconds old (bot check). Rather
+		// than being refused, wait out the rest when the form was very quick.
+		var early = attempt ? 0 : Math.max( 0, ( this.sessionAt || 0 ) + MIN_FORM_MS - Date.now() );
+		var ready = early ? new Promise( function ( resolve ) {
+			window.setTimeout( resolve, early );
+		} ) : Promise.resolve();
+
+		return ready.then( function () {
+			return api.start( body );
+		} ).catch( function ( error ) {
 			if ( attempt >= 2 ) {
 				throw error;
 			}

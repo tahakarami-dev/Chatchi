@@ -130,6 +130,37 @@ final class SpamGuard {
 		return null;
 	}
 
+	/**
+	 * Only the timing part of check(): whether a start comes too soon.
+	 *
+	 * Runs before rate limiting, so a person who was merely quick does not
+	 * use up their allowance with a refused attempt.
+	 *
+	 * @param string $token Form token sent by the widget.
+	 * @return \WP_Error|null A chatchi_too_fast error, or null.
+	 */
+	public function too_fast( string $token ): ?\WP_Error {
+		if ( ! $this->enabled() || ! preg_match( '/^(\d{1,12})\.([a-f0-9]{64})$/', $token, $m ) || ! hash_equals( $this->sign( $m[1] ), $m[2] ) ) {
+			return null;
+		}
+
+		$age = time() - (int) $m[1];
+		$min = $this->min_seconds();
+
+		if ( $age < 0 || $age >= $min ) {
+			return null;
+		}
+
+		return new \WP_Error(
+			'chatchi_too_fast',
+			__( 'Please take a moment before starting the chat.', 'chatchi' ),
+			array(
+				'status'      => 400,
+				'retry_after' => $min - $age,
+			)
+		);
+	}
+
 	private function expired(): \WP_Error {
 		return new \WP_Error(
 			'chatchi_form_expired',
