@@ -144,9 +144,62 @@ final class PanelStrings {
 			'sectionAppearance'    => __( 'Appearance', 'chatchi' ),
 			'sectionDisplay'       => __( 'Welcome & display', 'chatchi' ),
 			'sectionSecurity'      => __( 'IP & security', 'chatchi' ),
+			'reports'              => __( 'Reports', 'chatchi' ),
+			'reportsIntro'         => __( 'How your chat is doing: volume, response times and customer satisfaction.', 'chatchi' ),
+			'reportsRange'         => __( 'Period', 'chatchi' ),
+			/* translators: %d: number of days. */
+			'reportsDays'          => __( '%d days', 'chatchi' ),
+			'reportsError'         => __( 'The report could not be loaded.', 'chatchi' ),
+			'reportsEmpty'         => __( 'No conversations in this period', 'chatchi' ),
+			'reportsEmptyHint'     => __( 'Reports fill in as visitors start chatting.', 'chatchi' ),
+			'reportsNoPrevious'    => __( 'No earlier data to compare', 'chatchi' ),
+			'reportsSame'          => __( 'No change', 'chatchi' ),
+			/* translators: %d: number of days. */
+			'reportsVsPrevious'    => __( 'vs. the previous %d days', 'chatchi' ),
+			'kpiConversations'     => __( 'Conversations', 'chatchi' ),
+			/* translators: 1: messages from visitors, 2: replies from agents. */
+			'kpiMessages'          => __( '%1$s visitor messages, %2$s replies', 'chatchi' ),
+			'kpiAnswered'          => __( 'Answered', 'chatchi' ),
+			/* translators: %d: number of conversations. */
+			'kpiMissed'            => __( '%d without a reply', 'chatchi' ),
+			'kpiNoMissed'          => __( 'Every conversation got a reply', 'chatchi' ),
+			'kpiFirstResponse'     => __( 'First response time', 'chatchi' ),
+			'kpiFirstResponseHint' => __( 'Median time until an agent first replied.', 'chatchi' ),
+			/* translators: %s: a duration, e.g. 3 min. */
+			'kpiAverage'           => __( 'Average %s', 'chatchi' ),
+			'kpiSatisfaction'      => __( 'Satisfaction', 'chatchi' ),
+			/* translators: %d: number of ratings. */
+			'kpiRatings'           => __( '%d ratings', 'chatchi' ),
+			/* translators: %s: a percentage. */
+			'kpiSatisfied'         => __( '%s satisfied', 'chatchi' ),
+			'reportsNoRatings'     => __( 'No ratings yet', 'chatchi' ),
+			'chartDaily'           => __( 'Conversations per day', 'chatchi' ),
+			/* translators: %d: number of conversations. */
+			'chartConversationsCount'=> __( '%d conversations', 'chatchi' ),
+			/* translators: %d: number of conversations. */
+			'chartAnsweredCount'   => __( '%d answered', 'chatchi' ),
+			'legendAnswered'       => __( 'Answered', 'chatchi' ),
+			'legendUnanswered'     => __( 'Not answered', 'chatchi' ),
+			'chartRatings'         => __( 'Ratings', 'chatchi' ),
+			'tableAgents'          => __( 'Agents', 'chatchi' ),
+			'colAgent'             => __( 'Agent', 'chatchi' ),
+			'colConversations'     => __( 'Conversations', 'chatchi' ),
+			'colReplies'           => __( 'Replies', 'chatchi' ),
+			'colFirstResponse'     => __( 'First response', 'chatchi' ),
+			'colRating'            => __( 'Rating', 'chatchi' ),
+			'reportsNoAgents'      => __( 'No agent has replied in this period.', 'chatchi' ),
+			/* translators: %d: number of conversations. */
+			'reportsUnassigned'    => __( '%d conversations were not assigned to anyone.', 'chatchi' ),
+			'chartHours'           => __( 'Busiest hours', 'chatchi' ),
+			'chartHoursHint'       => __( 'When conversations start, in your site\'s time zone.', 'chatchi' ),
+			'heatLess'             => __( 'Fewer', 'chatchi' ),
+			'heatMore'             => __( 'More', 'chatchi' ),
+			'chartTags'            => __( 'Common topics', 'chatchi' ),
+			'reportsNoTags'        => __( 'No tags were used in this period.', 'chatchi' ),
+			'reportsComments'      => __( 'Latest comments', 'chatchi' ),
 			'rating'               => __( 'Rating', 'chatchi' ),
-			/* translators: %s: number of stars, 1–5. */
-			'ratedStars'           => __( 'Rated %s out of 5', 'chatchi' ),
+			/* translators: %d: number of stars, 1–5. */
+			'ratedStars'           => __( 'Rated %d out of 5', 'chatchi' ),
 			'sectionSales'         => __( 'Sales', 'chatchi' ),
 			'invitesTitle'         => __( 'Chat invitations', 'chatchi' ),
 			'invitesIntro'         => __( 'Invite visitors to chat on the pages where they need help most, such as product pages or the checkout. The first invitation that fits a page is shown.', 'chatchi' ),

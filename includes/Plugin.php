@@ -43,6 +43,7 @@ use ChatChi\Frontend\WidgetModule;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
+use ChatChi\Reports\ReportService;
 use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
 use ChatChi\Rest\BotTestController;
@@ -51,6 +52,7 @@ use ChatChi\Notifications\Transcript;
 use ChatChi\Rest\CannedController;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
+use ChatChi\Rest\ReportsController;
 use ChatChi\Rest\RestModule;
 use ChatChi\Rest\SettingsController;
 use ChatChi\Rest\WidgetController;
@@ -512,6 +514,20 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ReportService::class,
+			static function ( Container $c ): ReportService {
+				return new ReportService( $c->get( \wpdb::class ), $c->get( AgentRepository::class ), $c->get( VisitorRepository::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			ReportsController::class,
+			static function ( Container $c ): ReportsController {
+				return new ReportsController( $c->get( ReportService::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			RestModule::class,
 			static function ( Container $c ): RestModule {
 				return new RestModule(
@@ -520,7 +536,8 @@ final class Plugin {
 					$c->get( AgentManagementController::class ),
 					$c->get( SettingsController::class ),
 					$c->get( CannedController::class ),
-					$c->get( BotTestController::class )
+					$c->get( BotTestController::class ),
+					$c->get( ReportsController::class )
 				);
 			}
 		);

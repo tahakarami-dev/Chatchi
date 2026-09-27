@@ -130,6 +130,9 @@
 		canned: function () {
 			return request( 'GET', '/agent/canned' );
 		},
+		reports: function ( range ) {
+			return request( 'GET', '/agent/reports', { query: { range: range } } );
+		},
 		saveCanned: function ( id, data ) {
 			return id ? request( 'PATCH', '/agent/canned/' + id, { body: data } ) : request( 'POST', '/agent/canned', { body: data } );
 		},
@@ -356,6 +359,7 @@
 		this.agentsView = config.canManageAgents ? new AgentsView( this ) : null;
 		this.settingsView = config.canManageSettings ? new SettingsView( this ) : null;
 		this.cannedView = config.canManageSettings ? new CannedView( this ) : null;
+		this.reportsView = config.canManageSettings ? new ReportsView( this ) : null;
 		this.canned = [];
 		this.toast = h( 'div', { className: 'cc-toast', role: 'status', 'aria-live': 'polite', hidden: true } );
 		root.appendChild( this.toast );
@@ -433,6 +437,7 @@
 				hasUnread ? h( 'span', { className: 'cc-rail-dot' } ) : null
 			] ),
 			this.agentsView ? railLink( 'agents', '#/agents', S.agents, 'users' ) : null,
+			this.reportsView ? railLink( 'reports', '#/reports', S.reports, 'chart' ) : null,
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
@@ -874,6 +879,8 @@
 			page = 'agents';
 		} else if ( this.cannedView && hash === '#/canned' ) {
 			page = 'canned';
+		} else if ( this.reportsView && hash === '#/reports' ) {
+			page = 'reports';
 		} else if ( settings ) {
 			page = 'settings';
 		}
@@ -888,6 +895,10 @@
 		}
 		if ( page === 'canned' ) {
 			this.cannedView.show();
+			return;
+		}
+		if ( page === 'reports' ) {
+			this.reportsView.show();
 			return;
 		}
 		if ( page === 'settings' ) {
@@ -3051,6 +3062,461 @@
 
 		nameInput.focus();
 		nameInput.select();
+	};
+
+	/* ------------------------------------------------------------------ *
+	 * Reports (site administrators only)
+	 * ------------------------------------------------------------------ */
+
+	var SVG_NS = 'http://www.w3.org/2000/svg';
+
+	function svg( tag, attrs, children ) {
+		var el = document.createElementNS( SVG_NS, tag );
+		Object.keys( attrs || {} ).forEach( function ( key ) {
+			el.setAttribute( key, String( attrs[ key ] ) );
+		} );
+		( children || [] ).forEach( function ( child ) {
+			if ( child ) {
+				el.appendChild( child );
+			}
+		} );
+		return el;
+	}
+
+	/**
+	 * "45 s", "3 min", "1.5 h" in the panel's language.
+	 */
+	function formatDuration( seconds ) {
+		var locale = /^fa/i.test( config.locale || '' ) ? 'fa-IR' : ( config.locale || undefined );
+		var value;
+		var unit;
+
+		if ( seconds < 60 ) {
+			value = seconds;
+			unit = 'second';
+		} else if ( seconds < 3600 ) {
+			value = seconds / 60;
+			value = value < 10 ? Math.round( value * 10 ) / 10 : Math.round( value );
+			unit = 'minute';
+		} else {
+			value = Math.round( seconds / 360 ) / 10;
+			unit = 'hour';
+		}
+
+		try {
+			return new Intl.NumberFormat( locale, { style: 'unit', unit: unit, unitDisplay: 'short' } ).format( value );
+		} catch ( e ) {
+			return fmt.number( value ) + ' ' + unit.charAt( 0 );
+		}
+	}
+
+	function ReportsView( panel ) {
+		this.panel = panel;
+		this.el = panel.page;
+		this.range = 30;
+		this.data = null;
+		this.state = { loading: true, error: '' };
+		this.ticket = 0;
+	}
+
+	ReportsView.prototype.show = function () {
+		if ( ! this.data || this.data.range !== this.range ) {
+			this.load();
+			return;
+		}
+		this.render();
+	};
+
+	ReportsView.prototype.load = function () {
+		var self = this;
+		var ticket = ++this.ticket;
+
+		this.state = { loading: true, error: '' };
+		this.render();
+
+		api.reports( this.range ).then( function ( data ) {
+			if ( ticket !== self.ticket ) {
+				return;
+			}
+			self.data = data;
+			self.state = { loading: false, error: '' };
+			self.render();
+		} ).catch( function ( error ) {
+			if ( ticket !== self.ticket ) {
+				return;
+			}
+			self.state = { loading: false, error: error.message || S.reportsError };
+			self.render();
+		} );
+	};
+
+	ReportsView.prototype.render = function () {
+		var self = this;
+
+		if ( this.panel.view !== 'reports' ) {
+			return;
+		}
+
+		var ranges = h( 'div', { className: 'cc-segmented', role: 'radiogroup', 'aria-label': S.reportsRange }, [ 7, 30, 90 ].map( function ( days ) {
+			return h( 'button', {
+				type: 'button',
+				role: 'radio',
+				className: 'cc-segmented__item' + ( days === self.range ? ' is-active' : '' ),
+				'aria-checked': days === self.range ? 'true' : 'false',
+				text: fmt.format( S.reportsDays, days ),
+				onClick: function () {
+					if ( days !== self.range ) {
+						self.range = days;
+						self.load();
+					}
+				}
+			} );
+		} ) );
+
+		var header = h( 'header', { className: 'cc-page-head' }, [
+			h( 'div', {}, [
+				h( 'h1', { text: S.reports } ),
+				h( 'p', { text: S.reportsIntro } )
+			] ),
+			ranges
+		] );
+
+		var body;
+		var data = this.data;
+
+		if ( this.state.loading ) {
+			body = h( 'div', { className: 'cc-report', 'aria-busy': 'true' }, [
+				h( 'div', { className: 'cc-kpis' }, [ 1, 2, 3, 4 ].map( function () {
+					return h( 'div', { className: 'cc-card cc-kpi' }, [
+						h( 'span', { className: 'cc-skeleton', style: 'display:block;width:50%;height:12px;margin-bottom:12px' } ),
+						h( 'span', { className: 'cc-skeleton', style: 'display:block;width:40%;height:28px' } )
+					] );
+				} ) ),
+				h( 'div', { className: 'cc-card' }, [ h( 'span', { className: 'cc-skeleton', style: 'display:block;width:100%;height:220px' } ) ] )
+			] );
+		} else if ( this.state.error ) {
+			body = h( 'div', { className: 'cc-state', role: 'alert' }, [
+				icon( 'alert' ),
+				h( 'p', { text: this.state.error } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary',
+					text: S.retry,
+					onClick: function () {
+						self.load();
+					}
+				} )
+			] );
+		} else if ( ! data.kpis.conversations.value ) {
+			body = h( 'div', { className: 'cc-state' }, [
+				icon( 'chart' ),
+				h( 'h2', { text: S.reportsEmpty } ),
+				h( 'p', { text: S.reportsEmptyHint } )
+			] );
+		} else {
+			body = h( 'div', { className: 'cc-report' }, [
+				this.buildKpis(),
+				h( 'div', { className: 'cc-report__row cc-report__row--wide' }, [ this.buildDaily(), this.buildRatings() ] ),
+				this.buildAgents(),
+				h( 'div', { className: 'cc-report__row' }, [ this.buildHeatmap(), this.buildTags() ] ),
+				this.buildComments()
+			] );
+		}
+
+		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner cc-page-inner--wide' }, [ header, body ] ) );
+	};
+
+	/**
+	 * A change against the previous period, e.g. "▲ 12% vs. the previous 30 days".
+	 *
+	 * @param {string} kind "percent" (relative change), "points" (percentage
+	 *                      points), "stars" (absolute) or "time" (lower is better).
+	 */
+	ReportsView.prototype.delta = function ( current, previous, kind ) {
+		if ( current === null || previous === null || previous === undefined || ( kind === 'percent' && previous === 0 ) ) {
+			return h( 'p', { className: 'cc-kpi__delta', text: S.reportsNoPrevious } );
+		}
+
+		var change = current - previous;
+		var text;
+
+		if ( kind === 'percent' ) {
+			text = fmt.number( Math.round( Math.abs( change ) / previous * 100 ) ) + '٪';
+		} else if ( kind === 'points' ) {
+			text = fmt.number( Math.abs( change ) ) + '٪';
+		} else if ( kind === 'stars' ) {
+			text = fmt.number( Math.round( Math.abs( change ) * 100 ) / 100 );
+		} else {
+			text = formatDuration( Math.abs( change ) );
+		}
+
+		if ( ! /^fa/i.test( config.locale || '' ) ) {
+			text = text.replace( '٪', '%' );
+		}
+
+		var better = kind === 'time' ? change < 0 : change > 0;
+		var tone = change === 0 ? 'flat' : ( kind === 'percent' ? 'neutral' : ( better ? 'up' : 'down' ) );
+
+		return h( 'p', { className: 'cc-kpi__delta cc-kpi__delta--' + tone }, [
+			h( 'span', { className: 'cc-kpi__arrow', 'aria-hidden': 'true', text: change === 0 ? '–' : ( change > 0 ? '▲' : '▼' ) } ),
+			h( 'span', { text: ( change === 0 ? S.reportsSame : text ) + ' ' + fmt.format( S.reportsVsPrevious, this.data.range ) } )
+		] );
+	};
+
+	ReportsView.prototype.buildKpis = function () {
+		var k = this.data.kpis;
+		var satisfaction = k.satisfaction.value;
+
+		function tile( iconName, label, value, sub, delta, hint ) {
+			return h( 'div', { className: 'cc-card cc-kpi' }, [
+				h( 'div', { className: 'cc-kpi__head' }, [ icon( iconName ), h( 'span', { text: label } ) ] ),
+				h( 'p', { className: 'cc-kpi__value', text: value } ),
+				sub ? h( 'p', { className: 'cc-kpi__sub', text: sub } ) : null,
+				delta,
+				hint ? h( 'p', { className: 'cc-kpi__hint', text: hint } ) : null
+			] );
+		}
+
+		var percentSign = /^fa/i.test( config.locale || '' ) ? '٪' : '%';
+
+		return h( 'div', { className: 'cc-kpis' }, [
+			tile( 'message', S.kpiConversations, fmt.number( k.conversations.value ),
+				S.kpiMessages.replace( '%1$s', fmt.number( k.messages.visitor ) ).replace( '%2$s', fmt.number( k.messages.agent ) ),
+				this.delta( k.conversations.value, k.conversations.previous, 'percent' ) ),
+			tile( 'check', S.kpiAnswered, k.answered.value === null ? '—' : fmt.number( k.answered.value ) + percentSign,
+				k.answered.missed ? fmt.format( S.kpiMissed, k.answered.missed ) : S.kpiNoMissed,
+				this.delta( k.answered.value, k.answered.previous, 'points' ) ),
+			tile( 'clock', S.kpiFirstResponse, k.first_response.value === null ? '—' : formatDuration( k.first_response.value ),
+				k.first_response.average === null ? '' : S.kpiAverage.replace( '%s', formatDuration( k.first_response.average ) ),
+				this.delta( k.first_response.value, k.first_response.previous, 'time' ),
+				S.kpiFirstResponseHint ),
+			tile( 'star', S.kpiSatisfaction, satisfaction === null ? '—' : fmt.number( satisfaction.toFixed( 1 ) ) + ' / ' + fmt.number( 5 ),
+				k.satisfaction.count ? fmt.format( S.kpiRatings, k.satisfaction.count ) + ' · ' + S.kpiSatisfied.replace( '%s', fmt.number( k.satisfaction.satisfied ) + percentSign ) : S.reportsNoRatings,
+				this.delta( satisfaction, k.satisfaction.previous, 'stars' ) )
+		] );
+	};
+
+	/**
+	 * Conversations per day as bars; the answered part is filled.
+	 */
+	ReportsView.prototype.buildDaily = function () {
+		var days = this.data.daily;
+		var width = 640;
+		var height = 220;
+		var pad = { top: 12, right: 8, bottom: 26, left: 34 };
+		var plotW = width - pad.left - pad.right;
+		var plotH = height - pad.top - pad.bottom;
+		var max = Math.max.apply( null, days.map( function ( d ) {
+			return d.conversations;
+		} ).concat( [ 1 ] ) );
+		var step = Math.max( 1, Math.ceil( max / 4 ) );
+		var top = step * Math.ceil( max / step );
+		var slot = plotW / days.length;
+		var barW = Math.max( 2, Math.min( 22, slot * 0.66 ) );
+		var dayFormat = new Intl.DateTimeFormat( /^fa/i.test( config.locale || '' ) ? 'fa-IR-u-ca-persian' : config.locale, { day: 'numeric', month: 'short' } );
+		var tooltip = h( 'div', { className: 'cc-chart__tip', hidden: true } );
+
+		function y( value ) {
+			return pad.top + plotH - ( value / top ) * plotH;
+		}
+
+		var grid = [];
+		for ( var v = 0; v <= top; v += step ) {
+			grid.push( svg( 'line', { x1: pad.left, x2: width - pad.right, y1: y( v ), y2: y( v ), class: v === 0 ? 'cc-chart__axis' : 'cc-chart__grid' } ) );
+			grid.push( svg( 'text', { x: pad.left - 8, y: y( v ) + 4, 'text-anchor': 'end', class: 'cc-chart__label' }, [ document.createTextNode( fmt.number( v ) ) ] ) );
+		}
+
+		var every = Math.ceil( days.length / 7 );
+		var bars = days.map( function ( d, i ) {
+			var x = pad.left + slot * i + ( slot - barW ) / 2;
+			var date = new Date( d.date + 'T12:00:00' );
+			var label = dayFormat.format( date );
+			var group = svg( 'g', { class: 'cc-chart__bar', tabindex: '0', role: 'img', 'aria-label': label + ': ' + fmt.format( S.chartConversationsCount, d.conversations ) + ', ' + fmt.format( S.chartAnsweredCount, d.answered ) }, [
+				svg( 'rect', { x: x - ( slot - barW ) / 2, y: pad.top, width: slot, height: plotH, class: 'cc-chart__hit' } ),
+				d.conversations ? svg( 'rect', { x: x, y: y( d.conversations ), width: barW, height: plotH - ( y( d.conversations ) - pad.top ), rx: Math.min( 3, barW / 3 ), class: 'cc-chart__total' } ) : null,
+				d.answered ? svg( 'rect', { x: x, y: y( d.answered ), width: barW, height: plotH - ( y( d.answered ) - pad.top ), rx: Math.min( 3, barW / 3 ), class: 'cc-chart__answered' } ) : null,
+				( days.length - 1 - i ) % every === 0 ? svg( 'text', { x: x + barW / 2, y: height - 6, 'text-anchor': 'middle', class: 'cc-chart__label' }, [ document.createTextNode( label ) ] ) : null
+			] );
+
+			function showTip() {
+				tooltip.replaceChildren(
+					h( 'strong', { text: label } ),
+					h( 'span', { text: fmt.format( S.chartConversationsCount, d.conversations ) } ),
+					h( 'span', { text: fmt.format( S.chartAnsweredCount, d.answered ) } )
+				);
+				tooltip.hidden = false;
+				var box = chart.getBoundingClientRect();
+				var cx = ( x + barW / 2 ) / width * box.width;
+				tooltip.style.left = Math.max( 0, Math.min( box.width - 140, cx - 70 ) ) + 'px';
+				tooltip.style.top = Math.max( 0, y( d.conversations ) / height * box.height - 70 ) + 'px';
+			}
+
+			group.addEventListener( 'mouseenter', showTip );
+			group.addEventListener( 'focus', showTip );
+			group.addEventListener( 'mouseleave', function () {
+				tooltip.hidden = true;
+			} );
+			group.addEventListener( 'blur', function () {
+				tooltip.hidden = true;
+			} );
+			return group;
+		} );
+
+		var chart = h( 'div', { className: 'cc-chart' }, [
+			svg( 'svg', { viewBox: '0 0 ' + width + ' ' + height, class: 'cc-chart__svg', role: 'group', 'aria-label': S.chartDaily, direction: 'ltr' }, grid.concat( bars ) ),
+			tooltip
+		] );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [
+				h( 'h2', { text: S.chartDaily } ),
+				h( 'div', { className: 'cc-legend' }, [
+					h( 'span', { className: 'cc-legend__item' }, [ h( 'span', { className: 'cc-legend__swatch cc-legend__swatch--answered' } ), S.legendAnswered ] ),
+					h( 'span', { className: 'cc-legend__item' }, [ h( 'span', { className: 'cc-legend__swatch cc-legend__swatch--total' } ), S.legendUnanswered ] )
+				] )
+			] ),
+			chart
+		] );
+	};
+
+	ReportsView.prototype.buildRatings = function () {
+		var ratings = this.data.ratings;
+		var total = [ 1, 2, 3, 4, 5 ].reduce( function ( sum, n ) {
+			return sum + ratings[ n ];
+		}, 0 );
+
+		var content = total ? h( 'ul', { className: 'cc-hbars' }, [ 5, 4, 3, 2, 1 ].map( function ( n ) {
+			var share = Math.round( ratings[ n ] / total * 100 );
+			return h( 'li', { className: 'cc-hbar', 'aria-label': fmt.format( S.ratedStars, n ) + ': ' + fmt.number( ratings[ n ] ) }, [
+				h( 'span', { className: 'cc-hbar__label cc-hbar__label--stars', 'aria-hidden': 'true' }, [ fmt.number( n ), icon( 'star' ) ] ),
+				h( 'span', { className: 'cc-hbar__track' }, [ h( 'span', { className: 'cc-hbar__fill cc-hbar__fill--r' + n, style: 'width:' + share + '%' } ) ] ),
+				h( 'span', { className: 'cc-hbar__value', text: fmt.number( ratings[ n ] ) } )
+			] );
+		} ) ) : h( 'p', { className: 'cc-report__empty', text: S.reportsNoRatings } );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.chartRatings } ) ] ),
+			content
+		] );
+	};
+
+	ReportsView.prototype.buildAgents = function () {
+		var agents = this.data.agents;
+		var rows = agents.rows;
+		var maxConversations = Math.max.apply( null, rows.map( function ( row ) {
+			return row.conversations;
+		} ).concat( [ 1 ] ) );
+
+		var table = rows.length ? h( 'div', { className: 'cc-table-wrap' }, [ h( 'table', { className: 'cc-table' }, [
+			h( 'thead', {}, [ h( 'tr', {}, [ S.colAgent, S.colConversations, S.colReplies, S.colFirstResponse, S.colRating ].map( function ( label, i ) {
+				return h( 'th', { scope: 'col', className: i ? 'is-num' : '', text: label } );
+			} ) ) ] ),
+			h( 'tbody', {}, rows.map( function ( row ) {
+				return h( 'tr', {}, [
+					h( 'th', { scope: 'row' }, [ h( 'span', { className: 'cc-table__agent' }, [ avatar( row.name, 'sm' ), h( 'span', { text: row.name } ) ] ) ] ),
+					h( 'td', { className: 'is-num' }, [ h( 'span', { className: 'cc-table__count' }, [
+						h( 'span', { className: 'cc-table__bar' }, [
+							h( 'span', { className: 'cc-table__bar-fill', style: 'width:' + Math.round( row.conversations / maxConversations * 100 ) + '%' } )
+						] ),
+						h( 'span', { text: fmt.number( row.conversations ) } )
+					] ) ] ),
+					h( 'td', { className: 'is-num', text: fmt.number( row.replies ) } ),
+					h( 'td', { className: 'is-num', text: row.first_response === null ? '—' : formatDuration( row.first_response ) } ),
+					h( 'td', { className: 'is-num' }, [ row.rating === null ? '—' : h( 'span', { className: 'cc-table__rating' }, [ icon( 'star' ), fmt.number( row.rating.toFixed( 1 ) ), h( 'small', { text: '(' + fmt.number( row.rating_count ) + ')' } ) ] ) ] )
+				] );
+			} ) )
+		] ) ] ) : h( 'p', { className: 'cc-report__empty', text: S.reportsNoAgents } );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.tableAgents } ) ] ),
+			table,
+			agents.unassigned ? h( 'p', { className: 'cc-hint', text: fmt.format( S.reportsUnassigned, agents.unassigned ) } ) : null
+		] );
+	};
+
+	/**
+	 * When conversations start, by weekday and hour.
+	 */
+	ReportsView.prototype.buildHeatmap = function () {
+		var grid = this.data.heatmap;
+		var max = 1;
+
+		grid.forEach( function ( hours ) {
+			hours.forEach( function ( n ) {
+				max = Math.max( max, n );
+			} );
+		} );
+
+		var hoursRow = h( 'div', { className: 'cc-heat__hours', 'aria-hidden': 'true' }, [ h( 'span' ) ].concat( Array.from( { length: 24 }, function ( _, hour ) {
+			return h( 'span', { text: hour % 6 === 0 ? fmt.number( hour ) : '' } );
+		} ) ) );
+
+		var rows = weekOrder().map( function ( day ) {
+			var hours = grid[ parseInt( day, 10 ) ];
+			var name = dayName( day );
+			return h( 'div', { className: 'cc-heat__row' }, [ h( 'span', { className: 'cc-heat__day', text: name } ) ].concat( hours.map( function ( n, hour ) {
+				var level = n ? Math.max( 0.12, n / max ) : 0;
+				return h( 'span', {
+					className: 'cc-heat__cell' + ( n ? '' : ' is-empty' ),
+					style: n ? '--level:' + level.toFixed( 2 ) : null,
+					title: name + ' ' + fmt.time( new Date( 2024, 0, 7, hour, 0 ) ) + ' — ' + fmt.format( S.chartConversationsCount, n )
+				} );
+			} ) ) );
+		} );
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [
+				h( 'h2', { text: S.chartHours } ),
+				h( 'p', { className: 'cc-hint', text: S.chartHoursHint } )
+			] ),
+			h( 'div', { className: 'cc-heat', role: 'img', 'aria-label': S.chartHours }, [ hoursRow ].concat( rows ) ),
+			h( 'div', { className: 'cc-heat__scale', 'aria-hidden': 'true' }, [
+				h( 'span', { text: S.heatLess } ),
+				[ 0.15, 0.4, 0.7, 1 ].map( function ( level ) {
+					return h( 'span', { className: 'cc-heat__cell', style: '--level:' + level } );
+				} ),
+				h( 'span', { text: S.heatMore } )
+			].reduce( function ( all, item ) {
+				return all.concat( item );
+			}, [] ) )
+		] );
+	};
+
+	ReportsView.prototype.buildTags = function () {
+		var tags = this.data.tags;
+		var max = tags.length ? tags[ 0 ].count : 1;
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.chartTags } ) ] ),
+			tags.length ? h( 'ul', { className: 'cc-hbars' }, tags.map( function ( tag ) {
+				return h( 'li', { className: 'cc-hbar' }, [
+					h( 'span', { className: 'cc-hbar__label', dir: 'auto', text: '#' + tag.tag } ),
+					h( 'span', { className: 'cc-hbar__track' }, [ h( 'span', { className: 'cc-hbar__fill', style: 'width:' + Math.round( tag.count / max * 100 ) + '%' } ) ] ),
+					h( 'span', { className: 'cc-hbar__value', text: fmt.number( tag.count ) } )
+				] );
+			} ) ) : h( 'p', { className: 'cc-report__empty', text: S.reportsNoTags } )
+		] );
+	};
+
+	ReportsView.prototype.buildComments = function () {
+		var comments = this.data.comments;
+
+		if ( ! comments.length ) {
+			return null;
+		}
+
+		return h( 'section', { className: 'cc-card cc-report__card' }, [
+			h( 'div', { className: 'cc-report__head' }, [ h( 'h2', { text: S.reportsComments } ) ] ),
+			h( 'ul', { className: 'cc-comments' }, comments.map( function ( item ) {
+				return h( 'li', {}, [
+					h( 'a', { className: 'cc-comment', href: '#/conversations/' + item.conversation_id }, [
+						h( 'span', { className: 'cc-comment__stars cc-comment__stars--' + ( item.score >= 4 ? 'good' : item.score === 3 ? 'ok' : 'bad' ), 'aria-label': fmt.format( S.ratedStars, item.score ), text: '★★★★★'.slice( 0, item.score ) + '☆☆☆☆☆'.slice( 0, 5 - item.score ) } ),
+						h( 'p', { className: 'cc-comment__text', text: item.comment } ),
+						h( 'span', { className: 'cc-comment__meta', text: ( item.visitor || S.visitor ) + ( item.at ? ' · ' + fmt.ago( new Date( item.at ) ) : '' ) } )
+					] )
+				] );
+			} ) )
+		] );
 	};
 
 	/* ------------------------------------------------------------------ *

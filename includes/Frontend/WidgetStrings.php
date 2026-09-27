@@ -78,8 +78,8 @@ final class WidgetStrings {
 			'ratingComment'  => __( 'Anything to add? (optional)', 'chatchi' ),
 			'ratingSend'     => __( 'Send', 'chatchi' ),
 			'ratingThanks'   => __( 'Thanks for your feedback!', 'chatchi' ),
-			/* translators: %s: number of stars. */
-			'ratingStars'    => __( '%s stars', 'chatchi' ),
+			/* translators: %d: number of stars. */
+			'ratingStars'    => __( '%d stars', 'chatchi' ),
 			'rating1'        => __( 'Very bad', 'chatchi' ),
 			'rating2'        => __( 'Bad', 'chatchi' ),
 			'rating3'        => __( 'OK', 'chatchi' ),

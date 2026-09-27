@@ -333,7 +333,8 @@ UNIQUE KEY open_visitor (open_visitor_id),
 KEY visitor_status (visitor_id,status),
 KEY status_activity (status,last_message_at),
 KEY last_message_at (last_message_at),
-KEY agent_id (agent_id)
+KEY agent_id (agent_id),
+KEY created_at (created_at)
 ) {$collate};",
 
 			"CREATE TABLE {$messages} (
