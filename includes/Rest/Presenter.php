@@ -240,6 +240,7 @@ final class Presenter {
 			'items'    => $items,
 			'has_more' => $page->has_more,
 			'last_id'  => $page->last_id(),
+			'typing'   => $page->typing,
 		);
 	}
 

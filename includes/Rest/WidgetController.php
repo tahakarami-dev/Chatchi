@@ -329,7 +329,8 @@ final class WidgetController extends ConversationController {
 	}
 
 	/**
-	 * Counts visitor writes: sending messages, marking read and closing.
+	 * Counts visitor writes: sending messages, typing signals, marking read
+	 * and closing.
 	 * Reads (polling) are not limited.
 	 *
 	 * {@inheritDoc}
@@ -339,7 +340,14 @@ final class WidgetController extends ConversationController {
 			return null;
 		}
 
-		$action = '/messages' === substr( (string) $request->get_route(), -9 ) ? 'message' : 'write';
+		$route  = (string) $request->get_route();
+		$action = 'write';
+
+		if ( '/messages' === substr( $route, -9 ) ) {
+			$action = 'message';
+		} elseif ( '/typing' === substr( $route, -7 ) ) {
+			$action = 'typing';
+		}
 
 		return $this->once(
 			$request,

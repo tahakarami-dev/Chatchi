@@ -92,7 +92,7 @@ docs/                    Design and architecture documents
 | `chatchi_widget_config` | filter | Full widget configuration |
 | `chatchi_settings` | filter | Settings as the plugin uses them (not saved) |
 | `chatchi_settings_updated` | action | Settings were saved, with the validated changes |
-| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]`; receives the Settings values |
+| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `typing`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]`; receives the Settings values |
 | `chatchi_rate_limited` | action | A request was refused by a rate limit |
 | `chatchi_rate_limit_error` | action | The counter table failed; the request was allowed |
 | `chatchi_client_ip` | filter | The visitor IP used for rate limiting |
@@ -109,7 +109,7 @@ docs/                    Design and architecture documents
 |---|---|---|
 | `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token) and contact info | `UNIQUE token_hash`, `user_id` |
 | `{prefix}chatchi_agents` | Agents, one per WordPress user | `UNIQUE user_id`, `is_active` |
-| `{prefix}chatchi_conversations` | Conversation state and latest activity | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
+| `{prefix}chatchi_conversations` | Conversation state, latest activity, and when each side last reported typing | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
 | `{prefix}chatchi_messages` | Messages and read state | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
 | `{prefix}chatchi_rate_limits` | Rate-limit counters; buckets are salted hashes, no IPs stored. Purged hourly | `bucket` (primary), `expires_at` |
 
@@ -127,9 +127,10 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 |---|---|---|
 | GET | `/widget/session` | Visitor, open conversation, unread count, start-form config, `form_token`. Never sets a cookie |
 | POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url`, `form_token`, `website` (honeypot, must be empty) → visitor + open conversation |
-| GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50 |
+| GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50. Also returns `typing`: whether the other side is typing |
 | POST | `/widget/conversations/{id}/messages` | `body`, optional `client_id` (UUID, makes retries idempotent) |
 | POST | `/widget/conversations/{id}/read` | Mark agent messages read, optional `up_to_id` |
+| POST | `/widget/conversations/{id}/typing` | `typing` (default `true`): the visitor is typing, or stopped. Lasts 6 seconds unless repeated; sending a message clears it. Ignored for closed conversations |
 | POST | `/widget/conversations/{id}/close` | Close own conversation |
 
 ### Agent panel
@@ -143,6 +144,7 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
 | POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
+| POST | `/agent/conversations/{id}/typing` | Same as widget: the agent is typing |
 | POST | `/agent/conversations/{id}/close` | Close |
 
 ### Agent management
@@ -175,7 +177,7 @@ Administrators also get an **Agents** screen (`#/agents`) to add agents from exi
 
 Administrators also get a **Settings** screen with six sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
 
-- **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
+- **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), the notification sound for new replies, how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
 - **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
 - **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, and the longest allowed message (100–10000 characters).
 
@@ -186,6 +188,13 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 - **Where the widget appears**: on every page, only on chosen page types and items, or everywhere except them. Page types are the home page, all pages, all blog posts, and WooCommerce products (single products, the shop, product categories and tags).
 - **Shortcode**: `[chatchi]` (alias `[hamyarchat]`) shows the floating widget on that page even where the rules hide it. It prints nothing itself and also works in widget areas and page builders (the widget then loads in the footer).
 
+## Chat widget
+
+- **Composer**: one rounded box with an emoji picker, a text area that grows up to about five lines, and a round send button. Enter sends and Shift+Enter starts a new line (shown as a hint on devices with a keyboard). The character counter counts emoji as one character, as the server does, and blocks sending past the limit.
+- **Typing indicators**: visitors see three dots and "typing…" in the header while an agent writes; agents see "typing…" above their composer while the visitor writes. Each side signals at most every 3 seconds while typing.
+- **Notifications**: a soft two-note chime (Web Audio, no sound file) when a reply arrives while the chat is closed or the tab is in the background, and the count in the tab title until the visitor comes back. The sound can be turned off in Settings → General.
+- A message of one to three emoji is shown large without a bubble, and a "latest message" button appears when the visitor scrolls up, with a dot when new messages arrive below.
+
 ## Troubleshooting
 
 - **"Not sent" in the widget:** when a site administrator is logged in, the widget shows the technical cause under a failed message (HTTP status, error code, and the server's explanation). Visitors never see it. The same message is always written to the server's PHP error log as `[ChatChi] … error: …`.
@@ -194,7 +203,7 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 
 ## Security
 
-- **Rate limits** (sliding window, per visitor and per IP; IPv6 per /64): starting conversations 5/hour per visitor and 10/10 min per IP; messages 20/min per visitor and 60/min per IP; other writes 60/min and 180/min. Reads (polling) and agents are not limited. Refused requests get `429 chatchi_rate_limited` with `data.retry_after` and a `Retry-After` header; the widget shows "try again in N seconds/minutes". Counting is atomic, so parallel requests cannot get past a limit. If the counter table fails, requests are allowed.
+- **Rate limits** (sliding window, per visitor and per IP; IPv6 per /64): starting conversations 5/hour per visitor and 10/10 min per IP; messages 20/min per visitor and 60/min per IP; typing signals 40/min and 240/min; other writes 60/min and 180/min. Reads (polling) and agents are not limited. Refused requests get `429 chatchi_rate_limited` with `data.retry_after` and a `Retry-After` header; the widget shows "try again in N seconds/minutes". Counting is atomic, so parallel requests cannot get past a limit. If the counter table fails, requests are allowed.
 - **Visitor IP**: the connection address by default. Behind Cloudflare, `CF-Connecting-IP` is used only on connections from Cloudflare's published ranges; behind another CDN or proxy (e.g. ArvanCloud), the configured header is used only from the listed proxy addresses (`X-Forwarded-For` is read right to left, skipping trusted proxies).
 - **Bot checks on the start form**: a honeypot field, and a signed timestamp from `/widget/session` that must be at least 2 seconds and at most 1 day old. The widget retries too-early and expired starts by itself, so people never see these errors.
 - **Agent panel**: Content-Security-Policy with a per-view nonce (no injected scripts, `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: same-origin`, not cacheable.

@@ -18,6 +18,11 @@ final class Conversation {
 	public const STATUS_ACTIVE = 'active';
 	public const STATUS_CLOSED = 'closed';
 
+	/**
+	 * How long a typing signal lasts, in seconds.
+	 */
+	public const TYPING_SECONDS = 6;
+
 	public int $id = 0;
 
 	public int $visitor_id = 0;
@@ -48,6 +53,16 @@ final class Conversation {
 	public ?string $closed_at = null;
 
 	/**
+	 * When the visitor last reported typing (UTC), or null.
+	 */
+	public ?string $visitor_typing_at = null;
+
+	/**
+	 * When an agent last reported typing (UTC), or null.
+	 */
+	public ?string $agent_typing_at = null;
+
+	/**
 	 * Returns every valid status.
 	 *
 	 * @return string[]
@@ -72,11 +87,35 @@ final class Conversation {
 		$conversation->updated_at      = (string) $row['updated_at'];
 		$conversation->closed_at       = null === $row['closed_at'] ? null : (string) $row['closed_at'];
 
+		// Columns added in schema 4; absent while an upgrade is pending.
+		$conversation->visitor_typing_at = empty( $row['visitor_typing_at'] ) ? null : (string) $row['visitor_typing_at'];
+		$conversation->agent_typing_at   = empty( $row['agent_typing_at'] ) ? null : (string) $row['agent_typing_at'];
+
 		return $conversation;
 	}
 
 	public function is_closed(): bool {
 		return self::STATUS_CLOSED === $this->status;
+	}
+
+	/**
+	 * Whether a side ("visitor" or "agent") is typing right now.
+	 *
+	 * Clients repeat their typing signal every few seconds, so a signal older
+	 * than TYPING_SECONDS means they stopped or left.
+	 *
+	 * @param string $side "visitor" or "agent".
+	 */
+	public function is_typing( string $side ): bool {
+		$at = 'agent' === $side ? $this->agent_typing_at : $this->visitor_typing_at;
+
+		if ( null === $at || $this->is_closed() ) {
+			return false;
+		}
+
+		$time = strtotime( $at . ' UTC' );
+
+		return false !== $time && time() - $time <= self::TYPING_SECONDS;
 	}
 
 	/**
@@ -93,7 +132,9 @@ final class Conversation {
 			'last_message_at' => $this->last_message_at,
 			'created_at'      => $this->created_at,
 			'updated_at'      => $this->updated_at,
-			'closed_at'       => $this->closed_at,
+			'closed_at'         => $this->closed_at,
+			'visitor_typing_at' => $this->visitor_typing_at,
+			'agent_typing_at'   => $this->agent_typing_at,
 		);
 	}
 }
