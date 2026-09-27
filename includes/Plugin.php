@@ -30,6 +30,7 @@ use ChatChi\Database\Repositories\AttachmentRepository;
 use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\RateLimitRepository;
+use ChatChi\Database\Repositories\TagRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Database\Schema;
 use ChatChi\Frontend\ColorPalette;
@@ -177,6 +178,7 @@ final class Plugin {
 			MessageRepository::class,
 			RateLimitRepository::class,
 			AttachmentRepository::class,
+			TagRepository::class,
 		);
 
 		foreach ( $repositories as $repository ) {
@@ -336,7 +338,8 @@ final class Plugin {
 					$c->get( VisitorRepository::class ),
 					$c->get( AgentRepository::class ),
 					$c->get( MessageRepository::class ),
-					$c->get( ConversationPolicy::class )
+					$c->get( ConversationPolicy::class ),
+					$c->get( TagRepository::class )
 				);
 			}
 		);

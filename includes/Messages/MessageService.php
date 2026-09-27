@@ -190,7 +190,8 @@ final class MessageService {
 
 		try {
 			// One extra row tells whether more messages exist.
-			$messages = $this->messages->list_for_conversation( $conversation->id, $after_id, $before_id, $limit + 1 );
+			// Internal notes and events are for agents only.
+			$messages = $this->messages->list_for_conversation( $conversation->id, $after_id, $before_id, $limit + 1, $actor->is_agent() );
 			$has_more = count( $messages ) > $limit;
 
 			if ( $has_more ) {
@@ -204,6 +205,71 @@ final class MessageService {
 		}
 
 		return new MessagePage( $messages, $agents, $has_more, $conversation->is_typing( $this->other_side( $actor ) ) );
+	}
+
+	/**
+	 * Adds an internal note: visible to agents only, never to the visitor.
+	 * Notes do not change the conversation's order, preview or unread counts.
+	 *
+	 * @param Actor       $actor           Writing agent.
+	 * @param int         $conversation_id Conversation ID.
+	 * @param mixed       $body            Raw note text.
+	 * @param string|null $client_id       Optional client UUID, makes retries safe.
+	 * @return Message|\WP_Error
+	 */
+	public function add_note( Actor $actor, int $conversation_id, $body, ?string $client_id = null ) {
+		if ( ! $actor->is_agent() ) {
+			return new \WP_Error( 'chatchi_forbidden', __( 'You are not allowed to do this.', 'chatchi' ), array( 'status' => 403 ) );
+		}
+
+		$conversation = $this->conversations->get( $actor, $conversation_id );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		$text = $this->body->clean( $body );
+
+		if ( $text instanceof \WP_Error ) {
+			return $text;
+		}
+
+		try {
+			$created = false;
+			$note    = $this->messages->create( $conversation->id, Message::SENDER_AGENT, $actor->id(), $text, null !== $client_id ? strtolower( $client_id ) : null, $created, true );
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		if ( $created ) {
+			/**
+			 * Fires after an agent adds an internal note.
+			 *
+			 * @param Message      $note         The note.
+			 * @param Conversation $conversation Its conversation.
+			 * @param Actor        $actor        Writing agent.
+			 */
+			do_action( 'chatchi_note_added', $note, $conversation, $actor );
+		}
+
+		return $note;
+	}
+
+	/**
+	 * Records an internal event line, such as a transfer. Agents only see it.
+	 *
+	 * @param int    $conversation_id Conversation ID.
+	 * @param string $text            Event text, in the site language.
+	 * @return Message|null Null when it could not be stored.
+	 */
+	public function add_event( int $conversation_id, string $text ): ?Message {
+		try {
+			$created = false;
+			return $this->messages->create( $conversation_id, Message::SENDER_SYSTEM, 0, $text, null, $created, true );
+		} catch ( \Throwable $e ) {
+			$this->failure( $e );
+			return null;
+		}
 	}
 
 	/**

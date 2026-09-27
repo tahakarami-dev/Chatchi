@@ -99,6 +99,16 @@ final class AgentController extends ConversationController {
 						'maxLength' => 100,
 						'default'   => '',
 					),
+					'assigned' => array(
+						'type'    => 'string',
+						'enum'    => array( '', 'mine', 'unassigned' ),
+						'default' => '',
+					),
+					'tag'      => array(
+						'type'      => 'string',
+						'maxLength' => 100,
+						'default'   => '',
+					),
 					'page'     => array(
 						'type'    => 'integer',
 						'minimum' => 1,
@@ -124,6 +134,94 @@ final class AgentController extends ConversationController {
 				'args'                => $this->id_arg(),
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/agent/conversations/(?P<id>\d+)/notes',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'add_note' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'body'      => array(
+							'type'      => 'string',
+							'required'  => true,
+							'maxLength' => 20000,
+						),
+						'client_id' => array(
+							'type'    => 'string',
+							'pattern' => '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+						),
+					)
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/agent/conversations/(?P<id>\d+)/assign',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'assign' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'agent_id' => array(
+							'type'     => 'integer',
+							'minimum'  => 0,
+							'required' => true,
+						),
+					)
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/agent/conversations/(?P<id>\d+)/tags',
+			array(
+				'methods'             => \WP_REST_Server::EDITABLE,
+				'callback'            => array( $this, 'set_tags' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'tags' => array(
+							'type'     => 'array',
+							'items'    => array(
+								'type'      => 'string',
+								'maxLength' => 200,
+							),
+							'maxItems' => 50,
+							'required' => true,
+						),
+					)
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/agent/tags',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'tags' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/agent/team',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'team' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+			)
+		);
 	}
 
 	/**
@@ -142,6 +240,123 @@ final class AgentController extends ConversationController {
 		return $this->respond(
 			$this->presenter->agent_self( $actor->agent_model() ) + array(
 				'attachments' => $this->attachments->client_config( $actor ),
+			)
+		);
+	}
+
+	/**
+	 * POST …/notes: an internal note, never shown to the visitor.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function add_note( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$client_id = $request['client_id'];
+		$note      = $this->messages->add_note( $actor, (int) $request['id'], $request['body'], is_string( $client_id ) && '' !== $client_id ? $client_id : null );
+
+		if ( $note instanceof \WP_Error ) {
+			return $note;
+		}
+
+		$agent = $actor->agent_model();
+
+		return $this->respond( $this->presenter->message( $note, $actor, array( $agent->id => $agent ) ), 201 );
+	}
+
+	/**
+	 * POST …/assign: hands the conversation to an agent (0 unassigns).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function assign( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$conversation = $this->conversations->assign( $actor, (int) $request['id'], (int) $request['agent_id'] );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		$data = $this->present_conversation( $conversation, $actor );
+
+		return $data instanceof \WP_Error ? $data : $this->respond( $data );
+	}
+
+	/**
+	 * PUT/PATCH/POST …/tags: replaces the conversation's tags.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function set_tags( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$tags = $this->conversations->set_tags( $actor, (int) $request['id'], $request['tags'] );
+
+		return $tags instanceof \WP_Error ? $tags : $this->respond( array( 'tags' => $tags ) );
+	}
+
+	/**
+	 * GET /agent/tags: the most used tags.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function tags( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$tags = $this->conversations->popular_tags( $actor );
+
+		return $tags instanceof \WP_Error ? $tags : $this->respond( $tags );
+	}
+
+	/**
+	 * GET /agent/team: active agents, to transfer conversations to.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function team( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		try {
+			$agents = $this->agents->all( true );
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		return $this->respond(
+			array_map(
+				function ( Agent $agent ) use ( $actor ): array {
+					return $this->presenter->agent( $agent ) + array(
+						'online' => $agent->is_available(),
+						'is_me'  => $agent->id === $actor->id(),
+					);
+				},
+				$agents
 			)
 		);
 	}
@@ -219,6 +434,8 @@ final class AgentController extends ConversationController {
 			array(
 				'status'   => (string) $request['status'],
 				'search'   => (string) $request['search'],
+				'assigned' => (string) $request['assigned'],
+				'tag'      => (string) $request['tag'],
 				'page'     => (int) $request['page'],
 				'per_page' => (int) $request['per_page'],
 			)

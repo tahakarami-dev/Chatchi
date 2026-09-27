@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '5';
+	public const VERSION = '6';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -33,11 +33,12 @@ final class Schema {
 	 */
 	private const REQUIRED_COLUMNS = array(
 		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url', 'visitor_typing_at', 'agent_typing_at' ),
-		Table::MESSAGES      => array( 'client_id', 'read_at', 'attachment_id' ),
+		Table::MESSAGES      => array( 'client_id', 'read_at', 'attachment_id', 'internal' ),
 		Table::AGENTS        => array( 'avatar_id', 'is_active', 'status', 'last_seen_at' ),
 		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone' ),
 		Table::RATE_LIMITS   => array( 'bucket', 'hits', 'expires_at' ),
 		Table::ATTACHMENTS   => array( 'conversation_id', 'message_id', 'path' ),
+		Table::TAGS          => array( 'conversation_id', 'tag' ),
 	);
 
 	private \wpdb $db;
@@ -271,6 +272,7 @@ final class Schema {
 		$messages      = $prefix . Table::MESSAGES;
 		$rate_limits   = $prefix . Table::RATE_LIMITS;
 		$attachments   = $prefix . Table::ATTACHMENTS;
+		$tags          = $prefix . Table::TAGS;
 
 		// token_hash stores a hash of the visitor's cookie token, never the token itself.
 		// open_visitor_id equals visitor_id while a conversation is open and is NULL once
@@ -335,6 +337,7 @@ sender_id bigint(20) unsigned NOT NULL DEFAULT 0,
 body text NOT NULL,
 client_id char(36) NULL DEFAULT NULL,
 attachment_id bigint(20) unsigned NOT NULL DEFAULT 0,
+internal tinyint(1) unsigned NOT NULL DEFAULT 0,
 created_at datetime NOT NULL,
 read_at datetime NULL DEFAULT NULL,
 PRIMARY KEY  (id),
@@ -369,6 +372,14 @@ created_at datetime NOT NULL,
 PRIMARY KEY  (id),
 KEY conversation_id (conversation_id),
 KEY message_id (message_id)
+) {$collate};",
+
+			// Labels agents put on conversations, e.g. "billing".
+			"CREATE TABLE {$tags} (
+conversation_id bigint(20) unsigned NOT NULL,
+tag varchar(40) NOT NULL,
+PRIMARY KEY  (conversation_id,tag),
+KEY tag (tag)
 ) {$collate};",
 		);
 	}
