@@ -19,6 +19,8 @@
 
 	var ICONS = {
 		chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+		// Solid speech bubble with three dots, for the chat launcher.
+		launcher: '<path class="cc-bubble" d="M12 2.5c-5.52 0-10 3.94-10 8.8 0 2.53 1.22 4.81 3.17 6.41-.2 1.38-.8 2.64-1.74 3.7a.6.6 0 0 0 .5 1c2.2-.14 4.17-.93 5.66-2.06.78.16 1.59.25 2.41.25 5.52 0 10-3.94 10-8.8S17.52 2.5 12 2.5Z"/><circle class="cc-dot" cx="7.6" cy="11.3" r="1.35"/><circle class="cc-dot" cx="12" cy="11.3" r="1.35"/><circle class="cc-dot" cx="16.4" cy="11.3" r="1.35"/>',
 		close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
 		send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
 		check: '<path d="M20 6 9 17l-5-5"/>',

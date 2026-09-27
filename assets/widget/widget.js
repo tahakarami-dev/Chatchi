@@ -249,7 +249,7 @@
 				self.toggle();
 			}
 		}, [
-			h( 'span', { className: 'chatchi-launcher__icon chatchi-launcher__icon--chat' }, [ icon( 'chat' ) ] ),
+			h( 'span', { className: 'chatchi-launcher__icon chatchi-launcher__icon--chat' }, [ icon( 'launcher' ) ] ),
 			h( 'span', { className: 'chatchi-launcher__icon chatchi-launcher__icon--close' }, [ icon( 'close' ) ] ),
 			this.badge
 		] );

@@ -4124,7 +4124,7 @@
 				] ),
 				h( 'div', { className: 'cc-preview__composer' }, [ h( 'span', { text: S.previewPlaceholder } ), h( 'span', { className: 'cc-preview__send' }, [ icon( 'send', 'cc-flip' ) ] ) ] )
 			] ),
-			h( 'span', { className: 'cc-preview__launcher' }, [ icon( 'chat' ) ] )
+			h( 'span', { className: 'cc-preview__launcher' }, [ icon( 'launcher' ) ] )
 		] );
 
 		return {
