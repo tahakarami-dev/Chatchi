@@ -25,6 +25,8 @@ function chatchi_uninstall_site() {
 	global $wpdb;
 
 	wp_clear_scheduled_hook( 'chatchi_purge_rate_limits' );
+	// Pending SMS checks (one per conversation, each with its own argument).
+	wp_unschedule_hook( 'chatchi_sms_check' );
 	delete_option( 'chatchi_install_lock' );
 	delete_transient( 'chatchi_install_backoff' );
 	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}chatchi_rate_limits" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.SchemaChange -- Temporary counters, recreated on install.

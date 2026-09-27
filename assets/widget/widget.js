@@ -362,6 +362,11 @@
 		}
 
 		this.scheduleInvitation();
+
+		// Links from SMS (and anywhere else) ending in #chatchi open the chat.
+		if ( window.location.hash === '#chatchi' ) {
+			this.open();
+		}
 	};
 
 	/* --------------------------- invitations --------------------------- */
