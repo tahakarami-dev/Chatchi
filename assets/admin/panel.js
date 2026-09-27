@@ -837,6 +837,7 @@
 				h( 'span', { className: 'cc-item__bottom' }, [
 					h( 'span', { className: 'cc-status-dot cc-status-dot--' + item.status, title: STATUS_LABELS[ item.status ] } ),
 					h( 'span', { className: 'cc-item__preview', text: preview } ),
+					item.rating ? h( 'span', { className: 'cc-item__rating cc-item__rating--' + ( item.rating.score >= 4 ? 'good' : item.rating.score === 3 ? 'ok' : 'bad' ), title: fmt.format( S.ratedStars, item.rating.score ), 'aria-label': fmt.format( S.ratedStars, item.rating.score ) }, [ icon( 'star' ), fmt.number( item.rating.score ) ] ) : null,
 					item.unread_count > 0 ? h( 'span', { className: 'cc-count', 'aria-label': fmt.format( S.unread, item.unread_count ), text: fmt.number( item.unread_count ) } ) : null
 				] ),
 				item.tags && item.tags.length ? h( 'span', { className: 'cc-item__tags' }, item.tags.slice( 0, 3 ).map( function ( tag ) {
@@ -2129,6 +2130,13 @@
 			row( 'clock', S.lastSeen, visitor.last_seen_at ? document.createTextNode( fmt.ago( new Date( visitor.last_seen_at ) ) ) : muted( S.notProvided ) ),
 			row( 'user', S.assignedTo, conv.agent ? document.createTextNode( conv.agent.name ) : muted( S.unassigned ) )
 		];
+
+		if ( conv.rating ) {
+			rows.push( row( 'star', S.rating, h( 'div', { className: 'cc-info-rating' }, [
+				h( 'span', { className: 'cc-info-rating__stars', 'aria-label': fmt.format( S.ratedStars, conv.rating.score ), text: '★★★★★'.slice( 0, conv.rating.score ) + '☆☆☆☆☆'.slice( 0, 5 - conv.rating.score ) } ),
+				conv.rating.comment ? h( 'p', { className: 'cc-info-rating__comment', text: conv.rating.comment } ) : null
+			] ) ) );
+		}
 
 		if ( visitor.user_id ) {
 			rows.push( row( 'user', S.wpUser, h( 'a', { href: config.userEditUrl + '?user_id=' + encodeURIComponent( visitor.user_id ), text: S.viewProfile } ) ) );

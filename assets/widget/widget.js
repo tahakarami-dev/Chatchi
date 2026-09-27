@@ -76,6 +76,9 @@
 		close: function ( id ) {
 			return request( 'POST', '/widget/conversations/' + id + '/close' );
 		},
+		rate: function ( id, score, comment ) {
+			return request( 'POST', '/widget/conversations/' + id + '/rating', { body: { score: score, comment: comment } } );
+		},
 		typing: function ( id, typing ) {
 			return request( 'POST', '/widget/conversations/' + id + '/typing', { body: { typing: typing } } );
 		},
@@ -1330,7 +1333,8 @@
 			state.view === 'form' ? [ state.formErrors, state.formAlert, state.submitting ] : null,
 			state.view === 'error' ? state.errorMessage : null,
 			this.availability() ? [ this.availability().mode, this.availability().offline_form, this.availability().opens_at ] : null,
-			!! state.offlineSent
+			!! state.offlineSent,
+			state.closed ? state.rated : null
 		] );
 
 		if ( shellKey !== this.shellKey ) {
@@ -1965,6 +1969,96 @@
 		] );
 	};
 
+	/**
+	 * "How was your chat?" with five stars and an optional comment, shown
+	 * once the conversation has ended (when rating is turned on).
+	 */
+	Widget.prototype.renderRating = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! config.rating || ! conversation ) {
+			return null;
+		}
+
+		if ( this.state.rated === conversation.id ) {
+			return h( 'div', { className: 'chatchi-rating chatchi-rating--done', role: 'status' }, [
+				icon( 'check' ),
+				h( 'p', { text: S.ratingThanks } )
+			] );
+		}
+
+		var score = 0;
+		var stars = [];
+		var error = h( 'p', { className: 'chatchi-rating__error', role: 'alert', hidden: true } );
+		var comment = h( 'textarea', { className: 'chatchi-rating__comment', rows: '2', placeholder: S.ratingComment, 'aria-label': S.ratingComment } );
+		var send = h( 'button', { type: 'submit', className: 'chatchi-button', text: S.ratingSend } );
+		var more = h( 'div', { className: 'chatchi-rating__more', hidden: true }, [ comment, send ] );
+		var label = h( 'p', { className: 'chatchi-rating__label', 'aria-live': 'polite', text: '' } );
+		var labels = [ S.rating1, S.rating2, S.rating3, S.rating4, S.rating5 ];
+
+		function paint( upTo ) {
+			stars.forEach( function ( star, index ) {
+				star.classList.toggle( 'is-on', index < upTo );
+			} );
+			label.textContent = upTo ? labels[ upTo - 1 ] : '';
+		}
+
+		for ( var i = 1; i <= 5; i++ ) {
+			( function ( value ) {
+				var star = h( 'button', {
+					type: 'button',
+					className: 'chatchi-star',
+					role: 'radio',
+					'aria-checked': 'false',
+					'aria-label': format( S.ratingStars, value ),
+					title: labels[ value - 1 ],
+					onClick: function () {
+						score = value;
+						stars.forEach( function ( other, index ) {
+							other.setAttribute( 'aria-checked', index === value - 1 ? 'true' : 'false' );
+						} );
+						paint( value );
+						more.hidden = false;
+						error.hidden = true;
+					},
+					onMouseenter: function () {
+						paint( value );
+					},
+					onMouseleave: function () {
+						paint( score );
+					}
+				}, [ icon( 'star' ) ] );
+				stars.push( star );
+			}( i ) );
+		}
+
+		return h( 'form', {
+			className: 'chatchi-rating',
+			noValidate: true,
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				if ( ! score ) {
+					return;
+				}
+				send.disabled = true;
+				api.rate( conversation.id, score, comment.value.trim() ).then( function () {
+					self.set( { rated: conversation.id } );
+				} ).catch( function ( failure ) {
+					send.disabled = false;
+					error.textContent = failure.message || S.loadError;
+					error.hidden = false;
+				} );
+			}
+		}, [
+			h( 'p', { className: 'chatchi-rating__title', text: S.ratingTitle } ),
+			h( 'div', { className: 'chatchi-rating__stars', role: 'radiogroup', 'aria-label': S.ratingTitle }, stars ),
+			label,
+			more,
+			error
+		] );
+	};
+
 	Widget.prototype.renderFooter = function () {
 		var self = this;
 		var state = this.state;
@@ -1972,6 +2066,7 @@
 
 		if ( state.closed ) {
 			return h( 'div', { className: 'chatchi-footer' }, [
+				this.renderRating(),
 				h( 'div', { className: 'chatchi-notice', role: 'status' }, [
 					h( 'p', { text: S.closed } ),
 					h( 'button', {

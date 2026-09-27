@@ -12,6 +12,7 @@ use ChatChi\Availability\Availability;
 use ChatChi\Commerce\CustomerContext;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
+use ChatChi\Conversations\RatingService;
 use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
@@ -49,6 +50,8 @@ final class WidgetController extends ConversationController {
 
 	private ?CustomerContext $context;
 
+	private ?RatingService $ratings;
+
 	/**
 	 * Rate-limit decisions per request object.
 	 *
@@ -73,6 +76,7 @@ final class WidgetController extends ConversationController {
 	 * @param Availability         $availability  Business hours and agent presence.
 	 * @param AttachmentService    $attachments   Files in conversations.
 	 * @param CustomerContext|null $context       Page and cart tracking.
+	 * @param RatingService|null   $ratings       Ratings of ended chats.
 	 */
 	public function __construct(
 		ConversationService $conversations,
@@ -86,7 +90,8 @@ final class WidgetController extends ConversationController {
 		SpamGuard $spam,
 		Availability $availability,
 		AttachmentService $attachments,
-		?CustomerContext $context = null
+		?CustomerContext $context = null,
+		?RatingService $ratings = null
 	) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
@@ -98,6 +103,7 @@ final class WidgetController extends ConversationController {
 		$this->spam         = $spam;
 		$this->availability = $availability;
 		$this->context      = $context;
+		$this->ratings      = $ratings;
 		$this->decisions    = new \SplObjectStorage();
 	}
 
@@ -184,6 +190,60 @@ final class WidgetController extends ConversationController {
 				),
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/widget/conversations/(?P<id>\d+)/rating',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'rate' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'score'   => array(
+							'type'     => 'integer',
+							'minimum'  => 1,
+							'maximum'  => 5,
+							'required' => true,
+						),
+						'comment' => array(
+							'type'      => 'string',
+							'maxLength' => 2000,
+							'default'   => '',
+						),
+					)
+				),
+			)
+		);
+	}
+
+	/**
+	 * POST /widget/conversations/{id}/rating: the visitor rates their ended chat.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function rate( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		if ( ! $this->ratings ) {
+			return new \WP_Error( 'chatchi_rating_disabled', __( 'Rating is turned off.', 'chatchi' ), array( 'status' => 403 ) );
+		}
+
+		$rated = $this->ratings->rate( $actor, (int) $request['id'], (int) $request['score'], (string) $request['comment'] );
+
+		if ( $rated instanceof \WP_Error ) {
+			return $rated;
+		}
+
+		$data = $this->present_conversation( $rated, $actor );
+
+		return $data instanceof \WP_Error ? $data : $this->respond( $data );
 	}
 
 	/**

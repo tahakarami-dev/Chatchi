@@ -1467,3 +1467,123 @@
 	.chatchi--left .chatchi-teaser { left: 16px; }
 	.chatchi--right .chatchi-teaser { right: 16px; }
 }
+
+/* Rating an ended chat */
+
+.chatchi-rating {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 10px;
+	padding: 14px 12px 12px;
+	border-radius: 16px;
+	background: var(--chatchi-primary-soft);
+	text-align: center;
+	animation: chatchi-in var(--chatchi-duration-base) var(--chatchi-ease-out);
+}
+
+.chatchi-rating__title {
+	margin: 0;
+	font-weight: 700;
+	color: var(--chatchi-text);
+}
+
+.chatchi-rating__stars {
+	display: flex;
+	direction: ltr;
+	gap: 4px;
+}
+
+.chatchi-star {
+	width: 38px;
+	height: 38px;
+	display: grid;
+	place-items: center;
+	border-radius: 10px;
+	color: var(--chatchi-border-strong);
+	transition: transform var(--chatchi-duration-fast), color var(--chatchi-duration-fast);
+}
+
+.chatchi-star svg {
+	width: 28px;
+	height: 28px;
+}
+
+.chatchi-star:hover {
+	transform: scale(1.12);
+}
+
+.chatchi-star.is-on {
+	color: #F5A524;
+}
+
+.chatchi-star.is-on svg {
+	fill: currentColor;
+}
+
+.chatchi-star:focus-visible {
+	outline: none;
+	box-shadow: var(--chatchi-focus-ring);
+}
+
+.chatchi-rating__label {
+	min-height: 1.5em;
+	margin: 0;
+	font-size: 13px;
+	color: var(--chatchi-text-muted);
+}
+
+.chatchi-rating__more {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: 100%;
+}
+
+.chatchi-rating__more[hidden] {
+	display: none;
+}
+
+.chatchi-rating__comment {
+	width: 100%;
+	min-height: 64px;
+	padding: 10px 12px;
+	border: 1.5px solid var(--chatchi-border);
+	border-radius: 12px;
+	background: var(--chatchi-surface);
+	font-size: 16px;
+	line-height: 1.6;
+	resize: vertical;
+	unicode-bidi: plaintext;
+}
+
+.chatchi-rating__comment:focus {
+	outline: none;
+	border-color: var(--chatchi-primary);
+	box-shadow: var(--chatchi-focus-ring);
+}
+
+.chatchi-rating__error {
+	margin: 0;
+	font-size: 13px;
+	color: var(--chatchi-error-text);
+}
+
+.chatchi-rating--done {
+	flex-direction: row;
+	justify-content: center;
+	gap: 8px;
+	color: var(--chatchi-success-text);
+	background: var(--chatchi-success-soft);
+	font-weight: 600;
+}
+
+.chatchi-rating--done p {
+	margin: 0;
+}
+
+.chatchi-rating--done svg {
+	width: 18px;
+	height: 18px;
+}

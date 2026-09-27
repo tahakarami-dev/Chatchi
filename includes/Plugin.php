@@ -21,6 +21,7 @@ use ChatChi\Admin\PanelPage;
 use ChatChi\Admin\PanelStrings;
 use ChatChi\Conversations\ConversationPolicy;
 use ChatChi\Conversations\ConversationService;
+use ChatChi\Conversations\RatingService;
 use ChatChi\Core\Container;
 use ChatChi\Core\Contracts\Module;
 use ChatChi\Core\I18n;
@@ -372,6 +373,18 @@ final class Plugin {
 				);
 			}
 		);
+
+		$this->container->singleton(
+			RatingService::class,
+			static function ( Container $c ): RatingService {
+				return new RatingService(
+					$c->get( Settings::class ),
+					$c->get( ConversationService::class ),
+					$c->get( ConversationRepository::class ),
+					$c->get( MessageService::class )
+				);
+			}
+		);
 	}
 
 	/**
@@ -407,7 +420,8 @@ final class Plugin {
 					$c->get( SpamGuard::class ),
 					$c->get( Availability::class ),
 					$c->get( AttachmentService::class ),
-					$c->get( CustomerContext::class )
+					$c->get( CustomerContext::class ),
+					$c->get( RatingService::class )
 				);
 			}
 		);

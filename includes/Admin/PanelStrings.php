@@ -144,6 +144,9 @@ final class PanelStrings {
 			'sectionAppearance'    => __( 'Appearance', 'chatchi' ),
 			'sectionDisplay'       => __( 'Welcome & display', 'chatchi' ),
 			'sectionSecurity'      => __( 'IP & security', 'chatchi' ),
+			'rating'               => __( 'Rating', 'chatchi' ),
+			/* translators: %s: number of stars, 1–5. */
+			'ratedStars'           => __( 'Rated %s out of 5', 'chatchi' ),
 			'sectionSales'         => __( 'Sales', 'chatchi' ),
 			'invitesTitle'         => __( 'Chat invitations', 'chatchi' ),
 			'invitesIntro'         => __( 'Invite visitors to chat on the pages where they need help most, such as product pages or the checkout. The first invitation that fits a page is shown.', 'chatchi' ),
