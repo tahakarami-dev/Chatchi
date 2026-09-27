@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '7';
+	public const VERSION = '8';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -32,7 +32,7 @@ final class Schema {
 	 * dbDelta() does not report when it fails to add one.
 	 */
 	private const REQUIRED_COLUMNS = array(
-		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url', 'visitor_typing_at', 'agent_typing_at', 'rating', 'rated_at' ),
+		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url', 'visitor_typing_at', 'agent_typing_at', 'rating', 'rated_at', 'bot_handoff_at' ),
 		Table::MESSAGES      => array( 'client_id', 'read_at', 'attachment_id', 'internal' ),
 		Table::AGENTS        => array( 'avatar_id', 'is_active', 'status', 'last_seen_at' ),
 		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone', 'current_url', 'cart', 'context_at' ),
@@ -327,6 +327,7 @@ agent_typing_at datetime NULL DEFAULT NULL,
 rating tinyint(1) unsigned NULL DEFAULT NULL,
 rating_comment text NULL,
 rated_at datetime NULL DEFAULT NULL,
+bot_handoff_at datetime NULL DEFAULT NULL,
 open_visitor_id bigint(20) unsigned NULL DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY open_visitor (open_visitor_id),

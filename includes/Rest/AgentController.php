@@ -8,6 +8,7 @@
 namespace ChatChi\Rest;
 
 use ChatChi\Admin\PanelTheme;
+use ChatChi\Ai\Assistant;
 use ChatChi\Attachments\AttachmentService;
 use ChatChi\Commerce\CustomerContext;
 use ChatChi\Database\Repositories\VisitorRepository;
@@ -38,6 +39,8 @@ final class AgentController extends ConversationController {
 
 	private ?VisitorRepository $visitors;
 
+	private ?Assistant $assistant;
+
 	/**
 	 * Agent whose presence was already recorded in this request.
 	 */
@@ -52,14 +55,16 @@ final class AgentController extends ConversationController {
 	 * @param Transcript|null        $transcript    Transcript emails.
 	 * @param CustomerContext|null   $context       Page, cart and orders.
 	 * @param VisitorRepository|null $visitors      Visitor storage.
+	 * @param Assistant|null         $assistant     AI reply suggestions.
 	 */
-	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null, ?CustomerContext $context = null, ?VisitorRepository $visitors = null ) {
+	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null, ?CustomerContext $context = null, ?VisitorRepository $visitors = null, ?Assistant $assistant = null ) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
 		$this->agents     = $agents;
 		$this->transcript = $transcript;
 		$this->context    = $context;
 		$this->visitors   = $visitors;
+		$this->assistant  = $assistant;
 	}
 
 	/**
@@ -236,6 +241,17 @@ final class AgentController extends ConversationController {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/agent/conversations/(?P<id>\d+)/suggest',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'suggest' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => $this->id_arg(),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/agent/conversations/(?P<id>\d+)/customer',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -352,6 +368,28 @@ final class AgentController extends ConversationController {
 		$tags = $this->conversations->set_tags( $actor, (int) $request['id'], $request['tags'] );
 
 		return $tags instanceof \WP_Error ? $tags : $this->respond( array( 'tags' => $tags ) );
+	}
+
+	/**
+	 * POST …/suggest: an AI draft of the next reply, for the agent to edit.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function suggest( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		if ( ! $this->assistant ) {
+			return new \WP_Error( 'chatchi_unavailable', __( 'This is not available right now.', 'chatchi' ), array( 'status' => 503 ) );
+		}
+
+		$text = $this->assistant->suggest( $actor, (int) $request['id'] );
+
+		return $text instanceof \WP_Error ? $text : $this->respond( array( 'text' => $text ) );
 	}
 
 	/**

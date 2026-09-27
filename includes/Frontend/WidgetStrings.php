@@ -86,6 +86,8 @@ final class WidgetStrings {
 			'rating4'        => __( 'Good', 'chatchi' ),
 			'rating5'        => __( 'Excellent', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
+			'talkToPerson'   => __( 'Talk to a person', 'chatchi' ),
+			'personComing'   => __( 'We\'ve told the team. A person will reply here soon.', 'chatchi' ),
 			'faqTitle'       => __( 'Frequently asked questions', 'chatchi' ),
 			'faqSearch'      => __( 'Search the questions', 'chatchi' ),
 			'faqNone'        => __( 'No matching question. Ask us in the chat.', 'chatchi' ),

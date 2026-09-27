@@ -7,6 +7,7 @@
 
 namespace ChatChi\Settings;
 
+use ChatChi\Ai\AiClient;
 use ChatChi\Availability\Schedule;
 use ChatChi\Security\IpRange;
 use ChatChi\Support\PlainText;
@@ -54,6 +55,16 @@ final class SettingsValidator {
 
 	public const SMS_MESSAGE_MAX_LENGTH = 300;
 
+	public const AI_PROVIDERS = array( 'anthropic', 'openai' );
+
+	public const AI_BOT_MODES = array( 'offline', 'always' );
+
+	public const AI_INSTRUCTIONS_MAX_LENGTH = 1500;
+
+	public const AI_NAME_MAX_LENGTH = 40;
+
+	public const MAX_KNOWLEDGE_IDS = 20;
+
 	/**
 	 * Whole-number settings: name => array( min, max, default ).
 	 */
@@ -67,6 +78,9 @@ final class SettingsValidator {
 		'attachment_max_mb'      => array( 1, 50, 5 ),
 		// Minutes an agent's reply waits unread before the visitor gets an SMS.
 		'sms_delay'              => array( 1, 60, 3 ),
+		// AI bot replies per day (all conversations), and per conversation.
+		'ai_daily_limit'         => array( 10, 100000, 300 ),
+		'ai_max_replies'         => array( 1, 50, 15 ),
 	);
 
 	public const MAX_TRUSTED_PROXIES = 100;
@@ -167,6 +181,20 @@ final class SettingsValidator {
 			'sms_sender'               => '',
 			// Empty means "use the translated default text".
 			'sms_message'              => '',
+			// AI (see Ai\AiClient): the bot and reply suggestions for agents.
+			'ai_provider'              => 'anthropic',
+			'ai_api_key'               => '',
+			// Empty means the provider's own API address.
+			'ai_base_url'              => '',
+			// Empty means the default model (Claude: claude-opus-5).
+			'ai_model'                 => '',
+			'ai_bot_enabled'           => false,
+			'ai_bot_mode'              => 'offline',
+			// Empty means the translated default name.
+			'ai_bot_name'              => '',
+			'ai_instructions'          => '',
+			'ai_knowledge_ids'         => array(),
+			'ai_suggest_enabled'       => false,
 		);
 
 		foreach ( self::NUMBERS as $key => $range ) {
@@ -251,6 +279,16 @@ final class SettingsValidator {
 				if ( '' === $settings[ $service . '_chat_id' ] ) {
 					$errors[ $service . '_chat_id' ] = __( 'Enter the chat ID the bot sends to.', 'chatchi' );
 				}
+			}
+		}
+
+		// The AI features need a key, and OpenAI-compatible services a model name.
+		if ( ! empty( $settings['ai_bot_enabled'] ) || ! empty( $settings['ai_suggest_enabled'] ) ) {
+			if ( '' === $settings['ai_api_key'] ) {
+				$errors['ai_api_key'] = __( 'Enter the API key of your AI service.', 'chatchi' );
+			}
+			if ( 'openai' === $settings['ai_provider'] && '' === $settings['ai_model'] ) {
+				$errors['ai_model'] = __( 'Enter the model name.', 'chatchi' );
 			}
 		}
 
@@ -360,7 +398,29 @@ final class SettingsValidator {
 				case 'channels_enabled':
 				case 'faq_enabled':
 				case 'sms_enabled':
+				case 'ai_bot_enabled':
+				case 'ai_suggest_enabled':
 					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'ai_provider':
+					$settings[ $key ] = in_array( $value, self::AI_PROVIDERS, true ) ? $value : $default;
+					break;
+
+				case 'ai_bot_mode':
+					$settings[ $key ] = in_array( $value, self::AI_BOT_MODES, true ) ? $value : $default;
+					break;
+
+				case 'ai_api_key':
+				case 'ai_base_url':
+				case 'ai_model':
+				case 'ai_bot_name':
+				case 'ai_instructions':
+					$settings[ $key ] = is_string( $value ) ? $value : $default;
+					break;
+
+				case 'ai_knowledge_ids':
+					$settings[ $key ] = is_array( $value ) ? array_slice( $this->ids( $value ), 0, self::MAX_KNOWLEDGE_IDS ) : $default;
 					break;
 
 				case 'widget_theme':
@@ -513,7 +573,49 @@ final class SettingsValidator {
 			case 'channels_enabled':
 			case 'faq_enabled':
 			case 'sms_enabled':
+			case 'ai_bot_enabled':
+			case 'ai_suggest_enabled':
 				return rest_sanitize_boolean( $value );
+
+			case 'ai_provider':
+				return in_array( $value, self::AI_PROVIDERS, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose an AI service.', 'chatchi' ) );
+
+			case 'ai_bot_mode':
+				return in_array( $value, self::AI_BOT_MODES, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose when the bot answers.', 'chatchi' ) );
+
+			case 'ai_api_key':
+				$value = is_string( $value ) ? trim( $value ) : null;
+
+				return null !== $value && preg_match( '/^[\x21-\x7E]{0,300}$/', $value )
+					? $value
+					: new \WP_Error( 'invalid', __( 'The API key looks wrong. Copy it again from your AI service.', 'chatchi' ) );
+
+			case 'ai_base_url':
+				$value = is_string( $value ) ? untrailingslashit( trim( $value ) ) : null;
+
+				return null !== $value && ( '' === $value || AiClient::is_valid_base( $value ) )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Enter an https address, like https://api.example.com/v1, or leave it empty.', 'chatchi' ) );
+
+			case 'ai_model':
+				$value = is_string( $value ) ? trim( $value ) : null;
+
+				return null !== $value && preg_match( '#^[A-Za-z0-9._:/@\-]{0,100}$#', $value )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Enter the model name exactly as your AI service writes it.', 'chatchi' ) );
+
+			case 'ai_bot_name':
+				return $this->short_text( $value, self::AI_NAME_MAX_LENGTH );
+
+			case 'ai_instructions':
+				return $this->long_text( $value, self::AI_INSTRUCTIONS_MAX_LENGTH );
+
+			case 'ai_knowledge_ids':
+				return $this->picked_ids( $value, self::MAX_KNOWLEDGE_IDS );
 
 			case 'widget_theme':
 				return in_array( $value, self::THEMES, true )
@@ -726,6 +828,17 @@ final class SettingsValidator {
 	 * @return int[]|\WP_Error
 	 */
 	private function display_ids( $value ) {
+		return $this->picked_ids( $value, self::MAX_DISPLAY_IDS );
+	}
+
+	/**
+	 * Published pages, posts or products picked from the search results.
+	 *
+	 * @param mixed $value Raw value.
+	 * @param int   $max   Most items allowed.
+	 * @return int[]|\WP_Error
+	 */
+	private function picked_ids( $value, int $max ) {
 		if ( ! is_array( $value ) ) {
 			return new \WP_Error( 'invalid', __( 'Choose items from the search results.', 'chatchi' ) );
 		}
@@ -738,11 +851,11 @@ final class SettingsValidator {
 
 		$ids = $this->ids( $value );
 
-		if ( count( $ids ) > self::MAX_DISPLAY_IDS ) {
+		if ( count( $ids ) > $max ) {
 			return new \WP_Error(
 				'invalid',
 				/* translators: %d: maximum number of items. */
-				sprintf( __( 'You can choose at most %d items.', 'chatchi' ), self::MAX_DISPLAY_IDS )
+				sprintf( __( 'You can choose at most %d items.', 'chatchi' ), $max )
 			);
 		}
 

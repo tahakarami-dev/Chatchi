@@ -118,6 +118,22 @@ final class Settings {
 	}
 
 	/**
+	 * The default name the AI bot answers with.
+	 */
+	public function default_bot_name(): string {
+		return __( 'Smart assistant', 'chatchi' );
+	}
+
+	/**
+	 * The AI bot's name, or the translated default.
+	 */
+	public function bot_name(): string {
+		$name = (string) $this->get( 'ai_bot_name' );
+
+		return '' !== $name ? $name : $this->default_bot_name();
+	}
+
+	/**
 	 * The default SMS text; {site} is the site name and {link} the page.
 	 */
 	public function default_sms_message(): string {

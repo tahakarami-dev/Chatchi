@@ -10,6 +10,9 @@ namespace ChatChi;
 use ChatChi\Admin\AdminModule;
 use ChatChi\Agents\AgentService;
 use ChatChi\Agents\AvatarUploader;
+use ChatChi\Ai\AiClient;
+use ChatChi\Ai\Assistant;
+use ChatChi\Ai\Knowledge;
 use ChatChi\Attachments\AttachmentService;
 use ChatChi\Attachments\FileStore;
 use ChatChi\Availability\Availability;
@@ -46,6 +49,7 @@ use ChatChi\Messages\MessageService;
 use ChatChi\Reports\ReportService;
 use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
+use ChatChi\Rest\AiTestController;
 use ChatChi\Rest\BotTestController;
 use ChatChi\Notifications\BotNotifier;
 use ChatChi\Notifications\SmsGateway;
@@ -398,8 +402,8 @@ final class Plugin {
 	private function register_rest_services(): void {
 		$this->container->singleton(
 			Presenter::class,
-			static function (): Presenter {
-				return new Presenter();
+			static function ( Container $c ): Presenter {
+				return new Presenter( $c->get( Settings::class ) );
 			}
 		);
 
@@ -426,7 +430,8 @@ final class Plugin {
 					$c->get( Availability::class ),
 					$c->get( AttachmentService::class ),
 					$c->get( CustomerContext::class ),
-					$c->get( RatingService::class )
+					$c->get( RatingService::class ),
+					$c->get( Assistant::class )
 				);
 			}
 		);
@@ -442,7 +447,8 @@ final class Plugin {
 					$c->get( AttachmentService::class ),
 					$c->get( Transcript::class ),
 					$c->get( CustomerContext::class ),
-					$c->get( VisitorRepository::class )
+					$c->get( VisitorRepository::class ),
+					$c->get( Assistant::class )
 				);
 			}
 		);
@@ -541,7 +547,8 @@ final class Plugin {
 					$c->get( CannedController::class ),
 					$c->get( BotTestController::class ),
 					$c->get( ReportsController::class ),
-					$c->get( SmsTestController::class )
+					$c->get( SmsTestController::class ),
+					$c->get( AiTestController::class )
 				);
 			}
 		);
@@ -640,6 +647,44 @@ final class Plugin {
 					$c->get( VisitorRepository::class ),
 					$c->get( AgentRepository::class )
 				);
+			}
+		);
+
+		$this->container->singleton(
+			AiClient::class,
+			static function (): AiClient {
+				return new AiClient();
+			}
+		);
+
+		$this->container->singleton(
+			Knowledge::class,
+			static function ( Container $c ): Knowledge {
+				return new Knowledge( $c->get( Settings::class ), $c->get( ContentLookup::class ), $c->get( CustomerContext::class ), $c->get( Availability::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			Assistant::class,
+			static function ( Container $c ): Assistant {
+				return new Assistant(
+					$c->get( Settings::class ),
+					$c->get( ConversationService::class ),
+					$c->get( ConversationRepository::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( VisitorRepository::class ),
+					$c->get( MessageService::class ),
+					$c->get( Availability::class ),
+					$c->get( AiClient::class ),
+					$c->get( Knowledge::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			AiTestController::class,
+			static function ( Container $c ): AiTestController {
+				return new AiTestController( $c->get( AiClient::class ), $c->get( SettingsValidator::class ) );
 			}
 		);
 

@@ -80,6 +80,11 @@ final class RateLimiter {
 				'visitor' => array( 60, MINUTE_IN_SECONDS ),
 				'ip'      => array( 180, MINUTE_IN_SECONDS ),
 			),
+			// Asking the AI bot to answer: each one may cost money.
+			'bot'     => array(
+				'visitor' => array( 12, MINUTE_IN_SECONDS ),
+				'ip'      => array( 40, MINUTE_IN_SECONDS ),
+			),
 		);
 
 		/**

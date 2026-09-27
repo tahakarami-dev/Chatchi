@@ -72,6 +72,12 @@ final class Conversation {
 	public ?string $rated_at = null;
 
 	/**
+	 * When the AI bot handed the conversation to the team; null while the
+	 * bot may still answer (or never did).
+	 */
+	public ?string $bot_handoff_at = null;
+
+	/**
 	 * Returns every valid status.
 	 *
 	 * @return string[]
@@ -104,6 +110,9 @@ final class Conversation {
 		$conversation->rating         = isset( $row['rating'] ) && null !== $row['rating'] ? (int) $row['rating'] : null;
 		$conversation->rating_comment = (string) ( $row['rating_comment'] ?? '' );
 		$conversation->rated_at       = empty( $row['rated_at'] ) ? null : (string) $row['rated_at'];
+
+		// Column added in schema 8.
+		$conversation->bot_handoff_at = empty( $row['bot_handoff_at'] ) ? null : (string) $row['bot_handoff_at'];
 
 		return $conversation;
 	}
@@ -152,6 +161,7 @@ final class Conversation {
 			'rating'            => $this->rating,
 			'rating_comment'    => $this->rating_comment,
 			'rated_at'          => $this->rated_at,
+			'bot_handoff_at'    => $this->bot_handoff_at,
 		);
 	}
 }

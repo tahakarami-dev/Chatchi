@@ -1900,3 +1900,46 @@
 	font-weight: 600;
 	color: var(--chatchi-primary);
 }
+
+/* AI bot */
+
+.chatchi-avatar--bot {
+	background: var(--chatchi-gradient);
+	color: var(--chatchi-primary-contrast);
+}
+
+.chatchi-avatar--bot svg {
+	width: 14px;
+	height: 14px;
+	stroke-width: 2;
+}
+
+.chatchi-handoff {
+	justify-content: center;
+}
+
+.chatchi-handoff__button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 14px;
+	border-radius: 999px;
+	background: var(--chatchi-surface);
+	box-shadow: 0 0 0 1px var(--chatchi-border-strong);
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--chatchi-text);
+	transition: box-shadow var(--chatchi-duration-fast), color var(--chatchi-duration-fast);
+}
+
+.chatchi-handoff__button:hover,
+.chatchi-handoff__button:focus-visible {
+	outline: none;
+	color: var(--chatchi-primary);
+	box-shadow: 0 0 0 1.5px var(--chatchi-primary);
+}
+
+.chatchi-handoff__button svg {
+	width: 14px;
+	height: 14px;
+}
