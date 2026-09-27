@@ -40,6 +40,89 @@
 	var GROUP_GAP_MS = 2 * 60 * 1000;
 	var SEARCH_DELAY = 300;
 
+	/**
+	 * Alerts for new visitor messages: a soft chime and, when the browser
+	 * allows it, a desktop notification. Each agent turns them on or off
+	 * for their own browser (kept in localStorage).
+	 */
+	var alerts = {
+		key: 'chatchi_panel_alerts',
+		context: null,
+		on: function () {
+			try {
+				return window.localStorage.getItem( this.key ) !== 'off';
+			} catch ( e ) {
+				return true;
+			}
+		},
+		set: function ( on ) {
+			try {
+				window.localStorage.setItem( this.key, on ? 'on' : 'off' );
+			} catch ( e ) {
+				// Private windows may refuse storage; the choice lasts for this page.
+			}
+			this.forced = on;
+		},
+		enabled: function () {
+			return this.forced !== undefined ? this.forced : this.on();
+		},
+		// Browsers only allow sound after the person interacted with the page.
+		unlock: function () {
+			var Context = window.AudioContext || window.webkitAudioContext;
+			if ( ! Context ) {
+				return;
+			}
+			try {
+				this.context = this.context || new Context();
+				if ( this.context.state === 'suspended' ) {
+					this.context.resume();
+				}
+			} catch ( e ) {
+				this.context = null;
+			}
+		},
+		chime: function () {
+			var context = this.context;
+			if ( ! context || context.state !== 'running' ) {
+				return;
+			}
+			try {
+				var now = context.currentTime;
+				[ [ 660, 0 ], [ 990, 0.12 ], [ 1320, 0.24 ] ].forEach( function ( note ) {
+					var oscillator = context.createOscillator();
+					var gain = context.createGain();
+					var at = now + note[ 1 ];
+					oscillator.type = 'sine';
+					oscillator.frequency.value = note[ 0 ];
+					gain.gain.setValueAtTime( 0.0001, at );
+					gain.gain.exponentialRampToValueAtTime( 0.14, at + 0.02 );
+					gain.gain.exponentialRampToValueAtTime( 0.0001, at + 0.35 );
+					oscillator.connect( gain );
+					gain.connect( context.destination );
+					oscillator.start( at );
+					oscillator.stop( at + 0.4 );
+				} );
+			} catch ( e ) {
+				// Sound is a nicety.
+			}
+		},
+		desktop: function ( title, body, tag, onClick ) {
+			if ( ! ( 'Notification' in window ) || window.Notification.permission !== 'granted' ) {
+				return;
+			}
+			try {
+				var notification = new window.Notification( title, { body: body, tag: tag, icon: config.iconUrl || undefined } );
+				notification.onclick = function () {
+					window.focus();
+					onClick();
+					notification.close();
+				};
+			} catch ( e ) {
+				// Some browsers only allow notifications from a service worker.
+			}
+		}
+	};
+
 	var api = {
 		me: function () {
 			return request( 'GET', '/agent/me' );
@@ -73,6 +156,12 @@
 		},
 		team: function () {
 			return request( 'GET', '/agent/team' );
+		},
+		botTest: function ( data ) {
+			return request( 'POST', '/agent/settings/bot-test', { body: data } );
+		},
+		transcript: function ( id ) {
+			return request( 'POST', '/agent/conversations/' + id + '/transcript' );
 		},
 		setStatus: function ( status ) {
 			return request( 'PATCH', '/agent/me', { body: { status: status } } );
@@ -307,6 +396,14 @@
 		this.loadCanned();
 		this.loadTags();
 
+		var unlock = function () {
+			alerts.unlock();
+			document.removeEventListener( 'pointerdown', unlock );
+			document.removeEventListener( 'keydown', unlock );
+		};
+		document.addEventListener( 'pointerdown', unlock );
+		document.addEventListener( 'keydown', unlock );
+
 		this.loadList();
 		this.route();
 	};
@@ -336,9 +433,83 @@
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
+			this.buildAlertsButton(),
 			agent ? this.buildStatusButton( agent ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
 		);
+	};
+
+	/**
+	 * Turns new-message alerts on or off for this browser; turning them on
+	 * also asks for permission to show desktop notifications.
+	 */
+	Panel.prototype.buildAlertsButton = function () {
+		var self = this;
+		var on = alerts.enabled();
+		var label = on ? S.alertsOn : S.alertsOff;
+
+		return h( 'button', {
+			type: 'button',
+			className: 'cc-rail-item cc-alerts' + ( on ? '' : ' is-off' ),
+			title: label,
+			'aria-label': label,
+			'aria-pressed': on ? 'true' : 'false',
+			onClick: function () {
+				alerts.set( ! on );
+				alerts.unlock();
+				if ( ! on && 'Notification' in window && window.Notification.permission === 'default' ) {
+					window.Notification.requestPermission();
+				}
+				self.notify( ! on ? S.alertsEnabled : S.alertsDisabled );
+				self.renderRail();
+			}
+		}, [ icon( 'bell' ) ] );
+	};
+
+	/**
+	 * Alerts about visitor messages that arrived since the last refresh,
+	 * unless the agent is already looking at that conversation.
+	 *
+	 * @param {Array}   items  Inbox items just loaded.
+	 * @param {boolean} notify False to only remember what was seen.
+	 */
+	Panel.prototype.detectNew = function ( items, notify ) {
+		var self = this;
+		var seen = this.seenMessages || ( this.seenMessages = {} );
+		var fresh = [];
+
+		items.forEach( function ( item ) {
+			var last = item.last_message;
+			var before = seen[ item.id ];
+
+			if ( ! last ) {
+				return;
+			}
+			seen[ item.id ] = Math.max( before || 0, last.id );
+
+			// A conversation seen for the first time (e.g. after "load more")
+			// only counts when its last message is recent.
+			var isNew = before === undefined ? Date.now() - new Date( last.created_at ).getTime() < 2 * 60 * 1000 : last.id > before;
+
+			if ( notify && isNew && last.sender.type === 'visitor' && item.status !== 'closed' ) {
+				var watching = item.id === self.state.selectedId && ! document.hidden;
+				if ( ! watching ) {
+					fresh.push( item );
+				}
+			}
+		} );
+
+		if ( ! fresh.length || ! alerts.enabled() ) {
+			return;
+		}
+
+		alerts.chime();
+		fresh.slice( 0, 3 ).forEach( function ( item ) {
+			var last = item.last_message;
+			alerts.desktop( visitorName( item.visitor ), ( last.has_attachment ? '📎 ' : '' ) + last.body.slice( 0, 140 ), 'chatchi-' + item.id, function () {
+				window.location.hash = '#/conversations/' + item.id;
+			} );
+		} );
 	};
 
 	/**
@@ -502,6 +673,9 @@
 				return;
 			}
 			list.items = page.items;
+			// Only refreshes alert; a new filter or search just shows other items.
+			self.detectNew( page.items, !! refresh && self.alertsReady );
+			self.alertsReady = true;
 			list.total = page.total;
 			list.counts = page.counts;
 			list.loading = false;
@@ -1972,6 +2146,23 @@
 				statusBadge( conv.status )
 			] ),
 			h( 'ul', { className: 'cc-info-list' }, rows ),
+			visitor.email ? h( 'div', { className: 'cc-info-actions' }, [
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary cc-button--sm',
+					onClick: function ( event ) {
+						var button = event.currentTarget;
+						button.disabled = true;
+						api.transcript( conv.id ).then( function ( result ) {
+							self.notify( S.transcriptSent.replace( '%s', result.sent_to ) );
+						} ).catch( function ( error ) {
+							self.notify( error.message, true );
+						} ).then( function () {
+							button.disabled = false;
+						} );
+					}
+				}, [ icon( 'mail' ), S.sendTranscript ] )
+			] ) : null,
 			this.buildTagEditor( conv )
 		);
 	};
@@ -2804,7 +2995,8 @@
 		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
-		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message', 'notify_email_enabled', 'notify_email' ] },
+		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
+		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
@@ -2906,8 +3098,10 @@
 		if ( id === 'appearance' ) {
 			payload.primary_color = draft.primary_color.trim();
 		}
-		if ( id === 'hours' ) {
-			payload.notify_email = draft.notify_email.trim();
+		if ( id === 'notifications' ) {
+			[ 'notify_email', 'bale_token', 'bale_chat_id', 'telegram_token', 'telegram_chat_id', 'telegram_api_url' ].forEach( function ( key ) {
+				payload[ key ] = String( draft[ key ] ).trim();
+			} );
 		}
 
 		// Whole numbers go out as numbers; anything else is sent as typed so
@@ -3007,6 +3201,7 @@
 			form: S.sectionForm,
 			display: S.sectionDisplay,
 			hours: S.sectionHours,
+			notifications: S.sectionNotifications,
 			limits: S.sectionLimits,
 			security: S.sectionSecurity
 		};
@@ -3066,6 +3261,8 @@
 			children = [ this.buildProxy() ];
 		} else if ( this.section === 'hours' ) {
 			children = [ this.buildHours() ];
+		} else if ( this.section === 'notifications' ) {
+			children = [ this.buildNotifications() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -3689,13 +3886,6 @@
 		} );
 		count();
 
-		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email, disabled: ! draft.notify_email_enabled } );
-		email.value = draft.notify_email;
-		email.addEventListener( 'input', function () {
-			draft.notify_email = email.value;
-			self.clearError( 'notify_email' );
-		} );
-
 		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-hours-title' }, [
 				h( 'div', { className: 'cc-settings__head' }, [
@@ -3730,7 +3920,35 @@
 				] ),
 				this.fieldError( 'offline_mode' ),
 				this.fieldError( 'offline_message' )
-			] ),
+			] )
+		] );
+	};
+
+	/* -------------------------- notifications -------------------------- */
+
+	SettingsView.prototype.buildNotifications = function () {
+		var self = this;
+		var draft = this.draft;
+
+		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email, disabled: ! draft.notify_email_enabled } );
+		email.value = draft.notify_email;
+		email.addEventListener( 'input', function () {
+			draft.notify_email = email.value;
+			self.clearError( 'notify_email' );
+		} );
+
+		var whens = [ [ 'new', S.botNotifyNew, S.botNotifyNewHint ], [ 'offline', S.botNotifyOffline, S.botNotifyOfflineHint ] ];
+		var when = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-bot-when-title' }, whens.map( function ( option ) {
+			var input = h( 'input', { id: 'cc-bot-notify-' + option[ 0 ], type: 'radio', name: 'cc-bot-notify', value: option[ 0 ], checked: draft.bot_notify === option[ 0 ] } );
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.bot_notify = option[ 0 ];
+				}
+			} );
+			return h( 'label', { className: 'cc-radio cc-radio--rich', for: input.id }, [ input, h( 'span', {}, [ h( 'strong', { text: option[ 1 ] } ), h( 'small', { text: option[ 2 ] } ) ] ) ] );
+		} ) );
+
+		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-notify-title' }, [
 				h( 'div', { className: 'cc-settings__head' }, [
 					h( 'div', {}, [
@@ -3746,7 +3964,108 @@
 				email,
 				h( 'p', { className: 'cc-hint', text: S.notifyEmailHint } ),
 				this.fieldError( 'notify_email' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-bot-when-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-bot-when-title', text: S.botWhenTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.botWhenIntro } )
+				] ),
+				when,
+				this.fieldError( 'bot_notify' )
+			] ),
+			this.buildBot( 'bale', S.baleTitle, S.baleHelp ),
+			this.buildBot( 'telegram', S.telegramTitle, S.telegramHelp ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-transcript-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-transcript-title', text: S.transcriptTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.transcriptIntro } )
+					] ),
+					this.buildSwitch( 'cc-transcript-enabled', S.transcriptOn, draft.transcript_enabled, function ( on ) {
+						draft.transcript_enabled = on;
+					} )
+				] ),
+				this.fieldError( 'transcript_enabled' )
 			] )
+		] );
+	};
+
+	/**
+	 * One messenger bot: switch, token, chat ID and "send a test".
+	 *
+	 * @param {string} service "bale" or "telegram".
+	 */
+	SettingsView.prototype.buildBot = function ( service, title, help ) {
+		var self = this;
+		var draft = this.draft;
+		var prefix = 'cc-' + service;
+		var result = h( 'p', { className: 'cc-bot-result', role: 'status', hidden: true } );
+
+		function input( key, label, attrs ) {
+			var field = h( 'input', Object.assign( { id: prefix + '-' + key.replace( /_/g, '-' ), className: 'cc-input', type: 'text', dir: 'ltr', autocomplete: 'off', spellcheck: 'false' }, attrs || {} ) );
+			field.value = draft[ service + '_' + key ];
+			field.addEventListener( 'input', function () {
+				draft[ service + '_' + key ] = field.value;
+				self.clearError( service + '_' + key );
+				result.hidden = true;
+			} );
+			return h( 'div', { className: 'cc-field' }, [
+				h( 'label', { className: 'cc-label', for: field.id, text: label } ),
+				field,
+				self.fieldError( service + '_' + key )
+			] );
+		}
+
+		var test = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			text: S.botTest,
+			onClick: function () {
+				test.disabled = true;
+				result.hidden = true;
+				api.botTest( {
+					service: service,
+					token: String( draft[ service + '_token' ] ).trim(),
+					chat_id: String( draft[ service + '_chat_id' ] ).trim(),
+					api_url: service === 'telegram' ? String( draft.telegram_api_url ).trim() : ''
+				} ).then( function () {
+					result.textContent = S.botTestSent;
+					result.className = 'cc-bot-result is-ok';
+				} ).catch( function ( error ) {
+					var fields = ( error.data && error.data.fields ) || {};
+					var first = Object.keys( fields )[ 0 ];
+					result.textContent = first ? fields[ first ] : error.message;
+					result.className = 'cc-bot-result is-error';
+				} ).then( function () {
+					result.hidden = false;
+					test.disabled = false;
+				} );
+			}
+		} );
+
+		var fields = [
+			input( 'token', S.botToken, { type: 'password', placeholder: '123456789:AAH…' } ),
+			input( 'chat_id', S.botChatId, { placeholder: '123456789 / @channel' } )
+		];
+
+		if ( service === 'telegram' ) {
+			fields.push( input( 'api_url', S.telegramApiUrl, { type: 'url', placeholder: 'https://api.telegram.org' } ) );
+			fields.push( h( 'p', { className: 'cc-hint', text: S.telegramApiUrlHint } ) );
+		}
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': prefix + '-title' }, [
+			h( 'div', { className: 'cc-settings__head' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: prefix + '-title', text: title } ),
+					h( 'p', { className: 'cc-hint cc-hint--pre', text: help } )
+				] ),
+				this.buildSwitch( prefix + '-enabled', S.botOn, draft[ service + '_enabled' ], function ( on ) {
+					draft[ service + '_enabled' ] = on;
+				} )
+			] ),
+			h( 'div', { className: 'cc-bot-fields' }, fields ),
+			h( 'div', { className: 'cc-bot-test' }, [ test, result ] ),
+			this.fieldError( service + '_enabled' )
 		] );
 	};
 

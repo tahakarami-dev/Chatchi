@@ -14,6 +14,7 @@ use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Messages\MessageService;
 use ChatChi\Models\Agent;
 use ChatChi\Models\Conversation;
+use ChatChi\Notifications\Transcript;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -28,6 +29,8 @@ final class AgentController extends ConversationController {
 
 	private AgentRepository $agents;
 
+	private ?Transcript $transcript;
+
 	/**
 	 * Agent whose presence was already recorded in this request.
 	 */
@@ -39,11 +42,13 @@ final class AgentController extends ConversationController {
 	 * @param Presenter           $presenter     Response shapes.
 	 * @param AgentRepository     $agents        Agent storage.
 	 * @param AttachmentService   $attachments   Files in conversations.
+	 * @param Transcript|null     $transcript    Transcript emails.
 	 */
-	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments ) {
+	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null ) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
-		$this->agents = $agents;
+		$this->agents     = $agents;
+		$this->transcript = $transcript;
 	}
 
 	/**
@@ -205,6 +210,17 @@ final class AgentController extends ConversationController {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/agent/conversations/(?P<id>\d+)/transcript',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'send_transcript' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => $this->id_arg(),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/agent/tags',
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
@@ -309,6 +325,28 @@ final class AgentController extends ConversationController {
 		$tags = $this->conversations->set_tags( $actor, (int) $request['id'], $request['tags'] );
 
 		return $tags instanceof \WP_Error ? $tags : $this->respond( array( 'tags' => $tags ) );
+	}
+
+	/**
+	 * POST …/transcript: emails the visitor a copy of the conversation.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function send_transcript( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		if ( ! $this->transcript ) {
+			return new \WP_Error( 'chatchi_unavailable', __( 'This is not available right now.', 'chatchi' ), array( 'status' => 503 ) );
+		}
+
+		$to = $this->transcript->send_for( $actor, (int) $request['id'] );
+
+		return $to instanceof \WP_Error ? $to : $this->respond( array( 'sent_to' => $to ) );
 	}
 
 	/**

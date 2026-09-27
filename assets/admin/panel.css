@@ -2967,3 +2967,86 @@ label.cc-button {
 	height: 34px;
 	font-size: 13px;
 }
+
+.cc-alerts.is-off {
+	opacity: .45;
+}
+
+.cc-alerts.is-off::after {
+	content: "";
+	position: absolute;
+	width: 22px;
+	height: 2px;
+	border-radius: 2px;
+	background: currentColor;
+	transform: rotate(-45deg);
+}
+
+/* Messenger bots */
+
+.cc-hint--pre {
+	white-space: pre-line;
+	line-height: 1.9;
+}
+
+.cc-bot-fields {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.cc-bot-fields > .cc-hint,
+.cc-bot-fields > .cc-field:nth-child(3) {
+	grid-column: 1 / -1;
+}
+
+.cc-bot-test {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.cc-bot-result {
+	margin: 0;
+	font-size: 13px;
+}
+
+.cc-bot-result[hidden] {
+	display: none;
+}
+
+.cc-bot-result.is-ok {
+	color: var(--chatchi-success-text);
+}
+
+.cc-bot-result.is-error {
+	color: var(--chatchi-error-text);
+}
+
+@media (max-width: 640px) {
+	.cc-bot-fields {
+		grid-template-columns: 1fr;
+	}
+}
+
+.cc-info-actions {
+	padding: 0 16px 16px;
+}
+
+.cc-info-actions .cc-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	justify-content: center;
+}
+
+.cc-info-actions svg {
+	width: 16px;
+	height: 16px;
+}
+
+.cc-tool[hidden] {
+	display: none;
+}

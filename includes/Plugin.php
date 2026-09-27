@@ -43,6 +43,9 @@ use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
 use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
+use ChatChi\Rest\BotTestController;
+use ChatChi\Notifications\BotNotifier;
+use ChatChi\Notifications\Transcript;
 use ChatChi\Rest\CannedController;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
@@ -415,7 +418,8 @@ final class Plugin {
 					$c->get( MessageService::class ),
 					$c->get( Presenter::class ),
 					$c->get( AgentRepository::class ),
-					$c->get( AttachmentService::class )
+					$c->get( AttachmentService::class ),
+					$c->get( Transcript::class )
 				);
 			}
 		);
@@ -497,7 +501,8 @@ final class Plugin {
 					$c->get( AgentController::class ),
 					$c->get( AgentManagementController::class ),
 					$c->get( SettingsController::class ),
-					$c->get( CannedController::class )
+					$c->get( CannedController::class ),
+					$c->get( BotTestController::class )
 				);
 			}
 		);
@@ -568,6 +573,38 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			BotNotifier::class,
+			static function ( Container $c ): BotNotifier {
+				return new BotNotifier(
+					$c->get( Settings::class ),
+					$c->get( Availability::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( VisitorRepository::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			Transcript::class,
+			static function ( Container $c ): Transcript {
+				return new Transcript(
+					$c->get( Settings::class ),
+					$c->get( ConversationService::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( VisitorRepository::class ),
+					$c->get( AgentRepository::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			BotTestController::class,
+			static function ( Container $c ): BotTestController {
+				return new BotTestController( $c->get( BotNotifier::class ), $c->get( SettingsValidator::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			OfflineNotifier::class,
 			static function ( Container $c ): OfflineNotifier {
 				return new OfflineNotifier(
@@ -630,6 +667,8 @@ final class Plugin {
 			SecurityModule::class,
 			RestModule::class,
 			OfflineNotifier::class,
+			BotNotifier::class,
+			Transcript::class,
 			WidgetModule::class,
 			Shortcode::class,
 			AdminModule::class,

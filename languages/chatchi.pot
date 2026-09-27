@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatChi | چت‌چی 1.2.0\n"
+"Project-Id-Version: ChatChi | چت‌چی 1.3.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-27T08:18:56+00:00\n"
+"POT-Creation-Date: 2026-09-27T12:13:54+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -57,12 +57,12 @@ msgid "Sorry, you are not allowed to access this page."
 msgstr ""
 
 #. translators: %s: site name.
-#: includes/Admin/PanelPage.php:145
+#: includes/Admin/PanelPage.php:147
 #, php-format
 msgid "ChatChi — %s"
 msgstr ""
 
-#: includes/Admin/PanelPage.php:166
+#: includes/Admin/PanelPage.php:168
 msgid "The ChatChi panel needs JavaScript."
 msgstr ""
 
@@ -79,6 +79,7 @@ msgid "Search name, email, phone or number"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:26
+#: includes/Admin/PanelStrings.php:184
 msgid "All"
 msgstr ""
 
@@ -92,7 +93,7 @@ msgid "Active"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:29
-#: includes/Admin/PanelStrings.php:189
+#: includes/Admin/PanelStrings.php:238
 msgid "Closed"
 msgstr ""
 
@@ -274,6 +275,7 @@ msgid "Yesterday"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:72
+#: includes/Notifications/Transcript.php:207
 msgid "You"
 msgstr ""
 
@@ -386,7 +388,7 @@ msgid "Saving…"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:101
-#: includes/Admin/PanelStrings.php:156
+#: includes/Admin/PanelStrings.php:205
 #: includes/Frontend/WidgetStrings.php:72
 msgid "Uploading…"
 msgstr ""
@@ -480,7 +482,9 @@ msgid "Nothing found."
 msgstr ""
 
 #. translators: %s: page or post title.
+#. translators: %s: tag.
 #: includes/Admin/PanelStrings.php:125
+#: includes/Admin/PanelStrings.php:195
 #, php-format
 msgid "Remove %s"
 msgstr ""
@@ -491,7 +495,7 @@ msgstr ""
 
 #. translators: %d: maximum number of items.
 #: includes/Admin/PanelStrings.php:128
-#: includes/Settings/SettingsValidator.php:501
+#: includes/Settings/SettingsValidator.php:616
 #, php-format
 msgid "You can choose at most %d items."
 msgstr ""
@@ -567,475 +571,661 @@ msgid "IP & security"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:147
-msgid "Files and pictures"
+msgid "Chat transcript for visitors"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:148
-msgid "Visitors can send pictures, PDF, Word, Excel, text and ZIP files. Agents can always send files."
+msgid "When a conversation ends, email the visitor a copy of it (visitors who gave an email address). Internal notes are never included."
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:149
-msgid "Visitors can send files"
+msgid "Email transcripts automatically"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:150
+msgid "Email the transcript to the visitor"
+msgstr ""
+
+#. translators: %s: email address.
+#: includes/Admin/PanelStrings.php:152
+#, php-format
+msgid "Transcript sent to %s."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:153
+msgid "Notifications"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:154
+msgid "Telegram and Bale messages"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:155
+msgid "When the bots below send a message to your phone."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:156
+msgid "For every new chat"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:157
+msgid "One message for the first message of each conversation."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:158
+msgid "Only when nobody is online"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:159
+msgid "Only when no agent is available to answer in the panel."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:160
+msgid "Bale bot"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:161
+msgid "Telegram bot"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:162
+msgid ""
+"1. In Bale, open @botfather, create a bot and copy its token.\n"
+"2. Send any message to your bot (or add it to a group or channel as an admin).\n"
+"3. Open tapi.bale.ai/bot<token>/getUpdates in your browser and copy the number after \"chat\":{\"id\":."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:163
+msgid ""
+"1. In Telegram, open @BotFather, create a bot and copy its token.\n"
+"2. Send any message to your bot (or add it to a group or channel as an admin).\n"
+"3. Open api.telegram.org/bot<token>/getUpdates in your browser and copy the number after \"chat\":{\"id\":."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:164
+msgid "Send messages"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:165
+msgid "Bot token"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:166
+msgid "Chat ID"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:167
+msgid "Send a test message"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:168
+msgid "Test message sent. Check your chat."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:169
+msgid "API address (optional)"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:170
+msgid "Many servers in Iran cannot reach Telegram. If the test fails, enter the address of a relay here, or use Bale instead."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:171
+msgid "New-message alerts are on. Click to turn them off."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:172
+msgid "New-message alerts are off. Click to turn them on."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:173
+msgid "You will hear a sound and see a notification for new messages."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:174
+msgid "New-message alerts are off in this browser."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:175
+msgid "Internal note"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:176
+msgid "Only your team sees this note…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:177
+msgid "Add note"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:178
+msgid "Reply"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:179
+msgid "Message type"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:180
+msgid "Transfer"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:181
+msgid "Remove the agent"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:182
+msgid "you"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:183
+msgid "The conversation has no agent now."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:185
+msgid "Mine"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:186
+msgid "Whose conversations"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:187
+msgid "Filter by tag"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:188
+msgid "All tags"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:189
+msgid "Tags"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:190
+msgid "Add a tag…"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:191
+msgid "No tags yet"
+msgstr ""
+
+#. translators: %s: agent name.
+#: includes/Admin/PanelStrings.php:193
+#, php-format
+msgid "Transferred to %s."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:196
+msgid "Files and pictures"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:197
+msgid "Visitors can send pictures, PDF, Word, Excel, text and ZIP files. Agents can always send files."
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:198
+msgid "Visitors can send files"
+msgstr ""
+
+#: includes/Admin/PanelStrings.php:199
 msgid "Largest file"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:151
+#: includes/Admin/PanelStrings.php:200
 msgid "MB"
 msgstr ""
 
 #. translators: %s: number of megabytes.
-#: includes/Admin/PanelStrings.php:153
+#: includes/Admin/PanelStrings.php:202
 #, php-format
 msgid "Your server accepts uploads of up to %s MB; larger values are capped to it."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:154
+#: includes/Admin/PanelStrings.php:203
 #: includes/Frontend/WidgetStrings.php:70
 msgid "Send a file"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:155
+#: includes/Admin/PanelStrings.php:204
 #: includes/Frontend/WidgetStrings.php:71
 msgid "Download"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:157
+#: includes/Admin/PanelStrings.php:206
 #: includes/Frontend/WidgetStrings.php:73
 msgid "Drop files here to send them"
 msgstr ""
 
 #. translators: %s: maximum file size, e.g. "5 MB".
-#: includes/Admin/PanelStrings.php:159
+#: includes/Admin/PanelStrings.php:208
 #, php-format
 msgid "Too large to send (the limit is %s). Click to remove."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:160
-#: includes/Admin/PanelStrings.php:174
+#: includes/Admin/PanelStrings.php:209
+#: includes/Admin/PanelStrings.php:223
 msgid "Saved replies"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:161
+#: includes/Admin/PanelStrings.php:210
 msgid "Short answers your team inserts in a click. Every agent can use them; only administrators can change them."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:162
+#: includes/Admin/PanelStrings.php:211
 msgid "Add reply"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:163
+#: includes/Admin/PanelStrings.php:212
 msgid "No saved replies yet"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:164
+#: includes/Admin/PanelStrings.php:213
 msgid "Save answers you type often, like shipping times or opening hours."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:165
+#: includes/Admin/PanelStrings.php:214
 msgid "In a conversation, type / in the message box (or press the ⚡ button) to pick a reply. {name} becomes the visitor's name and {agent} yours."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:166
-#: includes/Admin/PanelStrings.php:222
+#: includes/Admin/PanelStrings.php:215
+#: includes/Admin/PanelStrings.php:271
 msgid "Title"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:167
+#: includes/Admin/PanelStrings.php:216
 msgid "Shortcut (optional)"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:168
+#: includes/Admin/PanelStrings.php:217
 msgid "Type /shortcut to find it fast."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:169
+#: includes/Admin/PanelStrings.php:218
 msgid "Reply text"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:170
+#: includes/Admin/PanelStrings.php:219
 msgid "You can use {name} and {agent}."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:171
+#: includes/Admin/PanelStrings.php:220
 msgid "Delete this reply?"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:172
+#: includes/Admin/PanelStrings.php:221
 msgid "Reply deleted."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:173
+#: includes/Admin/PanelStrings.php:222
 msgid "Delete"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:175
+#: includes/Admin/PanelStrings.php:224
 msgid "No saved reply matches."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:176
+#: includes/Admin/PanelStrings.php:225
 msgid "Manage saved replies"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:177
+#: includes/Admin/PanelStrings.php:226
 msgid "Hours & offline"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:178
+#: includes/Admin/PanelStrings.php:227
 #: includes/Frontend/WidgetStrings.php:59
 msgid "Online"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:179
+#: includes/Admin/PanelStrings.php:228
 msgid "Away"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:180
+#: includes/Admin/PanelStrings.php:229
 msgid "Click to set yourself away."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:181
+#: includes/Admin/PanelStrings.php:230
 msgid "Click to go online."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:182
+#: includes/Admin/PanelStrings.php:231
 msgid "You're away. Visitors see that nobody is online."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:183
+#: includes/Admin/PanelStrings.php:232
 msgid "You're online."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:184
+#: includes/Admin/PanelStrings.php:233
 msgid "Business hours"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:185
+#: includes/Admin/PanelStrings.php:234
 msgid "Outside these hours the chat shows as offline."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:186
+#: includes/Admin/PanelStrings.php:235
 msgid "Use business hours"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:187
+#: includes/Admin/PanelStrings.php:236
 msgid "from"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:188
+#: includes/Admin/PanelStrings.php:237
 msgid "to"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:190
+#: includes/Admin/PanelStrings.php:239
 #, php-format
 msgid "Times are in the site time zone (%s), set under Settings → General in WordPress."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:191
+#: includes/Admin/PanelStrings.php:240
 msgid "When nobody is available"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:192
+#: includes/Admin/PanelStrings.php:241
 msgid "What visitors see outside business hours, and when no agent is online if you turn that on."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:193
+#: includes/Admin/PanelStrings.php:242
 msgid "Offline visitors see"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:194
+#: includes/Admin/PanelStrings.php:243
 msgid "A leave-a-message form"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:195
+#: includes/Admin/PanelStrings.php:244
 msgid "Visitors enter their name, email and message, and you answer later."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:196
+#: includes/Admin/PanelStrings.php:245
 msgid "The normal chat with a notice"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:197
+#: includes/Admin/PanelStrings.php:246
 msgid "Visitors can still chat; a notice says you will reply when you are back."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:198
+#: includes/Admin/PanelStrings.php:247
 msgid "Also count as offline when no agent is online"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:199
+#: includes/Admin/PanelStrings.php:248
 msgid "Offline message"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:200
+#: includes/Admin/PanelStrings.php:249
 msgid "Leave empty for the default text."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:201
+#: includes/Admin/PanelStrings.php:250
 msgid "Email notifications"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:202
+#: includes/Admin/PanelStrings.php:251
 msgid "Get an email when a visitor writes while nobody is online, so no message is missed."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:203
+#: includes/Admin/PanelStrings.php:252
 msgid "Email me about offline messages"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:204
+#: includes/Admin/PanelStrings.php:253
 msgid "Send to"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:205
+#: includes/Admin/PanelStrings.php:254
 msgid "Leave empty to use the site admin email."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:206
+#: includes/Admin/PanelStrings.php:255
 msgid "Unsaved changes"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:207
+#: includes/Admin/PanelStrings.php:256
 msgid "Widget appearance"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:208
+#: includes/Admin/PanelStrings.php:257
 msgid "Your brand color, the corner the widget sits in, and its heading. The agent panel uses the same color."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:209
+#: includes/Admin/PanelStrings.php:258
 msgid "Brand color"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:210
+#: includes/Admin/PanelStrings.php:259
 msgid "Color code"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:211
+#: includes/Admin/PanelStrings.php:260
 msgid "Pick a color"
 msgstr ""
 
 #. translators: %s: color code.
-#: includes/Admin/PanelStrings.php:213
+#: includes/Admin/PanelStrings.php:262
 #, php-format
 msgid "Use %s"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:214
+#: includes/Admin/PanelStrings.php:263
 msgid "Use the default color"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:215
+#: includes/Admin/PanelStrings.php:264
 msgid "Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:216
+#: includes/Admin/PanelStrings.php:265
 msgid "This color is light: icons and links in this color may be hard to see on white."
 msgstr ""
 
 #. translators: %s: color code.
-#: includes/Admin/PanelStrings.php:218
+#: includes/Admin/PanelStrings.php:267
 #, php-format
 msgid "Code on your site sets the color to %s, so the widget uses that."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:219
+#: includes/Admin/PanelStrings.php:268
 msgid "Position"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:220
+#: includes/Admin/PanelStrings.php:269
 msgid "Bottom left"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:221
+#: includes/Admin/PanelStrings.php:270
 msgid "Bottom right"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:223
+#: includes/Admin/PanelStrings.php:272
 msgid "Subtitle"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:224
+#: includes/Admin/PanelStrings.php:273
 msgid "Leave a field empty to use the default text, which follows the site language."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:225
+#: includes/Admin/PanelStrings.php:274
 msgid "Preview"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:226
+#: includes/Admin/PanelStrings.php:275
 msgid "Hi, I have a question 🙂"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:227
+#: includes/Admin/PanelStrings.php:276
 #: includes/Frontend/WidgetStrings.php:38
 msgid "Write a message…"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:228
+#: includes/Admin/PanelStrings.php:277
 msgid "General"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:229
+#: includes/Admin/PanelStrings.php:278
 msgid "Start form"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:230
+#: includes/Admin/PanelStrings.php:279
 msgid "Spam & limits"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:231
+#: includes/Admin/PanelStrings.php:280
 msgid "Chat widget"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:232
+#: includes/Admin/PanelStrings.php:281
 msgid "Turn the widget off to hide it from your whole site, shortcodes included. The agent panel keeps working."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:233
+#: includes/Admin/PanelStrings.php:282
 msgid "Show the chat widget"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:234
+#: includes/Admin/PanelStrings.php:283
 msgid "Notification sound"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:235
+#: includes/Admin/PanelStrings.php:284
 msgid "Play a soft sound in the widget when a reply arrives while the visitor is looking elsewhere."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:236
+#: includes/Admin/PanelStrings.php:285
 msgid "Play a sound for new replies"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:237
+#: includes/Admin/PanelStrings.php:286
 #: includes/Frontend/WidgetStrings.php:52
 msgid "Typing…"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:238
+#: includes/Admin/PanelStrings.php:287
 msgid "The widget is off: visitors cannot start new chats."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:239
+#: includes/Admin/PanelStrings.php:288
 msgid "Visitors"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:240
+#: includes/Admin/PanelStrings.php:289
 msgid "Remember returning visitors for"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:241
+#: includes/Admin/PanelStrings.php:290
 msgid "days"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:242
+#: includes/Admin/PanelStrings.php:291
 msgid "Visitors who come back within this time see their earlier conversation. The time restarts on every visit."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:243
+#: includes/Admin/PanelStrings.php:292
 msgid "Data when the plugin is deleted"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:244
+#: includes/Admin/PanelStrings.php:293
 msgid "By default conversations, visitors, agents and settings are kept, so reinstalling brings everything back."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:245
+#: includes/Admin/PanelStrings.php:294
 msgid "Delete all data"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:246
+#: includes/Admin/PanelStrings.php:295
 msgid "Deleting the plugin will permanently delete every conversation and all ChatChi data. This cannot be undone."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:247
+#: includes/Admin/PanelStrings.php:296
 msgid "Start form fields"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:248
+#: includes/Admin/PanelStrings.php:297
 msgid "What visitors are asked before their first message."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:249
+#: includes/Admin/PanelStrings.php:298
 msgid "Off"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:250
+#: includes/Admin/PanelStrings.php:299
 msgid "Optional"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:251
+#: includes/Admin/PanelStrings.php:300
 msgid "Required"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:252
+#: includes/Admin/PanelStrings.php:301
 msgid "Every field is off: visitors start chatting right away, without a form."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:253
+#: includes/Admin/PanelStrings.php:302
 msgid "Text above the form"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:254
+#: includes/Admin/PanelStrings.php:303
 msgid "Bot protection"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:255
+#: includes/Admin/PanelStrings.php:304
 msgid "Stops simple bots from starting chats, invisibly for people. Turn it off only if another program starts chats through the API."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:256
+#: includes/Admin/PanelStrings.php:305
 msgid "Protect the start form"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:257
+#: includes/Admin/PanelStrings.php:306
 msgid "Rate limits"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:258
+#: includes/Admin/PanelStrings.php:307
 msgid "How much one visitor or one IP address may send. Keep the per-address limits generous: offices and mobile networks put many people behind one address."
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:259
+#: includes/Admin/PanelStrings.php:308
 msgid "Messages per visitor"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:260
+#: includes/Admin/PanelStrings.php:309
 msgid "Messages per IP address"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:261
+#: includes/Admin/PanelStrings.php:310
 msgid "New chats per visitor"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:262
+#: includes/Admin/PanelStrings.php:311
 msgid "New chats per IP address"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:263
+#: includes/Admin/PanelStrings.php:312
 msgid "per minute"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:264
+#: includes/Admin/PanelStrings.php:313
 msgid "per hour"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:265
+#: includes/Admin/PanelStrings.php:314
 msgid "per 10 minutes"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:266
+#: includes/Admin/PanelStrings.php:315
 msgid "Messages"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:267
+#: includes/Admin/PanelStrings.php:316
 msgid "Longest message"
 msgstr ""
 
-#: includes/Admin/PanelStrings.php:268
+#: includes/Admin/PanelStrings.php:317
 msgid "characters"
 msgstr ""
 
@@ -1083,6 +1273,7 @@ msgid "Sending files is turned off."
 msgstr ""
 
 #: includes/Attachments/AttachmentService.php:181
+#: includes/Conversations/ConversationService.php:307
 #: includes/Messages/MessageService.php:111
 msgid "This conversation has been closed."
 msgstr ""
@@ -1118,6 +1309,7 @@ msgid "This picture could not be read."
 msgstr ""
 
 #: includes/Availability/OfflineNotifier.php:85
+#: includes/Notifications/BotNotifier.php:119
 msgid "A visitor"
 msgstr ""
 
@@ -1170,8 +1362,8 @@ msgstr ""
 #. translators: %d: maximum number of characters.
 #: includes/Canned/CannedResponses.php:163
 #: includes/Canned/CannedResponses.php:170
-#: includes/Settings/SettingsValidator.php:460
-#: includes/Settings/SettingsValidator.php:630
+#: includes/Settings/SettingsValidator.php:575
+#: includes/Settings/SettingsValidator.php:745
 #, php-format
 msgid "Use at most %d characters."
 msgstr ""
@@ -1196,15 +1388,45 @@ msgstr ""
 msgid "This saved reply no longer exists."
 msgstr ""
 
-#: includes/Conversations/ConversationService.php:242
+#. translators: %d: maximum number of tags.
+#: includes/Conversations/ConversationService.php:238
+#, php-format
+msgid "A conversation can have at most %d tags."
+msgstr ""
+
+#: includes/Conversations/ConversationService.php:321
+msgid "Choose an active agent."
+msgstr ""
+
+#. translators: %s: agent name.
+#: includes/Conversations/ConversationService.php:328
+#, php-format
+msgid "%s unassigned the conversation."
+msgstr ""
+
+#. translators: %s: agent name.
+#: includes/Conversations/ConversationService.php:331
+#, php-format
+msgid "%s took the conversation."
+msgstr ""
+
+#. translators: 1: agent who transferred, 2: agent who receives the conversation.
+#: includes/Conversations/ConversationService.php:334
+#, php-format
+msgid "%1$s transferred the conversation to %2$s."
+msgstr ""
+
+#: includes/Conversations/ConversationService.php:409
 msgid "Unknown conversation status."
 msgstr ""
 
-#: includes/Conversations/ConversationService.php:358
+#: includes/Conversations/ConversationService.php:541
 msgid "Conversation not found."
 msgstr ""
 
-#: includes/Conversations/ConversationService.php:366
+#: includes/Conversations/ConversationService.php:549
+#: includes/Messages/MessageService.php:222
+#: includes/Notifications/Transcript.php:96
 #: includes/Rest/AdminPermission.php:41
 msgid "You are not allowed to do this."
 msgstr ""
@@ -1244,6 +1466,7 @@ msgid "We usually reply within a few minutes"
 msgstr ""
 
 #: includes/Frontend/WidgetStrings.php:27
+#: includes/Notifications/Transcript.php:216
 msgid "Support"
 msgstr ""
 
@@ -1389,25 +1612,84 @@ msgstr ""
 msgid "Invalid message identifier."
 msgstr ""
 
+#. translators: %s: site name.
+#: includes/Notifications/BotNotifier.php:127
+#, php-format
+msgid "New chat on %s"
+msgstr ""
+
+#. translators: %s: technical error from the connection.
+#: includes/Notifications/BotNotifier.php:189
+#, php-format
+msgid "Could not reach the service: %s"
+msgstr ""
+
+#. translators: %s: the service's own error message.
+#: includes/Notifications/BotNotifier.php:202
+#, php-format
+msgid "The service refused the message: %s"
+msgstr ""
+
+#: includes/Notifications/Transcript.php:120
+msgid "This visitor has not given an email address."
+msgstr ""
+
+#: includes/Notifications/Transcript.php:124
+msgid "There are no messages to send yet."
+msgstr ""
+
+#. translators: %s: site name.
+#: includes/Notifications/Transcript.php:132
+#: includes/Notifications/Transcript.php:237
+#, php-format
+msgid "Your conversation with %s"
+msgstr ""
+
+#: includes/Notifications/Transcript.php:146
+msgid "Sending the transcript was cancelled."
+msgstr ""
+
+#: includes/Notifications/Transcript.php:150
+msgid "The email could not be sent. Check that your site can send email."
+msgstr ""
+
+#: includes/Notifications/Transcript.php:240
+msgid "This is a copy of your chat, for your records."
+msgstr ""
+
 #: includes/Rest/AdminPermission.php:27
-#: includes/Rest/AgentController.php:287
+#: includes/Rest/AgentController.php:542
 #: includes/Rest/CannedController.php:100
 msgid "Please log in to continue."
 msgstr ""
 
-#: includes/Rest/AgentController.php:301
+#: includes/Rest/AgentController.php:344
+msgid "This is not available right now."
+msgstr ""
+
+#: includes/Rest/AgentController.php:556
 msgid "Your account is not a chat agent."
 msgstr ""
 
-#: includes/Rest/AgentController.php:309
+#: includes/Rest/AgentController.php:564
 msgid "Your agent account is inactive."
+msgstr ""
+
+#: includes/Rest/BotTestController.php:95
+msgid "Enter the bot token and the chat ID first."
+msgstr ""
+
+#. translators: %s: site name.
+#: includes/Rest/BotTestController.php:103
+#, php-format
+msgid "ChatChi on %s is connected. New chats will be announced here."
 msgstr ""
 
 #: includes/Rest/RequestGuard.php:57
 msgid "This request was rejected."
 msgstr ""
 
-#: includes/Rest/SettingsController.php:270
+#: includes/Rest/SettingsController.php:279
 msgid "(no title)"
 msgstr ""
 
@@ -1440,100 +1722,124 @@ msgstr ""
 msgid "We're away right now. Leave a message and we'll get back to you soon."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:168
+#: includes/Settings/SettingsValidator.php:184
 msgid "Enter the header your proxy puts the visitor address in."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:177
+#: includes/Settings/SettingsValidator.php:193
 msgid "Some settings need your attention."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:325
-msgid "Choose where the widget appears."
+#: includes/Settings/SettingsValidator.php:218
+msgid "Enter the bot token."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:336
-msgid "Choose how visitors reach your site."
-msgstr ""
-
-#: includes/Settings/SettingsValidator.php:349
-msgid "Enter a color code like #5B5BD6."
-msgstr ""
-
-#: includes/Settings/SettingsValidator.php:354
-msgid "Choose a corner for the widget."
+#: includes/Settings/SettingsValidator.php:221
+msgid "Enter the chat ID the bot sends to."
 msgstr ""
 
 #: includes/Settings/SettingsValidator.php:380
+msgid "Choose where the widget appears."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:391
+msgid "Choose how visitors reach your site."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:404
+msgid "Enter a color code like #5B5BD6."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:409
+msgid "Choose a corner for the widget."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:439
+msgid "Paste the bot token exactly as the bot maker gave it, like 123456789:AAH…."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:447
+msgid "Enter a numeric chat ID (e.g. 123456789 or -100123…) or a channel like @mychannel."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:454
+msgid "Enter an https:// address, or leave it empty for the official Telegram API."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:459
+msgid "Choose when the bot sends messages."
+msgstr ""
+
+#: includes/Settings/SettingsValidator.php:466
 msgid "Each open day needs a start time before its end time, like 09:00 to 17:00."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:385
+#: includes/Settings/SettingsValidator.php:471
 msgid "Choose what offline visitors see."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:395
+#: includes/Settings/SettingsValidator.php:481
 msgid "Enter a valid email address, or leave it empty for the site admin email."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:402
+#: includes/Settings/SettingsValidator.php:488
 msgid "Choose off, optional or required."
 msgstr ""
 
 #. translators: 1: smallest allowed number, 2: largest allowed number.
-#: includes/Settings/SettingsValidator.php:413
+#: includes/Settings/SettingsValidator.php:499
 #, php-format
 msgid "Enter a whole number from %1$d to %2$d."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:417
+#: includes/Settings/SettingsValidator.php:503
 msgid "Unknown setting."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:426
+#: includes/Settings/SettingsValidator.php:512
 msgid "Enter the message as text."
 msgstr ""
 
 #. translators: %d: maximum number of characters.
-#: includes/Settings/SettingsValidator.php:435
+#: includes/Settings/SettingsValidator.php:521
 #, php-format
 msgid "The welcome message can be at most %d characters."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:451
-#: includes/Settings/SettingsValidator.php:621
+#: includes/Settings/SettingsValidator.php:566
+#: includes/Settings/SettingsValidator.php:736
 msgid "Enter the text as plain text."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:473
+#: includes/Settings/SettingsValidator.php:588
 msgid "Choose page types from the list."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:486
-#: includes/Settings/SettingsValidator.php:491
+#: includes/Settings/SettingsValidator.php:601
+#: includes/Settings/SettingsValidator.php:606
 msgid "Choose items from the search results."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:506
+#: includes/Settings/SettingsValidator.php:621
 msgid "Some of the chosen items no longer exist or are not published."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:520
+#: includes/Settings/SettingsValidator.php:635
 msgid "Use a header name made of letters, digits and dashes, like X-Real-IP."
 msgstr ""
 
-#: includes/Settings/SettingsValidator.php:532
+#: includes/Settings/SettingsValidator.php:647
 msgid "Enter one address or range per line."
 msgstr ""
 
 #. translators: %s: the invalid entry.
-#: includes/Settings/SettingsValidator.php:550
+#: includes/Settings/SettingsValidator.php:665
 #, php-format
 msgid "“%s” is not an IP address or range."
 msgstr ""
 
 #. translators: %d: maximum number of entries.
-#: includes/Settings/SettingsValidator.php:561
+#: includes/Settings/SettingsValidator.php:676
 #, php-format
 msgid "Enter at most %d addresses or ranges."
 msgstr ""
