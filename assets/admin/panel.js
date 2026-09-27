@@ -163,8 +163,14 @@
 		botTest: function ( data ) {
 			return request( 'POST', '/agent/settings/bot-test', { body: data } );
 		},
+		aiTest: function ( data ) {
+			return request( 'POST', '/agent/settings/ai-test', { body: data } );
+		},
 		smsTest: function ( data ) {
 			return request( 'POST', '/agent/settings/sms-test', { body: data } );
+		},
+		suggest: function ( id ) {
+			return request( 'POST', '/agent/conversations/' + id + '/suggest' );
 		},
 		customer: function ( id ) {
 			return request( 'GET', '/agent/conversations/' + id + '/customer' );
@@ -1733,7 +1739,12 @@
 			return this.buildNote( entry );
 		}
 
-		var classes = [ 'cc-row', entry.mine ? 'cc-row--mine' : 'cc-row--theirs' ];
+		var isBot = !! ( entry.sender && entry.sender.bot );
+		// The bot writes for the team: its messages sit on the team's side.
+		var classes = [ 'cc-row', entry.mine || isBot ? 'cc-row--mine' : 'cc-row--theirs' ];
+		if ( isBot ) {
+			classes.push( 'cc-row--bot' );
+		}
 		if ( groupStart ) {
 			classes.push( 'is-group-start' );
 		}
@@ -1753,8 +1764,10 @@
 		var senderName = entry.type === 'visitor' ? visitor : ( entry.sender && entry.sender.name ) || S.appName;
 		var stack = h( 'div', { className: 'cc-stack' } );
 
-		if ( ! entry.mine && groupStart ) {
-			stack.appendChild( h( 'span', { className: 'cc-sender', text: senderName } ) );
+		if ( ( ! entry.mine || isBot ) && groupStart ) {
+			stack.appendChild( isBot
+				? h( 'span', { className: 'cc-sender cc-sender--bot' }, [ icon( 'sparkles' ), senderName ] )
+				: h( 'span', { className: 'cc-sender', text: senderName } ) );
 		}
 
 		var bubble;
@@ -1881,6 +1894,33 @@
 				}
 			}
 		}, [ icon( 'zap' ) ] );
+
+		// ✨ An AI draft of the reply, to edit before sending.
+		var suggestButton = config.aiSuggest ? h( 'button', {
+			type: 'button',
+			className: 'cc-tool cc-tool--ai',
+			title: S.aiSuggest,
+			'aria-label': S.aiSuggest,
+			onClick: function () {
+				var conv = self.state.conv;
+				if ( ! conv || suggestButton.classList.contains( 'is-busy' ) ) {
+					return;
+				}
+				suggestButton.classList.add( 'is-busy' );
+				suggestButton.setAttribute( 'aria-busy', 'true' );
+				api.suggest( conv.id ).then( function ( result ) {
+					textarea.value = result.text;
+					textarea.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+					textarea.focus();
+					textarea.setSelectionRange( textarea.value.length, textarea.value.length );
+				} ).catch( function ( error ) {
+					self.notify( error.message, true );
+				} ).then( function () {
+					suggestButton.classList.remove( 'is-busy' );
+					suggestButton.removeAttribute( 'aria-busy' );
+				} );
+			}
+		}, [ icon( 'sparkles' ) ] ) : null;
 
 		function fill( body ) {
 			var conv = self.state.conv;
@@ -2115,7 +2155,7 @@
 					event.preventDefault();
 					submit();
 				}
-			}, [ cannedButton, attachButton, fileInput, textarea, send ] )
+			}, [ cannedButton, suggestButton, attachButton, fileInput, textarea, send ] )
 		] );
 
 		if ( this.noteMode ) {
@@ -3592,12 +3632,13 @@
 		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
 		{ id: 'sales', icon: 'message', keys: [ 'proactive', 'rating_enabled' ] },
 		{ id: 'contact', icon: 'help', keys: [ 'channels_enabled', 'channels', 'faq_enabled', 'faq' ] },
+		{ id: 'ai', icon: 'sparkles', keys: [ 'ai_provider', 'ai_api_key', 'ai_base_url', 'ai_model', 'ai_bot_enabled', 'ai_bot_mode', 'ai_bot_name', 'ai_instructions', 'ai_knowledge_ids', 'ai_max_replies', 'ai_suggest_enabled', 'ai_daily_limit' ] },
 		{ id: 'sms', icon: 'phone', keys: [ 'sms_enabled', 'sms_provider', 'sms_api_key', 'sms_username', 'sms_password', 'sms_sender', 'sms_message', 'sms_delay' ] },
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
 
-	var NUMBER_SETTINGS = [ 'sms_delay', 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'attachment_max_mb' ];
+	var NUMBER_SETTINGS = [ 'ai_max_replies', 'ai_daily_limit', 'sms_delay', 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'attachment_max_mb' ];
 
 	function settingsSection( id ) {
 		return SETTINGS_SECTIONS.filter( function ( section ) {
@@ -3664,6 +3705,9 @@
 			// Items that were deleted since they were chosen are dropped on save.
 			this.items = this.data.items.slice();
 		}
+		if ( id === 'ai' ) {
+			this.knowledge = this.data.knowledge.slice();
+		}
 		if ( id === 'security' ) {
 			draft.trusted_proxies = saved.trusted_proxies.join( '\n' );
 		}
@@ -3712,6 +3756,14 @@
 				return { id: item.id, question: String( item.question ).trim(), answer: String( item.answer ).trim() };
 			} );
 		}
+		if ( id === 'ai' ) {
+			[ 'ai_api_key', 'ai_base_url', 'ai_model', 'ai_bot_name', 'ai_instructions' ].forEach( function ( key ) {
+				payload[ key ] = String( draft[ key ] ).trim();
+			} );
+			payload.ai_knowledge_ids = this.knowledge.map( function ( item ) {
+				return item.id;
+			} );
+		}
 		if ( id === 'sms' ) {
 			[ 'sms_api_key', 'sms_username', 'sms_sender', 'sms_message' ].forEach( function ( key ) {
 				payload[ key ] = String( draft[ key ] ).trim();
@@ -3757,6 +3809,11 @@
 			if ( key === 'display_ids' ) {
 				// Chosen items deleted since are dropped anyway; not a change.
 				stored = self.data.items.map( function ( item ) {
+					return item.id;
+				} );
+			}
+			if ( key === 'ai_knowledge_ids' ) {
+				stored = self.data.knowledge.map( function ( item ) {
 					return item.id;
 				} );
 			}
@@ -3825,6 +3882,7 @@
 			sales: S.sectionSales,
 			contact: S.sectionContact,
 			sms: S.sectionSms,
+			ai: S.sectionAi,
 			security: S.sectionSecurity
 		};
 
@@ -3891,6 +3949,8 @@
 			children = [ this.buildChannels(), this.buildFaq() ];
 		} else if ( this.section === 'sms' ) {
 			children = [ this.buildSms() ];
+		} else if ( this.section === 'ai' ) {
+			children = [ this.buildAi() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -5221,6 +5281,257 @@
 				h( 'label', { className: 'cc-label', for: phone.id, text: S.smsTestPhone } ),
 				h( 'div', { className: 'cc-bot-test' }, [ phone, test, result ] )
 			] )
+		] );
+	};
+
+	/**
+	 * AI: the service, the bot that answers visitors, and reply suggestions.
+	 */
+	SettingsView.prototype.buildAi = function () {
+		var self = this;
+		var draft = this.draft;
+		var limits = this.data.limits;
+		var defaults = this.data.defaults;
+
+		function input( key, label, attrs, hint ) {
+			var field = h( 'input', Object.assign( { id: 'cc-' + key.replace( /_/g, '-' ), className: 'cc-input', type: 'text', autocomplete: 'off', spellcheck: 'false' }, attrs || {} ) );
+			field.value = draft[ key ];
+			field.addEventListener( 'input', function () {
+				draft[ key ] = field.value;
+				self.clearError( key );
+				result.hidden = true;
+			} );
+			return h( 'div', { className: 'cc-field' }, [
+				h( 'label', { className: 'cc-label', for: field.id, text: label } ),
+				field,
+				hint ? h( 'p', { className: 'cc-hint', text: hint } ) : null,
+				self.fieldError( key )
+			] );
+		}
+
+		var keyField = input( 'ai_api_key', S.aiApiKey, { type: 'password', dir: 'ltr' } );
+		var baseField = input( 'ai_base_url', S.aiBaseUrl, { type: 'url', dir: 'ltr' }, ' ' );
+		var modelField = input( 'ai_model', S.aiModel, { dir: 'ltr' }, ' ' );
+		var result = h( 'p', { className: 'cc-bot-result', role: 'status', hidden: true } );
+
+		function showProvider() {
+			var claude = draft.ai_provider === 'anthropic';
+			baseField.querySelector( 'input' ).placeholder = claude ? 'https://api.anthropic.com' : 'https://api.openai.com/v1';
+			baseField.querySelector( '.cc-hint' ).textContent = claude ? S.aiBaseUrlClaudeHint : S.aiBaseUrlOpenAiHint;
+			modelField.querySelector( 'input' ).placeholder = claude ? defaults.ai_model : S.aiModelPlaceholder;
+			modelField.querySelector( '.cc-hint' ).textContent = claude ? String( S.aiModelClaudeHint ).replace( '%s', defaults.ai_model ) : S.aiModelOpenAiHint;
+		}
+
+		var providers = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-ai-provider-label' }, [
+			[ 'anthropic', S.aiClaude, S.aiClaudeHint ],
+			[ 'openai', S.aiOpenAi, S.aiOpenAiHint ]
+		].map( function ( option ) {
+			var radio = h( 'input', { id: 'cc-ai-provider-' + option[ 0 ], type: 'radio', name: 'cc-ai-provider', value: option[ 0 ], checked: draft.ai_provider === option[ 0 ] } );
+			radio.addEventListener( 'change', function () {
+				if ( radio.checked ) {
+					draft.ai_provider = option[ 0 ];
+					showProvider();
+					result.hidden = true;
+				}
+			} );
+			return h( 'label', { className: 'cc-radio cc-radio--rich', for: radio.id }, [ radio, h( 'span', {}, [ h( 'strong', { text: option[ 1 ] } ), h( 'small', { text: option[ 2 ] } ) ] ) ] );
+		} ) );
+
+		var test = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			text: S.aiTest,
+			onClick: function () {
+				test.disabled = true;
+				result.hidden = true;
+				api.aiTest( {
+					provider: draft.ai_provider,
+					api_key: String( draft.ai_api_key ).trim(),
+					base_url: String( draft.ai_base_url ).trim(),
+					model: String( draft.ai_model ).trim()
+				} ).then( function ( answer ) {
+					result.textContent = S.aiTestOk + ' ' + answer.text;
+					result.className = 'cc-bot-result is-ok';
+				} ).catch( function ( error ) {
+					var fields = ( error.data && error.data.fields ) || {};
+					var first = Object.keys( fields )[ 0 ];
+					result.textContent = first ? fields[ first ] : error.message;
+					result.className = 'cc-bot-result is-error';
+				} ).then( function () {
+					result.hidden = false;
+					test.disabled = false;
+				} );
+			}
+		} );
+
+		showProvider();
+
+		// When the bot answers.
+		var modes = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-ai-mode-label' }, [
+			[ 'offline', S.aiModeOffline, S.aiModeOfflineHint ],
+			[ 'always', S.aiModeAlways, S.aiModeAlwaysHint ]
+		].map( function ( option ) {
+			var radio = h( 'input', { id: 'cc-ai-mode-' + option[ 0 ], type: 'radio', name: 'cc-ai-mode', value: option[ 0 ], checked: draft.ai_bot_mode === option[ 0 ] } );
+			radio.addEventListener( 'change', function () {
+				if ( radio.checked ) {
+					draft.ai_bot_mode = option[ 0 ];
+				}
+			} );
+			return h( 'label', { className: 'cc-radio cc-radio--rich', for: radio.id }, [ radio, h( 'span', {}, [ h( 'strong', { text: option[ 1 ] } ), h( 'small', { text: option[ 2 ] } ) ] ) ] );
+		} ) );
+
+		var nameField = input( 'ai_bot_name', S.aiBotName, { placeholder: defaults.ai_bot_name, maxlength: '40' } );
+
+		var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+		var instructions = h( 'textarea', { id: 'cc-ai-instructions', className: 'cc-input cc-textarea', rows: '4', placeholder: S.aiInstructionsPlaceholder } );
+		instructions.value = draft.ai_instructions;
+
+		function count() {
+			var used = Array.from( instructions.value ).length;
+			counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limits.ai_instructions );
+			counter.classList.toggle( 'is-over', used > limits.ai_instructions );
+		}
+
+		instructions.addEventListener( 'input', function () {
+			draft.ai_instructions = instructions.value;
+			count();
+			self.clearError( 'ai_instructions' );
+		} );
+		count();
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ai-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-ai-title', text: S.aiTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.aiIntro } )
+				] ),
+				h( 'span', { className: 'cc-label', id: 'cc-ai-provider-label', text: S.aiProvider } ),
+				providers,
+				h( 'div', { className: 'cc-bot-fields' }, [ keyField, modelField ] ),
+				baseField,
+				this.fieldError( 'ai_provider' ),
+				h( 'div', { className: 'cc-bot-test' }, [ test, result ] )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ai-bot-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-ai-bot-title', text: S.aiBotTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.aiBotIntro } )
+					] ),
+					this.buildSwitch( 'cc-ai-bot-enabled', S.aiBotOn, draft.ai_bot_enabled, function ( on ) {
+						draft.ai_bot_enabled = on;
+						self.clearError( 'ai_api_key' );
+					} )
+				] ),
+				h( 'span', { className: 'cc-label', id: 'cc-ai-mode-label', text: S.aiMode } ),
+				modes,
+				nameField,
+				h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: instructions.id, text: S.aiInstructions } ), counter ] ),
+				instructions,
+				h( 'p', { className: 'cc-hint', text: S.aiInstructionsHint } ),
+				this.fieldError( 'ai_instructions' ),
+				this.buildKnowledgePicker(),
+				this.numberField( 'ai_max_replies', S.aiMaxReplies, S.aiReplies, S.aiMaxRepliesHint )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ai-suggest-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-ai-suggest-title', text: S.aiSuggestTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.aiSuggestIntro } )
+					] ),
+					this.buildSwitch( 'cc-ai-suggest-enabled', S.aiSuggestOn, draft.ai_suggest_enabled, function ( on ) {
+						draft.ai_suggest_enabled = on;
+						self.clearError( 'ai_api_key' );
+					} )
+				] )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ai-limit-title' }, [
+				h( 'h2', { id: 'cc-ai-limit-title', text: S.aiLimitTitle } ),
+				this.numberField( 'ai_daily_limit', S.aiDailyLimit, S.aiRequests, S.aiDailyLimitHint )
+			] )
+		] );
+	};
+
+	/**
+	 * The pages, posts and products the bot knows, picked by search.
+	 */
+	SettingsView.prototype.buildKnowledgePicker = function () {
+		var self = this;
+		var max = this.data.limits.ai_knowledge;
+		var chosen = h( 'ul', { className: 'cc-knowledge' } );
+		var results = h( 'ul', { className: 'cc-user-results cc-knowledge-results', 'aria-live': 'polite' } );
+		var ticket = 0;
+		var timer = null;
+		var search = h( 'input', { id: 'cc-ai-knowledge-search', className: 'cc-input', type: 'search', placeholder: S.aiKnowledgeSearch, autocomplete: 'off' } );
+
+		function draw() {
+			chosen.replaceChildren.apply( chosen, self.knowledge.length ? self.knowledge.map( function ( item ) {
+				return h( 'li', { className: 'cc-knowledge__item' }, [
+					h( 'span', {}, [ h( 'strong', { text: item.title } ), h( 'small', { text: item.type_label } ) ] ),
+					h( 'button', {
+						type: 'button',
+						className: 'cc-icon-button',
+						title: S.remove,
+						'aria-label': S.remove + ': ' + item.title,
+						onClick: function () {
+							self.knowledge = self.knowledge.filter( function ( other ) {
+								return other.id !== item.id;
+							} );
+							draw();
+							self.clearError( 'ai_knowledge_ids' );
+							self.syncNav();
+						}
+					}, [ icon( 'close' ) ] )
+				] );
+			} ) : [ h( 'li', { className: 'cc-hint', text: S.aiKnowledgeEmpty } ) ] );
+		}
+
+		function find( term ) {
+			var mine = ++ticket;
+			api.content( term ).then( function ( items ) {
+				if ( mine !== ticket ) {
+					return;
+				}
+				results.replaceChildren.apply( results, items.length ? items.map( function ( item ) {
+					var picked = self.knowledge.some( function ( other ) {
+						return other.id === item.id;
+					} );
+					return h( 'li', {}, [
+						h( 'button', {
+							type: 'button',
+							className: 'cc-user cc-content' + ( picked ? ' is-selected' : '' ),
+							disabled: picked || self.knowledge.length >= max,
+							onClick: function () {
+								self.knowledge.push( item );
+								draw();
+								find( search.value.trim() );
+								self.syncNav();
+							}
+						}, [ h( 'span', {}, [ h( 'strong', { text: item.title } ), h( 'small', { text: item.type_label } ) ] ), icon( picked ? 'check' : 'plus' ) ] )
+					] );
+				} ) : [ h( 'li', { className: 'cc-hint', text: S.noContent } ) ] );
+			} ).catch( function ( error ) {
+				results.replaceChildren( h( 'li', { className: 'cc-field-error', text: error.message } ) );
+			} );
+		}
+
+		search.addEventListener( 'input', function () {
+			window.clearTimeout( timer );
+			timer = window.setTimeout( function () {
+				find( search.value.trim() );
+			}, 250 );
+		} );
+
+		draw();
+		find( '' );
+
+		return h( 'div', { className: 'cc-field' }, [
+			h( 'label', { className: 'cc-label', for: search.id, text: fmt.format( S.aiKnowledge, max ) } ),
+			h( 'p', { className: 'cc-hint', text: S.aiKnowledgeHint } ),
+			chosen,
+			search,
+			results,
+			this.fieldError( 'ai_knowledge_ids' )
 		] );
 	};
 

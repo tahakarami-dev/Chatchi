@@ -762,7 +762,8 @@ final class Plugin {
 					$c->get( ColorPalette::class ),
 					$c->get( FontFace::class ),
 					$c->get( PanelStrings::class ),
-					$c->get( AvatarUploader::class )->max_bytes()
+					$c->get( AvatarUploader::class )->max_bytes(),
+					$c->get( Settings::class )
 				);
 			}
 		);

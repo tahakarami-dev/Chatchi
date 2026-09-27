@@ -9,6 +9,7 @@ namespace ChatChi\Admin;
 
 use ChatChi\Frontend\ColorPalette;
 use ChatChi\Frontend\FontFace;
+use ChatChi\Settings\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,6 +30,8 @@ final class PanelPage {
 
 	private int $avatar_max_bytes;
 
+	private ?Settings $settings;
+
 	/**
 	 * Nonce for this page's inline script and styles, allowed by the CSP.
 	 */
@@ -39,12 +42,14 @@ final class PanelPage {
 	 * @param FontFace     $font             Bundled font.
 	 * @param PanelStrings $strings          Interface text.
 	 * @param int          $avatar_max_bytes Largest avatar upload, for client-side checks.
+	 * @param Settings|null $settings        Plugin settings, for the AI features.
 	 */
-	public function __construct( ColorPalette $palette, FontFace $font, PanelStrings $strings, int $avatar_max_bytes ) {
+	public function __construct( ColorPalette $palette, FontFace $font, PanelStrings $strings, int $avatar_max_bytes, ?Settings $settings = null ) {
 		$this->palette          = $palette;
 		$this->font             = $font;
 		$this->strings          = $strings;
 		$this->avatar_max_bytes = $avatar_max_bytes;
+		$this->settings         = $settings;
 	}
 
 	/**
@@ -132,6 +137,8 @@ final class PanelPage {
 			'canManageSettings' => current_user_can( 'manage_options' ),
 			'canUpload'         => current_user_can( 'upload_files' ),
 			'maxAvatarBytes'    => $this->avatar_max_bytes,
+			// AI reply suggestions in the composer (the key never leaves the server).
+			'aiSuggest'         => $this->settings && $this->settings->get( 'ai_suggest_enabled' ) && '' !== (string) $this->settings->get( 'ai_api_key' ),
 			'strings'           => $this->strings->all(),
 		);
 	}
