@@ -76,6 +76,12 @@
 		close: function ( id ) {
 			return request( 'POST', '/widget/conversations/' + id + '/close' );
 		},
+		bot: function ( id ) {
+			return request( 'POST', '/widget/conversations/' + id + '/bot' );
+		},
+		handoff: function ( id ) {
+			return request( 'POST', '/widget/conversations/' + id + '/handoff' );
+		},
 		rate: function ( id, score, comment ) {
 			return request( 'POST', '/widget/conversations/' + id + '/rating', { body: { score: score, comment: comment } } );
 		},
@@ -811,7 +817,7 @@
 		items.forEach( function ( m ) {
 			// Show who is answering right away, before the next session check.
 			var conversation = self.state.conversation;
-			if ( conversation && ! conversation.agent && m.sender.type === 'agent' && m.sender.name ) {
+			if ( conversation && ! conversation.agent && m.sender.type === 'agent' && m.sender.name && ! m.sender.bot ) {
 				conversation.agent = { id: null, name: m.sender.name, avatar_url: m.sender.avatar_url };
 			}
 
@@ -938,6 +944,9 @@
 			self.render();
 			self.scrollToBottom();
 			self.schedulePoll();
+			if ( ! pending.file ) {
+				self.askBot();
+			}
 		} ).catch( function ( error ) {
 			if ( error.code === 'chatchi_conversation_closed' ) {
 				self.state.pending = self.state.pending.filter( function ( p ) {
@@ -1618,6 +1627,10 @@
 	Widget.prototype.renderAvatar = function ( agent, small ) {
 		var className = 'chatchi-avatar' + ( small ? ' chatchi-avatar--sm' : '' );
 
+		if ( agent && agent.bot ) {
+			return h( 'span', { className: className + ' chatchi-avatar--bot', 'aria-hidden': 'true' }, [ icon( 'sparkles' ) ] );
+		}
+
 		if ( agent && agent.avatar_url ) {
 			return h( 'span', { className: className }, [ h( 'img', { src: agent.avatar_url, alt: '' } ) ] );
 		}
@@ -1862,11 +1875,89 @@
 			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.offlineSent } ) ] ) );
 		}
 
-		if ( state.agentTyping && ! state.closed ) {
+		var botActive = config.ai && config.ai.bot && state.conversation && state.conversation.bot && ! state.closed;
+
+		if ( botActive && state.messages.some( function ( m ) {
+			return m.sender && m.sender.bot;
+		} ) ) {
+			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-handoff' }, [
+				h( 'button', {
+					type: 'button',
+					className: 'chatchi-handoff__button',
+					onClick: function () {
+						self.requestPerson();
+					}
+				}, [ icon( 'user' ), h( 'span', { text: S.talkToPerson } ) ] )
+			] ) );
+		}
+
+		if ( state.handedOff && ! state.closed ) {
+			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.personComing } ) ] ) );
+		}
+
+		if ( ( state.agentTyping || state.botTyping ) && ! state.closed ) {
 			log.appendChild( this.renderTyping() );
 		}
 
 		return log;
+	};
+
+	/* ------------------------------ AI bot ------------------------------ */
+
+	/**
+	 * Asks the AI bot to answer the visitor's latest message. The server
+	 * decides whether it should (bot on, nobody has taken the chat, ...).
+	 * Messages sent while it thinks are answered in one go afterwards.
+	 */
+	Widget.prototype.askBot = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! config.ai || ! config.ai.bot || ! conversation || conversation.bot === false ) {
+			return;
+		}
+		if ( this.botBusy ) {
+			this.botAgain = true;
+			return;
+		}
+
+		this.botBusy = true;
+		this.botAgain = false;
+		this.set( { botTyping: true } );
+		this.scrollToBottom();
+
+		api.bot( conversation.id ).then( function ( result ) {
+			if ( result.handoff && self.state.conversation ) {
+				self.state.conversation.bot = false;
+			}
+			return self.pollMessages();
+		} ).catch( function () {
+			// Humans still see the message; nothing to show the visitor.
+		} ).then( function () {
+			self.botBusy = false;
+			self.set( { botTyping: false } );
+			self.scrollToBottom();
+			if ( self.botAgain ) {
+				self.askBot();
+			}
+		} );
+	};
+
+	Widget.prototype.requestPerson = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! conversation ) {
+			return;
+		}
+
+		api.handoff( conversation.id ).then( function ( updated ) {
+			self.state.conversation = Object.assign( {}, self.state.conversation, updated, { bot: false } );
+			self.set( { handedOff: true } );
+			self.scrollToBottom();
+		} ).catch( function ( error ) {
+			window.alert( error.message );
+		} );
 	};
 
 	/* ------------------------------- FAQ -------------------------------- */
@@ -1970,7 +2061,7 @@
 	 * Three bouncing dots from the agent while they write a reply.
 	 */
 	Widget.prototype.renderTyping = function () {
-		var agent = this.state.conversation && this.state.conversation.agent;
+		var agent = this.state.botTyping ? { bot: true, name: config.ai.name } : this.state.conversation && this.state.conversation.agent;
 		var label = agent && agent.name ? String( S.typingNamed ).replace( '%s', agent.name ) : S.typing;
 
 		return h( 'div', { className: 'chatchi-row chatchi-row--theirs chatchi-row--typing is-group-start is-group-end is-new' }, [

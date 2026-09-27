@@ -171,6 +171,11 @@ final class WidgetModule implements Module {
 			),
 			'position'  => $this->position(),
 			'theme'     => $this->theme(),
+			// The AI bot answers in the chat (never the key or the model).
+			'ai'        => array(
+				'bot'  => (bool) $this->settings->get( 'ai_bot_enabled' ) && '' !== (string) $this->settings->get( 'ai_api_key' ),
+				'name' => $this->settings->bot_name(),
+			),
 			// Other ways to reach the site, shown in the launcher's menu.
 			'channels'  => $this->settings->get( 'channels_enabled' ) ? ContactChannels::links( (array) $this->settings->get( 'channels' ) ) : array(),
 			'faq'       => $this->settings->get( 'faq_enabled' ) ? array_values( (array) $this->settings->get( 'faq' ) ) : array(),

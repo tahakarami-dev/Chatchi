@@ -52,6 +52,7 @@ final class ConversationRepository extends Repository {
 			'rating'            => '%d',
 			'rating_comment'    => '%s',
 			'rated_at'          => '%s',
+			'bot_handoff_at'    => '%s',
 		);
 	}
 
@@ -167,6 +168,21 @@ final class ConversationRepository extends Repository {
 		}
 
 		return $this->execute( $sql ) > 0;
+	}
+
+	/**
+	 * Records that the AI bot handed the conversation to the team.
+	 *
+	 * @param int $id Conversation ID.
+	 * @return bool Whether it changed (false when already handed over).
+	 */
+	public function set_bot_handoff( int $id ): bool {
+		$rows = $this->db->query(
+			$this->db->prepare( "UPDATE {$this->table()} SET bot_handoff_at = %s WHERE id = %d AND bot_handoff_at IS NULL", $this->now(), $id )
+		);
+		$this->assert_no_error( 'update of ' . $this->table_name() );
+
+		return (int) $rows > 0;
 	}
 
 	/**

@@ -15,6 +15,7 @@ use ChatChi\Models\Attachment;
 use ChatChi\Models\Conversation;
 use ChatChi\Models\Message;
 use ChatChi\Models\Visitor;
+use ChatChi\Settings\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,6 +28,15 @@ defined( 'ABSPATH' ) || exit;
  * text by clients (textContent), never as HTML.
  */
 final class Presenter {
+
+	private ?Settings $settings;
+
+	/**
+	 * @param Settings|null $settings Plugin settings, for the AI bot's name.
+	 */
+	public function __construct( ?Settings $settings = null ) {
+		$this->settings = $settings;
+	}
 
 	/**
 	 * Formats a stored UTC datetime as ISO 8601.
@@ -220,6 +230,13 @@ final class Presenter {
 		if ( Message::SENDER_AGENT === $message->sender_type && isset( $agents[ $message->sender_id ] ) ) {
 			$sender['name']       = $agents[ $message->sender_id ]->display_name;
 			$sender['avatar_url'] = $this->avatar_url( $agents[ $message->sender_id ] );
+		}
+
+		// Agent messages with sender ID 0 are the AI bot's answers.
+		$sender['bot'] = Message::SENDER_AGENT === $message->sender_type && 0 === $message->sender_id;
+
+		if ( $sender['bot'] ) {
+			$sender['name'] = $this->settings ? $this->settings->bot_name() : __( 'Smart assistant', 'chatchi' );
 		}
 
 		return array(

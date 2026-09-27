@@ -59,6 +59,7 @@ function chatchi_uninstall_site() {
 		'chatchi_db_version',
 		'chatchi_settings',
 		'chatchi_canned_responses',
+		'chatchi_ai_usage',
 	);
 
 	foreach ( $options as $option ) {
@@ -69,6 +70,8 @@ function chatchi_uninstall_site() {
 
 	// Each agent's panel theme, and SMS cooldowns (chatchi_sms_{conversation}).
 	delete_metadata( 'user', 0, 'chatchi_panel_theme', '', true );
+	// Locks of AI answers in progress (chatchi_bot_lock_{conversation}).
+	$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'chatchi\_bot\_lock\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_chatchi\_sms\_%' OR option_name LIKE '\_transient\_timeout\_chatchi\_sms\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
 	chatchi_uninstall_files();

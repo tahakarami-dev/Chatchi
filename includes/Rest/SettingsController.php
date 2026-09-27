@@ -7,6 +7,7 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Ai\AiClient;
 use ChatChi\Frontend\ColorPalette;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Security\ClientIp;
@@ -194,6 +195,19 @@ final class SettingsController implements RouteProvider {
 			'sms_password'             => $text( 500 ),
 			'sms_sender'               => $text( 100 ),
 			'sms_message'              => $text( 2000 ),
+			'ai_provider'              => $enum( SettingsValidator::AI_PROVIDERS ),
+			'ai_api_key'               => $text( 500 ),
+			'ai_base_url'              => $text( 500 ),
+			'ai_model'                 => $text( 200 ),
+			'ai_bot_enabled'           => $flag,
+			'ai_bot_mode'              => $enum( SettingsValidator::AI_BOT_MODES ),
+			'ai_bot_name'              => $text( 200 ),
+			'ai_instructions'          => $text( 6000 ),
+			'ai_knowledge_ids'         => array(
+				'type'     => 'array',
+				'maxItems' => 100,
+			),
+			'ai_suggest_enabled'       => $flag,
 		);
 
 		// Numbers arrive as JSON numbers or numeric strings; ranges are the validator's job.
@@ -264,6 +278,8 @@ final class SettingsController implements RouteProvider {
 				'offline_message' => $this->settings->default_offline_message(),
 				'notify_email'    => (string) get_option( 'admin_email' ),
 				'sms_message'     => $this->settings->default_sms_message(),
+				'ai_bot_name'     => $this->settings->default_bot_name(),
+				'ai_model'        => AiClient::DEFAULT_ANTHROPIC_MODEL,
 			),
 			'limits'    => array(
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
@@ -280,6 +296,8 @@ final class SettingsController implements RouteProvider {
 				'faq_question'    => FaqItems::QUESTION_MAX_LENGTH,
 				'faq_answer'      => FaqItems::ANSWER_MAX_LENGTH,
 				'sms_message'     => SettingsValidator::SMS_MESSAGE_MAX_LENGTH,
+				'ai_instructions' => SettingsValidator::AI_INSTRUCTIONS_MAX_LENGTH,
+				'ai_knowledge'    => SettingsValidator::MAX_KNOWLEDGE_IDS,
 				// The server's own upload limit caps attachment_max_mb.
 				'upload_max_mb'   => max( 1, (int) floor( wp_max_upload_size() / MB_IN_BYTES ) ),
 			),
@@ -301,6 +319,8 @@ final class SettingsController implements RouteProvider {
 			'targets'   => $targets,
 			// Chosen items that still exist, with titles for display.
 			'items'     => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['display_ids'] ) ),
+			// Pages the AI bot knows, with titles.
+			'knowledge' => array_map( array( $this, 'item' ), $this->content->find( (array) $settings['ai_knowledge_ids'] ) ),
 		);
 	}
 

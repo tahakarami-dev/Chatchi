@@ -36,6 +36,7 @@ uninstall.php            On delete: removes temporary data; removes everything o
 includes/                PSR-4 root for the ChatChi\ namespace
 ├── Plugin.php           Kernel: service container + module boot
 ├── Agents/              Agent management service, avatar uploads
+├── Ai/                  AI client (Claude Messages API + OpenAI-compatible, plain HTTP), prompts, bot and reply suggestions
 ├── Commerce/           WooCommerce customer context for agents (current page, cart, orders)
 ├── Conversations/       Conversation service, access policy (Actor), inbox summaries, ratings
 ├── Messages/            Message service, text rules, paging
@@ -122,6 +123,9 @@ docs/                    Design and architecture documents
 | `chatchi_sms_message` | filter | Text of the SMS to a visitor; empty sends nothing |
 | `chatchi_sms_api_url` | filter | SMS service address per provider (e.g. a relay); Kavenegar's contains `%s` for the API key |
 | `chatchi_sms_sent` | action | An SMS told a visitor about a reply |
+| `chatchi_bot_answer` | filter | The AI bot's answer before it is sent; empty sends nothing |
+| `chatchi_bot_replied` | action | The AI bot answered a visitor |
+| `chatchi_bot_handoff` | action | The AI bot handed a conversation to the team |
 
 ## Database
 
@@ -129,7 +133,7 @@ docs/                    Design and architecture documents
 |---|---|---|
 | `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token), contact info, and the page they are on with a summary of their WooCommerce cart (for agents) | `UNIQUE token_hash`, `user_id` |
 | `{prefix}chatchi_agents` | Agents, one per WordPress user, with their chosen status (online / away) and when their panel last talked to the server | `UNIQUE user_id`, `is_active` |
-| `{prefix}chatchi_conversations` | Conversation state, latest activity, when each side last reported typing, and the visitor's rating (1–5) and comment | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id`, `created_at` |
+| `{prefix}chatchi_conversations` | Conversation state, latest activity, when each side last reported typing, the visitor's rating (1–5) and comment, and when the AI bot handed it to the team | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id`, `created_at` |
 | `{prefix}chatchi_messages` | Messages and read state; `attachment_id` links a sent file; `internal` marks agent-only notes and events, never sent to visitors | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
 | `{prefix}chatchi_attachments` | Files sent in conversations: original name, type, size, picture size, and the path of the stored file | `conversation_id`, `message_id` |
 | `{prefix}chatchi_conversation_tags` | Tags agents put on conversations | `(conversation_id,tag)` primary, `tag` |
@@ -156,6 +160,8 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 | POST | `/widget/conversations/{id}/attachments` | Send a file: multipart field `file`, optional `client_id`. Pictures (JPG, PNG, GIF, WebP), PDF, Word, Excel, text, CSV and ZIP, checked by content; SVG, HTML and scripts are always refused. Returns the new message with `attachment` |
 | GET | `/widget/conversations/{id}/attachments/{attachment_id}` | The file, after an access check. Pictures inline, everything else as a download (`download=1` forces it); sandboxing CSP and `nosniff` always |
 | POST | `/widget/conversations/{id}/close` | Close own conversation |
+| POST | `/widget/conversations/{id}/bot` | The AI bot answers the visitor's latest message when it looks after the conversation → `{answered, handoff}`. Rate limited (12/min per visitor) |
+| POST | `/widget/conversations/{id}/handoff` | The visitor asks for a person; the bot stops for this conversation |
 | POST | `/widget/conversations/{id}/rating` | `score` 1–5, optional `comment` (≤ 500 characters): rate own ended conversation. Can be changed for 7 days after it ends; `403 chatchi_rating_disabled` when rating is off, `409` while open or once too old |
 
 ### Agent panel
@@ -177,6 +183,7 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | PUT/PATCH/POST | `/agent/conversations/{id}/tags` | `tags`: replaces the tags (≤ 10; cleaned: one line, no `#`, ≤ 40 characters, Latin in lower case) |
 | POST | `/agent/conversations/{id}/transcript` | Email the visitor a copy of the conversation (notes excluded) |
 | GET | `/agent/conversations/{id}/customer` | What the visitor is viewing now and, on WooCommerce shops, their cart and (for agents allowed by `chatchi_agent_can_see_orders`) their recent orders and total spent |
+| POST | `/agent/conversations/{id}/suggest` | An AI draft of the next reply → `{text}` (when suggestions are on) |
 | GET | `/agent/tags` | The 50 most used tags with counts |
 | GET | `/agent/team` | Active agents (`id`, `name`, `avatar_url`, `online`, `is_me`), for transfers |
 | GET | `/agent/canned` | Saved replies (`id`, `title`, `shortcut`, `body`); any active agent |
@@ -206,6 +213,7 @@ Administrators only (`manage_options`).
 | POST/PATCH | `/agent/settings` | Save any of `primary_color` (`#RRGGBB`, `#RGB`; empty = default), `widget_position` (`left` / `right`), `widget_title` (≤ 60 characters), `widget_subtitle` (≤ 100; empty = translated default), `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
 | GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
 | GET | `/agent/reports` | `range` 7, 30 or 90 days (site time zone): KPIs with the previous period (`conversations`, `answered` %, median `first_response` in seconds, `satisfaction`), `daily`, `ratings`, `agents`, `heatmap` (weekday × hour, 0 = Sunday), `tags`, `comments` |
+| POST | `/agent/settings/ai-test` | `provider` (`anthropic` / `openai`), `api_key`, `base_url`, `model`: a tiny request with these values; returns the model's answer or the service's error |
 | POST | `/agent/settings/sms-test` | `provider` (`kavenegar` / `melipayamak`), `api_key` or `username` + `password`, `sender`, `phone`: sends a test SMS with these values and reports the service's answer |
 | POST | `/agent/settings/bot-test` | `service` (`telegram` / `bale`), `token`, `chat_id`, `api_url`: sends a test message with these values (saved or not) and reports the service's answer |
 
@@ -215,9 +223,10 @@ Administrators only (`manage_options`).
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
 
-Administrators also get a **Settings** screen with eleven sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
+Administrators also get a **Settings** screen with twelve sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
 
 - **Channels & FAQ** (`#/settings/contact`): WhatsApp, Telegram, Bale and phone numbers (up to 6, reorderable, each with an optional label) shown in a menu the chat button opens, and up to 30 frequently asked questions visitors see before their first message. Numbers are stored normalized (WhatsApp `0912…` becomes `98912…`) and links are built only from them (`wa.me`, `t.me`, `ble.ir`, `tel:`).
+- **AI** (`#/settings/ai`): the service (Claude via Anthropic's Messages API, or any OpenAI-compatible Chat Completions API), key, optional relay address and model (Claude defaults to `claude-opus-5`), "test the connection"; the bot (on/off, only when nobody is online or always first, name, extra instructions, up to 20 pages, posts or products it knows, most replies per conversation); reply suggestions for agents; and the most AI requests per day.
 - **SMS** (`#/settings/sms`): Kavenegar (API key, optional sender line) or Melipayamak (username, password, sender line), the text (`{site}`, `{link}`), how long to wait for the visitor to read the reply (1–60 minutes), and "send a test SMS".
 - **Sales** (`#/settings/sales`): chat invitations (up to 10) and the post-chat rating. Each invitation has a message (≤ 300 characters), where it shows (all pages, home, product pages, shop and categories, cart, checkout, or pages whose address contains a text), a delay (0–600 seconds) and how often (once per visit, once a day, every page view). The first matching invitation appears as a bubble by the launcher; clicking it opens the chat with the invitation as support's first message. Invitations never show to a visitor who is already chatting.
 - **Notifications** (`#/settings/notifications`): the email about unanswered messages, Telegram and Bale bots (token, chat ID, an optional relay address for Telegram, "send a test message"), whether bots write for every new chat or only when nobody is online, and automatic transcripts for visitors when a conversation ends.
@@ -263,6 +272,15 @@ Administrators also get a **Settings** screen with eleven sections, each saved o
 - **Contact menu**: with channels set, the chat button opens a menu (chat first, then the channels); arrow keys move, Escape or a click elsewhere closes it. Visitors with unread replies go straight to the chat. External links open in a new tab with `noopener`.
 - **FAQ**: shown above the start form and in the empty chat until the first message. Answers are plain text with clickable links; one is open at a time; with more than five questions there is a search box (Persian and Arabic ی/ک match).
 - **SMS**: when an agent replies, a check runs after the set delay (WP-Cron). If the reply is still unread, the visitor has not been on the site for a minute, and they gave a mobile number, one SMS is sent with a link to the page they chatted on (`#chatchi` opens the chat), at most once per conversation every 6 hours. Agents see an event line saying it was sent or why it failed. The service's credentials never appear in logs or errors.
+
+## AI bot and reply suggestions
+
+- **Protocols**: plain HTTP (no SDK, PHP 7.4). Claude: `POST {base}/v1/messages` with `x-api-key` and `anthropic-version: 2023-06-01`; the system prompt's stable part (rules, FAQ, chosen pages) is marked for prompt caching, the visitor's page and cart follow it; `output_config.effort: low` on models that support it; on Anthropic's own API with Opus 5 / Fable 5, `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`) retries a declined request on the recommended model. A `refusal` stop reason hands the chat to the team. OpenAI-compatible: `POST {base}/chat/completions` with a Bearer key. Relay addresses must be https; private and local addresses are refused when the request is made.
+- **When the bot answers**: the widget asks after each visitor message. It answers only while the conversation is open, not taken by an agent and not handed over; in "only when nobody is online" mode, only while no agent is available. One answer at a time per conversation; each answer is stored as an agent message with sender ID 0 and shown with the bot's name and a ✨ avatar.
+- **Handoff**: when the model ends its answer with `[[HANDOFF]]` (it doesn't know, the visitor wants a person, an order or payment problem), when the visitor presses "Talk to a person", when the AI fails, or after the per-conversation reply limit. Agents see an event line with the reason; the bot then stays quiet in that conversation, and also as soon as an agent replies.
+- **Knowledge**: the FAQ, the chosen pages/posts/products (price and stock read from WooCommerce), the owner's extra instructions, and the visitor's current page and cart. Only published content the administrator picked is sent; the key and the model never reach the browser.
+- **Cost control**: a daily limit (bot answers and suggestions together) and a per-conversation limit. The visitor endpoint is rate limited.
+- **Reply suggestions**: the ✨ button in the composer drafts a reply for the agent to edit; unknown facts come back as `[placeholders]`.
 
 ## Chat widget
 

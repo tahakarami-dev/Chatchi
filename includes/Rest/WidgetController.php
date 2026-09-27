@@ -7,6 +7,7 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Ai\Assistant;
 use ChatChi\Attachments\AttachmentService;
 use ChatChi\Availability\Availability;
 use ChatChi\Commerce\CustomerContext;
@@ -52,6 +53,8 @@ final class WidgetController extends ConversationController {
 
 	private ?RatingService $ratings;
 
+	private ?Assistant $assistant;
+
 	/**
 	 * Rate-limit decisions per request object.
 	 *
@@ -77,6 +80,7 @@ final class WidgetController extends ConversationController {
 	 * @param AttachmentService    $attachments   Files in conversations.
 	 * @param CustomerContext|null $context       Page and cart tracking.
 	 * @param RatingService|null   $ratings       Ratings of ended chats.
+	 * @param Assistant|null       $assistant     The AI bot.
 	 */
 	public function __construct(
 		ConversationService $conversations,
@@ -91,7 +95,8 @@ final class WidgetController extends ConversationController {
 		Availability $availability,
 		AttachmentService $attachments,
 		?CustomerContext $context = null,
-		?RatingService $ratings = null
+		?RatingService $ratings = null,
+		?Assistant $assistant = null
 	) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
@@ -104,6 +109,7 @@ final class WidgetController extends ConversationController {
 		$this->availability = $availability;
 		$this->context      = $context;
 		$this->ratings      = $ratings;
+		$this->assistant    = $assistant;
 		$this->decisions    = new \SplObjectStorage();
 	}
 
@@ -191,6 +197,20 @@ final class WidgetController extends ConversationController {
 			)
 		);
 
+		// The AI bot: answer the visitor's latest message, or hand over to a person.
+		foreach ( array( 'bot' => 'bot_answer', 'handoff' => 'bot_handoff' ) as $path => $callback ) {
+			register_rest_route(
+				self::NAMESPACE,
+				'/widget/conversations/(?P<id>\d+)/' . $path,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, $callback ),
+					'permission_callback' => array( $this, 'permit_actor' ),
+					'args'                => $this->id_arg(),
+				)
+			);
+		}
+
 		register_rest_route(
 			self::NAMESPACE,
 			'/widget/conversations/(?P<id>\d+)/rating',
@@ -242,6 +262,57 @@ final class WidgetController extends ConversationController {
 		}
 
 		$data = $this->present_conversation( $rated, $actor );
+
+		return $data instanceof \WP_Error ? $data : $this->respond( $data );
+	}
+
+	/**
+	 * POST /widget/conversations/{id}/bot: the AI bot answers the visitor's
+	 * latest message, when it looks after this conversation.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function bot_answer( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		if ( ! $this->assistant ) {
+			return $this->respond( array( 'answered' => false, 'handoff' => false ) );
+		}
+
+		$result = $this->assistant->answer( $actor, (int) $request['id'] );
+
+		return $result instanceof \WP_Error ? $result : $this->respond( $result );
+	}
+
+	/**
+	 * POST /widget/conversations/{id}/handoff: the visitor asks for a person.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function bot_handoff( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		if ( ! $this->assistant ) {
+			return new \WP_Error( 'chatchi_ai_disabled', __( 'This is not available right now.', 'chatchi' ), array( 'status' => 404 ) );
+		}
+
+		$conversation = $this->assistant->request_person( $actor, (int) $request['id'] );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		$data = $this->present_conversation( $conversation, $actor );
 
 		return $data instanceof \WP_Error ? $data : $this->respond( $data );
 	}
@@ -458,6 +529,8 @@ final class WidgetController extends ConversationController {
 			$action = 'typing';
 		} elseif ( '/attachments' === substr( $route, -12 ) ) {
 			$action = 'upload';
+		} elseif ( '/bot' === substr( $route, -4 ) ) {
+			$action = 'bot';
 		}
 
 		return $this->once(
@@ -478,6 +551,11 @@ final class WidgetController extends ConversationController {
 			return $this->failure( $e );
 		}
 
-		return $this->presenter->conversation_for_visitor( $conversation, $agent );
+		$data = $this->presenter->conversation_for_visitor( $conversation, $agent );
+
+		// Whether the AI bot looks after this conversation.
+		$data['bot'] = $this->assistant ? $this->assistant->is_active( $conversation ) : false;
+
+		return $data;
 	}
 }
