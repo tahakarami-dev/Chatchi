@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '4';
+	public const VERSION = '5';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -33,10 +33,11 @@ final class Schema {
 	 */
 	private const REQUIRED_COLUMNS = array(
 		Table::CONVERSATIONS => array( 'open_visitor_id', 'last_message_id', 'page_url', 'visitor_typing_at', 'agent_typing_at' ),
-		Table::MESSAGES      => array( 'client_id', 'read_at' ),
-		Table::AGENTS        => array( 'avatar_id', 'is_active' ),
+		Table::MESSAGES      => array( 'client_id', 'read_at', 'attachment_id' ),
+		Table::AGENTS        => array( 'avatar_id', 'is_active', 'status', 'last_seen_at' ),
 		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone' ),
 		Table::RATE_LIMITS   => array( 'bucket', 'hits', 'expires_at' ),
+		Table::ATTACHMENTS   => array( 'conversation_id', 'message_id', 'path' ),
 	);
 
 	private \wpdb $db;
@@ -269,6 +270,7 @@ final class Schema {
 		$conversations = $prefix . Table::CONVERSATIONS;
 		$messages      = $prefix . Table::MESSAGES;
 		$rate_limits   = $prefix . Table::RATE_LIMITS;
+		$attachments   = $prefix . Table::ATTACHMENTS;
 
 		// token_hash stores a hash of the visitor's cookie token, never the token itself.
 		// open_visitor_id equals visitor_id while a conversation is open and is NULL once
@@ -294,6 +296,8 @@ user_id bigint(20) unsigned NOT NULL,
 display_name varchar(100) NOT NULL,
 avatar_id bigint(20) unsigned NOT NULL DEFAULT 0,
 is_active tinyint(1) unsigned NOT NULL DEFAULT 1,
+status varchar(10) NOT NULL DEFAULT 'online',
+last_seen_at datetime NULL DEFAULT NULL,
 created_at datetime NOT NULL,
 updated_at datetime NOT NULL,
 PRIMARY KEY  (id),
@@ -330,6 +334,7 @@ sender_type varchar(20) NOT NULL,
 sender_id bigint(20) unsigned NOT NULL DEFAULT 0,
 body text NOT NULL,
 client_id char(36) NULL DEFAULT NULL,
+attachment_id bigint(20) unsigned NOT NULL DEFAULT 0,
 created_at datetime NOT NULL,
 read_at datetime NULL DEFAULT NULL,
 PRIMARY KEY  (id),
@@ -345,6 +350,25 @@ hits int(10) unsigned NOT NULL DEFAULT 0,
 expires_at int(10) unsigned NOT NULL,
 PRIMARY KEY  (bucket),
 KEY expires_at (expires_at)
+) {$collate};",
+
+			// Files sent in conversations. The files themselves are stored under
+			// uploads/chatchi-files with unguessable names and only served
+			// through the REST API, after an access check.
+			"CREATE TABLE {$attachments} (
+id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+conversation_id bigint(20) unsigned NOT NULL,
+message_id bigint(20) unsigned NOT NULL DEFAULT 0,
+file_name varchar(200) NOT NULL DEFAULT '',
+mime varchar(100) NOT NULL DEFAULT '',
+size bigint(20) unsigned NOT NULL DEFAULT 0,
+width int(10) unsigned NOT NULL DEFAULT 0,
+height int(10) unsigned NOT NULL DEFAULT 0,
+path varchar(255) NOT NULL DEFAULT '',
+created_at datetime NOT NULL,
+PRIMARY KEY  (id),
+KEY conversation_id (conversation_id),
+KEY message_id (message_id)
 ) {$collate};",
 		);
 	}

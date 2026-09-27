@@ -85,6 +85,32 @@ final class ProfileFields {
 	}
 
 	/**
+	 * Fields of the leave-a-message form shown while support is offline.
+	 *
+	 * The team answers offline messages later, so a way to reach the
+	 * visitor is always needed: email is asked for and required even when
+	 * the start form leaves it out, and the name is always asked for.
+	 *
+	 * @return array<string, array{enabled: bool, required: bool}>
+	 */
+	public function offline(): array {
+		$fields = $this->all();
+
+		$fields[ self::NAME ]['enabled']   = true;
+		$fields[ self::EMAIL ]['enabled']  = true;
+		$fields[ self::EMAIL ]['required'] = true;
+
+		/**
+		 * Filters the leave-a-message form fields.
+		 *
+		 * @param array<string, array{enabled: bool, required: bool}> $fields Field configuration.
+		 */
+		$filtered = apply_filters( 'chatchi_offline_fields', $fields );
+
+		return is_array( $filtered ) ? $filtered : $fields;
+	}
+
+	/**
 	 * Returns the configuration of the enabled fields only.
 	 *
 	 * @return array<string, array{enabled: bool, required: bool}>

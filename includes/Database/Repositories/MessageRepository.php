@@ -40,6 +40,7 @@ final class MessageRepository extends Repository {
 			'sender_id'       => '%d',
 			'body'            => '%s',
 			'client_id'       => '%s',
+			'attachment_id'   => '%d',
 			'created_at'      => '%s',
 			'read_at'         => '%s',
 		);
@@ -262,5 +263,35 @@ final class MessageRepository extends Repository {
 		}
 
 		return $counts;
+	}
+
+	/**
+	 * Links a file to a message.
+	 *
+	 * @param int $id            Message ID.
+	 * @param int $attachment_id Attachment ID.
+	 * @return bool Whether the row changed.
+	 */
+	public function attach( int $id, int $attachment_id ): bool {
+		return $this->update_row( $id, array( 'attachment_id' => max( 0, $attachment_id ) ) );
+	}
+
+	/**
+	 * Counts one side's messages in a conversation.
+	 *
+	 * @param int    $conversation_id Conversation ID.
+	 * @param string $sender_type     Whose messages to count.
+	 */
+	public function count_from( int $conversation_id, string $sender_type ): int {
+		$count = $this->db->get_var(
+			$this->db->prepare(
+				"SELECT COUNT(*) FROM {$this->table()} WHERE conversation_id = %d AND sender_type = %s",
+				$conversation_id,
+				$sender_type
+			)
+		);
+		$this->assert_no_error( 'count of ' . $this->table_name() );
+
+		return (int) $count;
 	}
 }

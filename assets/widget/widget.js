@@ -47,12 +47,13 @@
 	var timeFormat = { format: fmt.time };
 
 	// An expired nonce on a long-open page: continue as a guest instead of failing.
-	var request = Core.createApi( {
+	var client = Core.createApi( {
 		restUrl: config.restUrl,
 		nonce: config.nonce,
 		networkError: S.networkError,
 		dropExpiredNonce: true
-	} ).request;
+	} );
+	var request = client.request;
 
 	var api = {
 		session: function () {
@@ -76,6 +77,12 @@
 		},
 		typing: function ( id, typing ) {
 			return request( 'POST', '/widget/conversations/' + id + '/typing', { body: { typing: typing } } );
+		},
+		upload: function ( id, file, clientId, onProgress ) {
+			var form = new FormData();
+			form.append( 'file', file, file.name );
+			form.append( 'client_id', clientId );
+			return client.upload( '/widget/conversations/' + id + '/attachments', form, onProgress );
 		}
 	};
 
@@ -269,6 +276,43 @@
 			self.close();
 		} );
 
+		// Files dropped on the open chat are sent.
+		var dragDepth = 0;
+		var canDrop = function ( event ) {
+			var types = event.dataTransfer ? Array.from( event.dataTransfer.types || [] ) : [];
+			return self.state.view === 'chat' && ! self.state.closed && self.attachmentSettings().enabled && types.indexOf( 'Files' ) !== -1;
+		};
+
+		this.panel.setAttribute( 'data-drop-label', S.dropFiles );
+		this.panel.addEventListener( 'dragenter', function ( event ) {
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+				dragDepth++;
+				self.panel.classList.add( 'is-dropping' );
+			}
+		} );
+		this.panel.addEventListener( 'dragover', function ( event ) {
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+			}
+		} );
+		this.panel.addEventListener( 'dragleave', function () {
+			dragDepth = Math.max( 0, dragDepth - 1 );
+			if ( ! dragDepth ) {
+				self.panel.classList.remove( 'is-dropping' );
+			}
+		} );
+		this.panel.addEventListener( 'drop', function ( event ) {
+			dragDepth = 0;
+			self.panel.classList.remove( 'is-dropping' );
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+				Array.from( event.dataTransfer.files || [] ).slice( 0, 5 ).forEach( function ( file ) {
+					self.sendFile( file );
+				} );
+			}
+		} );
+
 		// A click anywhere else in the widget closes the emoji picker.
 		this.root.addEventListener( 'click', function ( event ) {
 			var path = event.composedPath ? event.composedPath() : [];
@@ -345,7 +389,37 @@
 
 	Widget.prototype.needsForm = function () {
 		var session = this.state.session;
-		return !! ( session && session.form && session.form.enabled && ! this.state.visitor );
+		return this.offlineForm() || !! ( session && session.form && session.form.enabled && ! this.state.visitor );
+	};
+
+	/**
+	 * Whether to show the leave-a-message form: support is offline and the
+	 * visitor has no conversation going.
+	 */
+	Widget.prototype.offlineForm = function () {
+		var availability = this.availability();
+		return !! ( availability && availability.offline_form && ( ! this.state.conversation || this.state.closed ) );
+	};
+
+	Widget.prototype.availability = function () {
+		return this.state.session && this.state.session.availability;
+	};
+
+	/**
+	 * "We're back today at 09:00" / "…Saturday at 09:00", in the visitor's
+	 * own time zone; empty when unknown.
+	 */
+	Widget.prototype.backAt = function () {
+		var availability = this.availability();
+		var opens = availability && availability.opens_at ? new Date( availability.opens_at ) : null;
+
+		if ( ! opens || isNaN( opens ) ) {
+			return '';
+		}
+
+		var day = dayKey( opens ) === dayKey( new Date() ) ? S.today : new Intl.DateTimeFormat( locale, { weekday: 'long' } ).format( opens );
+
+		return String( S.backAt ).replace( '%s', day + ' ' + timeFormat.format( opens ) );
 	};
 
 	Widget.prototype.toggle = function () {
@@ -500,13 +574,76 @@
 		this.deliver( pending );
 	};
 
+	/**
+	 * Sends a file the visitor picked, pasted or dropped. Too large or
+	 * unsupported files are refused right away, without uploading.
+	 */
+	Widget.prototype.sendFile = function ( file ) {
+		var settings = this.attachmentSettings();
+		var pending = { clientId: uuid(), body: file.name, file: file, progress: 0, failed: false };
+
+		if ( ! settings.enabled ) {
+			return;
+		}
+
+		pending.isImage = /^image\/(jpeg|png|gif|webp)$/.test( file.type );
+		if ( pending.isImage && window.URL && URL.createObjectURL ) {
+			pending.preview = URL.createObjectURL( file );
+		}
+
+		this.state.pending.push( pending );
+		this.scrollToBottom();
+
+		if ( file.size > settings.max_bytes ) {
+			pending.failed = true;
+			pending.fatal = true;
+			pending.reason = String( S.fileTooLarge ).replace( '%s', Core.fileSize( settings.max_bytes, locale ) );
+			this.render();
+			return;
+		}
+
+		this.deliver( pending );
+	};
+
+	Widget.prototype.attachmentSettings = function () {
+		var session = this.state.session || {};
+		return session.attachments || { enabled: false, max_bytes: 0, accept: '' };
+	};
+
+	/**
+	 * Updates an upload's progress bar in place.
+	 */
+	Widget.prototype.showProgress = function ( pending ) {
+		var bar = this.panel.querySelector( '[data-key="' + pending.clientId + '"] .chatchi-progress span' );
+
+		if ( bar ) {
+			bar.style.width = Math.round( pending.progress * 100 ) + '%';
+		}
+	};
+
 	Widget.prototype.deliver = function ( pending ) {
 		var self = this;
+
+		// A file that can never be sent (too large, wrong type): tapping the
+		// error removes it.
+		if ( pending.fatal ) {
+			this.state.pending = this.state.pending.filter( function ( p ) {
+				return p !== pending;
+			} );
+			this.render();
+			return;
+		}
 
 		pending.failed = false;
 		this.render();
 
 		this.ensureConversation().then( function ( conversation ) {
+			if ( pending.file ) {
+				return api.upload( conversation.id, pending.file, pending.clientId, function ( progress ) {
+					pending.progress = progress;
+					self.showProgress( pending );
+				} );
+			}
 			return api.send( conversation.id, pending.body, pending.clientId ).catch( function ( error ) {
 				// One quiet retry after a server error; client_id prevents duplicates.
 				if ( error.status >= 500 ) {
@@ -519,6 +656,10 @@
 				throw error;
 			} );
 		} ).then( function ( message ) {
+			if ( pending.preview ) {
+				// The server's copy replaces the local preview.
+				URL.revokeObjectURL( pending.preview );
+			}
 			self.merge( [ message ] );
 			self.render();
 			self.scrollToBottom();
@@ -541,6 +682,7 @@
 				return;
 			}
 			pending.failed = true;
+			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large', 'chatchi_attachments_disabled' ].indexOf( error.code ) !== -1;
 			pending.limited = error.code === 'chatchi_rate_limited';
 			// Say why when the server refused the message itself (e.g. too long);
 			// connection problems keep the generic "tap to retry".
@@ -676,6 +818,8 @@
 	Widget.prototype.submitForm = function ( form ) {
 		var self = this;
 		var data = {};
+		var offline = this.offlineForm();
+		var message = offline && form.elements.message ? form.elements.message.value.trim() : '';
 
 		[ 'name', 'email', 'phone' ].forEach( function ( field ) {
 			if ( form.elements[ field ] ) {
@@ -683,15 +827,30 @@
 			}
 		} );
 
-		this.state.formValues = data;
+		this.state.formValues = Object.assign( { message: offline && form.elements.message ? form.elements.message.value : '' }, data );
+
+		if ( offline && ! message ) {
+			this.set( { formErrors: { message: S.messageRequired }, formAlert: '' } );
+			form.elements.message.focus();
+			return;
+		}
+
 		this.set( { submitting: true, formErrors: {}, formAlert: '' } );
 
 		var trap = form.elements[ TRAP_FIELD ] ? form.elements[ TRAP_FIELD ].value : '';
 
-		this.startConversation( data, trap ).then( function ( result ) {
+		this.startConversation( Object.assign( { offline: offline }, data ), trap ).then( function ( result ) {
 			self.state.visitor = result.visitor;
 			self.state.conversation = result.conversation;
 			self.state.closed = false;
+			if ( offline ) {
+				// The message is part of the form; send it before showing the chat.
+				return api.send( result.conversation.id, message, uuid() ).then( function () {
+					self.state.offlineSent = true;
+					self.state.formValues = null;
+				} );
+			}
+		} ).then( function () {
 			return self.loadLatest();
 		} ).then( function () {
 			self.set( { view: 'chat', submitting: false } );
@@ -701,6 +860,16 @@
 		} ).catch( function ( error ) {
 			var fields = ( error.data && error.data.fields ) || {};
 			var alert = error.code === 'chatchi_rate_limited' ? self.waitMessage( error ) : error.message;
+
+			// Keep what was typed while the form was being sent: the form on
+			// screen (rebuilt when sending started) is rebuilt again below.
+			var current = self.panel.querySelector( '.chatchi-form' );
+			[ 'name', 'email', 'phone', 'message' ].forEach( function ( field ) {
+				if ( current && current.elements[ field ] ) {
+					self.state.formValues[ field ] = current.elements[ field ].value;
+				}
+			} );
+
 			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : alert, formDebug: self.debugDetails( error ) } );
 			var invalid = self.panel.querySelector( '[aria-invalid="true"]' );
 			if ( invalid ) {
@@ -758,6 +927,7 @@
 		this.state.pending = [];
 		this.state.hasMore = false;
 		this.lastReadMarked = 0;
+		this.state.offlineSent = false;
 		this.set( { closed: false, view: this.needsForm() ? 'form' : 'chat' } );
 		this.focusDefault();
 	};
@@ -852,6 +1022,12 @@
 
 	Widget.prototype.applySession = function ( session ) {
 		var current = this.state.conversation;
+
+		if ( this.state.session && session.availability && JSON.stringify( session.availability ) !== JSON.stringify( this.state.session.availability ) ) {
+			this.state.session.availability = session.availability;
+			this.shellKey = null;
+			this.render();
+		}
 
 		if ( ! session.conversation || ( current && session.conversation.id !== current.id ) ) {
 			if ( current ) {
@@ -1003,7 +1179,9 @@
 			agent ? [ agent.id, agent.name, agent.avatar_url ] : null,
 			!! state.conversation,
 			state.view === 'form' ? [ state.formErrors, state.formAlert, state.submitting ] : null,
-			state.view === 'error' ? state.errorMessage : null
+			state.view === 'error' ? state.errorMessage : null,
+			this.availability() ? [ this.availability().mode, this.availability().offline_form, this.availability().opens_at ] : null,
+			!! state.offlineSent
 		] );
 
 		if ( shellKey !== this.shellKey ) {
@@ -1031,8 +1209,59 @@
 			return;
 		}
 
-		subtitle.textContent = typing ? S.typing : ( agent ? S.support : S.subtitle );
+		subtitle.textContent = typing ? S.typing : this.statusText( agent );
 		subtitle.classList.toggle( 'is-typing', typing );
+	};
+
+	/**
+	 * The header subtitle for the current availability.
+	 */
+	Widget.prototype.statusText = function ( agent ) {
+		var availability = this.availability();
+		var mode = availability ? availability.mode : 'online';
+
+		if ( mode === 'offline' ) {
+			return this.backAt() || S.statusOffline;
+		}
+		if ( mode === 'away' ) {
+			return S.statusAway;
+		}
+
+		return agent ? S.support : S.subtitle;
+	};
+
+	/**
+	 * A dot on the header avatar: green online, amber away, gray offline.
+	 */
+	Widget.prototype.renderPresence = function () {
+		var availability = this.availability();
+
+		if ( ! availability ) {
+			return null;
+		}
+
+		var labels = { online: S.statusOnlineLabel, away: S.statusAway, offline: S.statusOffline };
+
+		return h( 'span', { className: 'chatchi-presence chatchi-presence--' + availability.mode, role: 'img', 'aria-label': labels[ availability.mode ] || '' } );
+	};
+
+	/**
+	 * A notice above the composer while no agent can answer right away.
+	 */
+	Widget.prototype.renderBanner = function () {
+		var availability = this.availability();
+
+		if ( ! availability || availability.mode === 'online' || this.state.closed ) {
+			return null;
+		}
+
+		var text = availability.mode === 'offline' ? S.offlineBanner : S.awayBanner;
+		var back = availability.mode === 'offline' ? this.backAt() : '';
+
+		return h( 'div', { className: 'chatchi-banner chatchi-banner--' + availability.mode, role: 'status' }, [
+			icon( availability.mode === 'offline' ? 'clock' : 'info' ),
+			h( 'p', {}, [ text, back ? h( 'strong', { text: ' ' + back } ) : null ] )
+		] );
 	};
 
 	Widget.prototype.renderShell = function () {
@@ -1080,10 +1309,13 @@
 		var canEnd = state.view === 'chat' && state.conversation && ! state.closed;
 
 		return h( 'div', { className: 'chatchi-header' }, [
-			agent ? this.renderAvatar( agent ) : h( 'span', { className: 'chatchi-avatar', 'aria-hidden': 'true' }, [ icon( 'headset' ) ] ),
+			h( 'span', { className: 'chatchi-header__avatar' }, [
+				agent ? this.renderAvatar( agent ) : h( 'span', { className: 'chatchi-avatar', 'aria-hidden': 'true' }, [ icon( 'headset' ) ] ),
+				this.renderPresence()
+			] ),
 			h( 'div', { className: 'chatchi-header__text' }, [
 				h( 'h2', { id: 'chatchi-title', className: 'chatchi-title', text: title } ),
-				h( 'p', { className: 'chatchi-subtitle', 'aria-live': 'polite', text: agent ? S.support : S.subtitle } )
+				h( 'p', { className: 'chatchi-subtitle', 'aria-live': 'polite', text: this.statusText( agent ) } )
 			] ),
 			h( 'div', { className: 'chatchi-header__actions' }, [
 				canEnd ? h( 'button', {
@@ -1143,6 +1375,11 @@
 			] ) );
 			if ( state.confirmingEnd ) {
 				body.appendChild( this.renderConfirm() );
+			} else {
+				var banner = this.renderBanner();
+				if ( banner ) {
+					body.appendChild( banner );
+				}
 			}
 			body.appendChild( this.renderFooter() );
 		}
@@ -1171,8 +1408,11 @@
 	Widget.prototype.renderForm = function () {
 		var self = this;
 		var state = this.state;
-		var fields = ( state.session && state.session.form && state.session.form.fields ) || {};
+		var offline = this.offlineForm();
+		var form_config = ( state.session && state.session.form ) || {};
+		var fields = ( offline ? form_config.offline_fields : form_config.fields ) || {};
 		var values = Object.assign( {}, state.visitor || {}, state.formValues || {} );
+		var availability = this.availability();
 		var specs = {
 			name: { type: 'text', autocomplete: 'name', label: S.name },
 			email: { type: 'email', autocomplete: 'email', label: S.email, dir: 'ltr', inputmode: 'email' },
@@ -1186,7 +1426,10 @@
 				event.preventDefault();
 				self.submitForm( form );
 			}
-		}, [
+		}, offline ? [
+			this.renderMessage( { key: 'offline', mine: false, type: 'welcome', sender: { name: S.support, avatar_url: null }, body: availability.offline_message, date: new Date() }, true, true ),
+			this.backAt() ? h( 'p', { className: 'chatchi-form__intro chatchi-form__back' }, [ icon( 'clock' ), this.backAt() ] ) : null
+		] : [
 			config.welcome ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
 			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
 		] );
@@ -1225,6 +1468,24 @@
 			] ) );
 		} );
 
+		if ( offline ) {
+			var messageError = state.formErrors.message;
+			card.appendChild( h( 'div', { className: 'chatchi-field' }, [
+				h( 'label', { className: 'chatchi-label', for: 'chatchi-field-message', text: S.yourMessage } ),
+				h( 'textarea', {
+					id: 'chatchi-field-message',
+					name: 'message',
+					className: 'chatchi-input chatchi-input--message',
+					rows: '4',
+					required: true,
+					value: values.message || state.draft || '',
+					'aria-invalid': messageError ? 'true' : null,
+					'aria-describedby': messageError ? 'chatchi-field-message-error' : null
+				} ),
+				messageError ? h( 'p', { id: 'chatchi-field-message-error', className: 'chatchi-field-error', text: messageError } ) : null
+			] ) );
+		}
+
 		// Honeypot: invisible to people and screen readers; bots fill it in.
 		card.appendChild( h( 'div', { className: 'chatchi-trap', 'aria-hidden': 'true' }, [
 			h( 'label', { for: 'chatchi-field-' + TRAP_FIELD, text: 'Website' } ),
@@ -1238,7 +1499,7 @@
 			}
 		}
 
-		card.appendChild( h( 'button', { type: 'submit', className: 'chatchi-button', disabled: state.submitting, text: state.submitting ? S.loading : S.start } ) );
+		card.appendChild( h( 'button', { type: 'submit', className: 'chatchi-button', disabled: state.submitting, text: state.submitting ? S.loading : ( offline ? S.sendMessage : S.start ) } ) );
 
 		return form;
 	};
@@ -1271,12 +1532,13 @@
 				type: m.sender.type,
 				sender: m.sender,
 				body: m.body,
+				attachment: m.attachment,
 				date: new Date( m.created_at ),
 				read: !! m.read_at,
 				isNew: !! self.newIds[ m.id ]
 			};
 		} ).concat( state.pending.map( function ( p ) {
-			return { key: p.clientId, mine: true, type: 'visitor', body: p.body, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: true };
+			return { key: p.clientId, mine: true, type: 'visitor', body: p.body, upload: p.file ? p : null, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: ! p.shown };
 		} ) );
 
 		// The welcome message opens the conversation once its start is loaded.
@@ -1307,6 +1569,10 @@
 
 			log.appendChild( self.renderMessage( entry, groupStart, groupEnd ) );
 		} );
+
+		if ( state.offlineSent ) {
+			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.offlineSent } ) ] ) );
+		}
 
 		if ( state.agentTyping && ! state.closed ) {
 			log.appendChild( this.renderTyping() );
@@ -1390,8 +1656,17 @@
 			stack.appendChild( h( 'span', { className: 'chatchi-sender', text: entry.sender.name } ) );
 		}
 
-		var bubble = h( 'div', { className: 'chatchi-bubble' + ( emojiOnly( entry.body ) ? ' is-emoji' : '' ) } );
-		bubble.appendChild( linkify( entry.body ) );
+		var bubble;
+
+		if ( entry.attachment ) {
+			bubble = this.renderAttachment( entry.attachment );
+		} else if ( entry.upload ) {
+			bubble = this.renderUpload( entry.upload );
+			entry.upload.shown = true;
+		} else {
+			bubble = h( 'div', { className: 'chatchi-bubble' + ( emojiOnly( entry.body ) ? ' is-emoji' : '' ) } );
+			bubble.appendChild( linkify( entry.body ) );
+		}
 		stack.appendChild( bubble );
 
 		if ( entry.failed ) {
@@ -1411,7 +1686,7 @@
 			stack.appendChild( this.renderMeta( entry ) );
 		}
 
-		var row = h( 'div', { className: classes.join( ' ' ) } );
+		var row = h( 'div', { className: classes.join( ' ' ), 'data-key': String( entry.key ) } );
 
 		if ( ! entry.mine ) {
 			var avatar = this.renderAvatar( entry.sender, true );
@@ -1424,6 +1699,69 @@
 		row.appendChild( stack );
 
 		return row;
+	};
+
+	/**
+	 * A sent file: pictures as a thumbnail that opens full size, other
+	 * files as a card that downloads them.
+	 */
+	Widget.prototype.renderAttachment = function ( attachment ) {
+		if ( attachment.is_image ) {
+			return h( 'a', {
+				className: 'chatchi-bubble chatchi-bubble--image',
+				href: client.fileUrl( attachment.url ),
+				target: '_blank',
+				rel: 'noopener',
+				title: attachment.name
+			}, [
+				h( 'img', {
+					src: client.fileUrl( attachment.url ),
+					alt: attachment.name,
+					loading: 'lazy',
+					width: attachment.width ? String( attachment.width ) : null,
+					height: attachment.height ? String( attachment.height ) : null
+				} )
+			] );
+		}
+
+		return h( 'a', {
+			className: 'chatchi-bubble chatchi-file',
+			href: client.fileUrl( attachment.url, true ),
+			download: attachment.name,
+			title: S.download + ': ' + attachment.name
+		}, [
+			h( 'span', { className: 'chatchi-file__icon' }, [ icon( 'file' ) ] ),
+			h( 'span', { className: 'chatchi-file__text' }, [
+				h( 'span', { className: 'chatchi-file__name', text: attachment.name } ),
+				h( 'small', { text: Core.fileSize( attachment.size, locale ) } )
+			] ),
+			icon( 'download' )
+		] );
+	};
+
+	/**
+	 * A file still uploading, with its progress.
+	 */
+	Widget.prototype.renderUpload = function ( pending ) {
+		var bar = h( 'span', { className: 'chatchi-progress', role: 'progressbar', 'aria-label': S.uploading }, [
+			h( 'span', { style: 'width:' + Math.round( ( pending.progress || 0 ) * 100 ) + '%' } )
+		] );
+
+		if ( pending.preview ) {
+			return h( 'div', { className: 'chatchi-bubble chatchi-bubble--image is-uploading' }, [
+				h( 'img', { src: pending.preview, alt: pending.body } ),
+				pending.failed ? null : bar
+			] );
+		}
+
+		return h( 'div', { className: 'chatchi-bubble chatchi-file is-uploading' }, [
+			h( 'span', { className: 'chatchi-file__icon' }, [ icon( 'file' ) ] ),
+			h( 'span', { className: 'chatchi-file__text' }, [
+				h( 'span', { className: 'chatchi-file__name', text: pending.body } ),
+				h( 'small', { text: Core.fileSize( pending.file.size, locale ) } ),
+				pending.failed ? null : bar
+			] )
+		] );
 	};
 
 	Widget.prototype.renderMeta = function ( entry ) {
@@ -1515,7 +1853,46 @@
 				self.toggleEmoji();
 			}
 		}, [ icon( 'smile' ) ] );
-		var box = h( 'div', { className: 'chatchi-composer__box' }, [ emojiButton, textarea, sendButton ] );
+		var attachments = this.attachmentSettings();
+		var fileInput = attachments.enabled ? h( 'input', {
+			type: 'file',
+			className: 'chatchi-sr',
+			tabindex: '-1',
+			'aria-hidden': 'true',
+			accept: attachments.accept,
+			multiple: true
+		} ) : null;
+		var attachButton = attachments.enabled ? h( 'button', {
+			type: 'button',
+			className: 'chatchi-tool chatchi-tool--attach',
+			'aria-label': S.attach,
+			title: S.attach,
+			onClick: function () {
+				fileInput.click();
+			}
+		}, [ icon( 'paperclip' ) ] ) : null;
+
+		if ( fileInput ) {
+			fileInput.addEventListener( 'change', function () {
+				Array.from( fileInput.files || [] ).slice( 0, 5 ).forEach( function ( file ) {
+					self.sendFile( file );
+				} );
+				fileInput.value = '';
+			} );
+
+			// Pasting a screenshot sends it.
+			textarea.addEventListener( 'paste', function ( event ) {
+				var files = event.clipboardData ? Array.from( event.clipboardData.files || [] ) : [];
+				if ( files.length ) {
+					event.preventDefault();
+					files.slice( 0, 5 ).forEach( function ( file ) {
+						self.sendFile( file );
+					} );
+				}
+			} );
+		}
+
+		var box = h( 'div', { className: 'chatchi-composer__box' }, [ emojiButton, attachButton, fileInput, textarea, sendButton ] );
 		var picker = h( 'div', { id: 'chatchi-emoji', className: 'chatchi-emoji', role: 'group', 'aria-label': S.emoji, hidden: true }, EMOJI.map( function ( emoji ) {
 			return h( 'button', {
 				type: 'button',

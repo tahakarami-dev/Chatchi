@@ -11,6 +11,7 @@ use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationSummary;
 use ChatChi\Messages\MessagePage;
 use ChatChi\Models\Agent;
+use ChatChi\Models\Attachment;
 use ChatChi\Models\Conversation;
 use ChatChi\Models\Message;
 use ChatChi\Models\Visitor;
@@ -70,6 +71,7 @@ final class Presenter {
 		return $this->agent( $agent ) + array(
 			'user_id'   => $agent->user_id,
 			'is_active' => $agent->is_active,
+			'status'    => $agent->status,
 		);
 	}
 
@@ -86,6 +88,8 @@ final class Presenter {
 			'user_id'    => $agent->user_id,
 			'avatar_id'  => $agent->avatar_id,
 			'is_active'  => $agent->is_active,
+			'status'     => $agent->status,
+			'online'     => $agent->is_available(),
 			'is_me'      => $agent->user_id === $viewer_id,
 			'user'       => $user ? array(
 				'login'        => $user->user_login,
@@ -196,9 +200,10 @@ final class Presenter {
 	 * @param Message           $message Message.
 	 * @param Actor             $viewer  Who is reading.
 	 * @param array<int, Agent> $agents  Agents by ID, to name agent senders.
+	 * @param array<int, Attachment> $attachments Attachments by ID, to describe files.
 	 * @return array<string, mixed>
 	 */
-	public function message( Message $message, Actor $viewer, array $agents = array() ): array {
+	public function message( Message $message, Actor $viewer, array $agents = array(), array $attachments = array() ): array {
 		$sender = array(
 			'type'       => $message->sender_type,
 			'name'       => null,
@@ -217,6 +222,8 @@ final class Presenter {
 			'is_mine'         => $message->sender_type === $viewer->type() && $message->sender_id === $viewer->id(),
 			'body'            => $message->body,
 			'client_id'       => $message->client_id,
+			'attachment'      => isset( $attachments[ $message->attachment_id ] ) ? $this->attachment( $attachments[ $message->attachment_id ], $viewer ) : null,
+			'has_attachment'  => $message->attachment_id > 0,
 			'created_at'      => $this->date( $message->created_at ),
 			'read_at'         => $this->date( $message->read_at ),
 		);
@@ -227,13 +234,14 @@ final class Presenter {
 	 *
 	 * @param MessagePage $page   Messages.
 	 * @param Actor       $viewer Who is reading.
+	 * @param array<int, Attachment> $attachments Attachments of the messages, by ID.
 	 * @return array<string, mixed>
 	 */
-	public function message_page( MessagePage $page, Actor $viewer ): array {
+	public function message_page( MessagePage $page, Actor $viewer, array $attachments = array() ): array {
 		$items = array();
 
 		foreach ( $page->messages as $message ) {
-			$items[] = $this->message( $message, $viewer, $page->agents );
+			$items[] = $this->message( $message, $viewer, $page->agents, $attachments );
 		}
 
 		return array(
@@ -241,6 +249,28 @@ final class Presenter {
 			'has_more' => $page->has_more,
 			'last_id'  => $page->last_id(),
 			'typing'   => $page->typing,
+		);
+	}
+
+	/**
+	 * A file, with the address the viewer downloads it from.
+	 *
+	 * @param Attachment $attachment Attachment.
+	 * @param Actor      $viewer     Who is reading; decides the API base.
+	 * @return array<string, mixed>
+	 */
+	public function attachment( Attachment $attachment, Actor $viewer ): array {
+		$base = $viewer->is_agent() ? 'agent' : 'widget';
+
+		return array(
+			'id'       => $attachment->id,
+			'name'     => $attachment->file_name,
+			'mime'     => $attachment->mime,
+			'size'     => $attachment->size,
+			'is_image' => $attachment->is_image(),
+			'width'    => $attachment->width,
+			'height'   => $attachment->height,
+			'url'      => rest_url( sprintf( 'chatchi/v1/%s/conversations/%d/attachments/%d', $base, $attachment->conversation_id, $attachment->id ) ),
 		);
 	}
 

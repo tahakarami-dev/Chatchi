@@ -115,6 +115,35 @@ svg {
 	color: var(--chatchi-primary-contrast);
 }
 
+.cc-status {
+	position: relative;
+	border-radius: 50%;
+	transition: transform var(--chatchi-duration-fast);
+}
+
+.cc-status:hover {
+	transform: scale(1.06);
+}
+
+.cc-status__dot {
+	position: absolute;
+	bottom: 0;
+	inset-inline-end: 0;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #f59e0b;
+	box-shadow: 0 0 0 2px var(--chatchi-text);
+}
+
+.cc-status.is-online .cc-status__dot {
+	background: #22c55e;
+}
+
+.cc-status.is-away .cc-avatar {
+	opacity: .7;
+}
+
 .cc-rail-item {
 	position: relative;
 	width: 44px;
@@ -1562,6 +1591,104 @@ label.cc-button {
 	accent-color: var(--chatchi-primary);
 }
 
+.cc-radio--rich {
+	align-items: flex-start;
+}
+
+.cc-radio--rich input {
+	margin-top: 4px;
+}
+
+.cc-radio--rich span {
+	display: flex;
+	flex-direction: column;
+}
+
+.cc-radio--rich small {
+	color: var(--chatchi-text-muted);
+	font-size: 12px;
+}
+
+/* Business hours: one row per day. */
+
+.cc-hours {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	transition: opacity var(--chatchi-duration-fast);
+}
+
+.cc-hours.is-off {
+	opacity: .5;
+}
+
+.cc-hours__row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 48px;
+	padding: 4px 12px;
+	border-radius: var(--chatchi-radius-sm);
+	background: var(--chatchi-bg);
+}
+
+.cc-hours__day {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 130px;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.cc-hours__day input {
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	accent-color: var(--chatchi-primary);
+}
+
+.cc-hours__times {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--chatchi-text-muted);
+	font-size: 13px;
+}
+
+.cc-input--time {
+	width: 116px;
+	height: 38px;
+	direction: ltr;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.cc-hours__closed {
+	display: none;
+	color: var(--chatchi-text-subtle);
+	font-size: 13px;
+}
+
+.cc-hours__row.is-closed .cc-hours__times {
+	display: none;
+}
+
+.cc-hours__row.is-closed .cc-hours__closed {
+	display: inline;
+}
+
+@media (max-width: 520px) {
+	.cc-hours__row {
+		flex-wrap: wrap;
+		padding: 8px 12px;
+	}
+
+	.cc-input--time {
+		width: 100px;
+	}
+}
+
 .cc-picker {
 	display: flex;
 	flex-direction: column;
@@ -2161,4 +2288,334 @@ label.cc-button {
 	.cc-field-row .cc-field-error {
 		grid-column: 1;
 	}
+}
+
+/* Saved replies (#/canned) */
+
+.cc-canned-tip {
+	margin: -8px 0 16px;
+}
+
+.cc-canned-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.cc-canned-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	padding: 14px 20px;
+	border-radius: var(--chatchi-radius-md);
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-sm), inset 0 0 0 1px var(--chatchi-border);
+}
+
+.cc-canned-item__text {
+	flex: 1;
+	min-width: 0;
+}
+
+.cc-canned-item__text h2 {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 4px;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.cc-canned-item__text p {
+	margin: 0;
+	color: var(--chatchi-text-muted);
+	font-size: 13px;
+	white-space: pre-line;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.cc-canned-item__actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.cc-canned-shortcut {
+	padding: 0 8px;
+	border-radius: 6px;
+	background: var(--chatchi-primary-soft);
+	color: var(--chatchi-primary);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 22px;
+}
+
+.cc-canned-editor {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin-bottom: 12px;
+	padding: 20px;
+}
+
+.cc-canned-editor__row {
+	display: grid;
+	grid-template-columns: 2fr 1fr;
+	gap: 12px;
+}
+
+.cc-canned-editor__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.cc-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.cc-button--sm {
+	height: 32px;
+	padding: 0 12px;
+	font-size: 12px;
+}
+
+@media (max-width: 640px) {
+	.cc-canned-editor__row {
+		grid-template-columns: 1fr;
+	}
+
+	.cc-canned-item {
+		flex-direction: column;
+	}
+}
+
+/* Composer tools and the saved-replies picker */
+
+.cc-composer__inner {
+	position: relative;
+	max-width: 760px;
+	margin: 0 auto;
+}
+
+.cc-tool {
+	width: 44px;
+	height: 44px;
+	flex-shrink: 0;
+	border-radius: var(--chatchi-radius-md);
+	display: grid;
+	place-items: center;
+	color: var(--chatchi-text-subtle);
+	transition: color var(--chatchi-duration-fast), background-color var(--chatchi-duration-fast);
+}
+
+.cc-tool:hover,
+.cc-tool[aria-expanded="true"] {
+	color: var(--chatchi-primary);
+	background: var(--chatchi-primary-soft);
+}
+
+.cc-canned-picker {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	inset-inline: 0;
+	z-index: 20;
+	max-height: 300px;
+	overflow-y: auto;
+	padding: 6px;
+	border-radius: var(--chatchi-radius-md);
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-lg), 0 0 0 1px var(--chatchi-border);
+}
+
+.cc-canned-picker[hidden] {
+	display: none;
+}
+
+.cc-canned-option {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 12px;
+	border-radius: var(--chatchi-radius-sm);
+	cursor: pointer;
+}
+
+.cc-canned-option.is-active,
+.cc-canned-option:hover {
+	background: var(--chatchi-primary-soft);
+}
+
+.cc-canned-option__head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+
+.cc-canned-option__head code {
+	color: var(--chatchi-primary);
+	font-size: 12px;
+}
+
+.cc-canned-option__body {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--chatchi-text-muted);
+	font-size: 12px;
+}
+
+.cc-canned-picker__empty {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0;
+	padding: 10px 12px;
+	color: var(--chatchi-text-muted);
+	font-size: 13px;
+}
+
+.cc-canned-picker__empty a {
+	color: var(--chatchi-primary);
+}
+
+/* Files and pictures in conversations */
+
+.cc-bubble--image {
+	position: relative;
+	display: block;
+	padding: 4px !important;
+	overflow: hidden;
+	line-height: 0;
+	background: var(--chatchi-surface) !important;
+	box-shadow: inset 0 0 0 1px var(--chatchi-border) !important;
+}
+
+.cc-bubble--image img {
+	display: block;
+	max-width: 280px;
+	max-height: 300px;
+	width: auto;
+	height: auto;
+	border-radius: 10px;
+	object-fit: cover;
+	background: var(--chatchi-surface-muted);
+}
+
+.cc-bubble--image.is-uploading img {
+	opacity: .6;
+}
+
+.cc-bubble--image .cc-progress {
+	position: absolute;
+	inset-inline: 12px;
+	bottom: 12px;
+}
+
+.cc-file {
+	display: flex !important;
+	align-items: center;
+	gap: 10px;
+	min-width: 220px;
+	max-width: 300px;
+	text-decoration: none;
+	color: inherit;
+}
+
+.cc-file__icon {
+	width: 38px;
+	height: 38px;
+	flex-shrink: 0;
+	border-radius: 10px;
+	display: grid;
+	place-items: center;
+	background: var(--chatchi-primary-soft);
+	color: var(--chatchi-primary);
+}
+
+.cc-row--mine .cc-file__icon {
+	background: rgba(255, 255, 255, .2);
+	color: inherit;
+}
+
+.cc-file__text {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	line-height: 1.5;
+}
+
+.cc-file__name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+	unicode-bidi: plaintext;
+}
+
+.cc-file__text small {
+	opacity: .75;
+	font-size: 11px;
+}
+
+.cc-file > svg {
+	width: 18px;
+	height: 18px;
+	opacity: .8;
+}
+
+.cc-progress {
+	display: block;
+	height: 4px;
+	margin-top: 6px;
+	overflow: hidden;
+	border-radius: 9999px;
+	background: var(--chatchi-surface-muted);
+}
+
+.cc-progress span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--chatchi-primary);
+	transition: width var(--chatchi-duration-base);
+}
+
+.cc-row--mine .cc-file .cc-progress {
+	background: rgba(255, 255, 255, .35);
+}
+
+.cc-row--mine .cc-file .cc-progress span {
+	background: #fff;
+}
+
+.cc-conv-pane.is-dropping {
+	position: relative;
+}
+
+.cc-conv-pane.is-dropping::after {
+	content: attr(data-drop-label);
+	position: absolute;
+	inset: 12px;
+	z-index: 30;
+	display: grid;
+	place-items: center;
+	border: 2px dashed var(--chatchi-primary);
+	border-radius: var(--chatchi-radius-md);
+	background: rgba(255, 255, 255, .9);
+	color: var(--chatchi-primary);
+	font-size: 16px;
+	font-weight: 700;
+	pointer-events: none;
 }

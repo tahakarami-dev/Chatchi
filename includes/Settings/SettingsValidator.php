@@ -7,6 +7,7 @@
 
 namespace ChatChi\Settings;
 
+use ChatChi\Availability\Schedule;
 use ChatChi\Security\IpRange;
 use ChatChi\Support\PlainText;
 
@@ -38,6 +39,10 @@ final class SettingsValidator {
 
 	public const FIELD_MODES = array( 'off', 'optional', 'required' );
 
+	public const OFFLINE_MODES = array( 'message', 'chat' );
+
+	public const OFFLINE_MESSAGE_MAX_LENGTH = 300;
+
 	/**
 	 * Whole-number settings: name => array( min, max, default ).
 	 */
@@ -48,6 +53,7 @@ final class SettingsValidator {
 		'limit_messages_ip'      => array( 1, 5000, 60 ),
 		'limit_starts_visitor'   => array( 1, 100, 5 ),
 		'limit_starts_ip'        => array( 1, 1000, 10 ),
+		'attachment_max_mb'      => array( 1, 50, 5 ),
 	);
 
 	public const MAX_TRUSTED_PROXIES = 100;
@@ -103,6 +109,17 @@ final class SettingsValidator {
 			// Empty means "use the translated default text".
 			'form_intro'               => '',
 			'spam_protection'          => true,
+			// Business hours and offline visitors.
+			'hours_enabled'            => false,
+			'hours'                    => Schedule::defaults(),
+			'offline_mode'             => 'message',
+			'offline_no_agents'        => false,
+			// Empty means "use the translated default text".
+			'offline_message'          => '',
+			'notify_email_enabled'     => true,
+			// Empty means "the site admin email".
+			'notify_email'             => '',
+			'attachments_enabled'      => true,
 		);
 
 		foreach ( self::NUMBERS as $key => $range ) {
@@ -249,7 +266,27 @@ final class SettingsValidator {
 				case 'widget_sound':
 				case 'delete_data_on_uninstall':
 				case 'spam_protection':
+				case 'hours_enabled':
+				case 'offline_no_agents':
+				case 'notify_email_enabled':
+				case 'attachments_enabled':
 					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'hours':
+					$settings[ $key ] = Schedule::repair( $value );
+					break;
+
+				case 'offline_mode':
+					$settings[ $key ] = in_array( $value, self::OFFLINE_MODES, true ) ? $value : $default;
+					break;
+
+				case 'offline_message':
+					$settings[ $key ] = is_string( $value ) ? $value : $default;
+					break;
+
+				case 'notify_email':
+					$settings[ $key ] = is_string( $value ) && ( '' === $value || is_email( $value ) ) ? $value : $default;
 					break;
 
 				case 'form_name':
@@ -329,7 +366,33 @@ final class SettingsValidator {
 			case 'widget_sound':
 			case 'delete_data_on_uninstall':
 			case 'spam_protection':
+			case 'hours_enabled':
+			case 'offline_no_agents':
+			case 'notify_email_enabled':
+			case 'attachments_enabled':
 				return rest_sanitize_boolean( $value );
+
+			case 'hours':
+				$week = Schedule::clean( $value );
+
+				return null !== $week
+					? $week
+					: new \WP_Error( 'invalid', __( 'Each open day needs a start time before its end time, like 09:00 to 17:00.', 'chatchi' ) );
+
+			case 'offline_mode':
+				return in_array( $value, self::OFFLINE_MODES, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose what offline visitors see.', 'chatchi' ) );
+
+			case 'offline_message':
+				return $this->long_text( $value, self::OFFLINE_MESSAGE_MAX_LENGTH );
+
+			case 'notify_email':
+				$email = is_string( $value ) ? sanitize_email( trim( $value ) ) : null;
+
+				return null !== $email && ( '' === trim( (string) $value ) || is_email( $email ) )
+					? (string) $email
+					: new \WP_Error( 'invalid', __( 'Enter a valid email address, or leave it empty for the site admin email.', 'chatchi' ) );
 
 			case 'form_name':
 			case 'form_email':
@@ -370,6 +433,31 @@ final class SettingsValidator {
 				'invalid',
 				/* translators: %d: maximum number of characters. */
 				sprintf( __( 'The welcome message can be at most %d characters.', 'chatchi' ), self::WELCOME_MAX_LENGTH )
+			);
+		}
+
+		return $text;
+	}
+
+	/**
+	 * Plain text that may have line breaks.
+	 *
+	 * @param mixed $value Raw value.
+	 * @param int   $max   Maximum length in characters.
+	 * @return string|\WP_Error
+	 */
+	private function long_text( $value, int $max ) {
+		if ( ! is_string( $value ) ) {
+			return new \WP_Error( 'invalid', __( 'Enter the text as plain text.', 'chatchi' ) );
+		}
+
+		$text = PlainText::paragraphs( $value );
+
+		if ( mb_strlen( $text ) > $max ) {
+			return new \WP_Error(
+				'invalid',
+				/* translators: %d: maximum number of characters. */
+				sprintf( __( 'Use at most %d characters.', 'chatchi' ), $max )
 			);
 		}
 

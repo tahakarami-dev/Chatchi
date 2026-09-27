@@ -39,6 +39,8 @@ final class AgentRepository extends Repository {
 			'display_name' => '%s',
 			'avatar_id'    => '%d',
 			'is_active'    => '%d',
+			'status'       => '%s',
+			'last_seen_at' => '%s',
 			'created_at'   => '%s',
 			'updated_at'   => '%s',
 		);
@@ -150,6 +152,58 @@ final class AgentRepository extends Repository {
 		$fields['updated_at'] = $this->now();
 
 		return $this->update_row( $id, $fields );
+	}
+
+	/**
+	 * Records that the agent's panel is open. Writes at most every 30
+	 * seconds per agent, so frequent polling stays cheap.
+	 *
+	 * @param int $id Agent ID.
+	 * @return bool Whether the row changed.
+	 */
+	public function touch( int $id ): bool {
+		if ( $id <= 0 ) {
+			return false;
+		}
+
+		$now = $this->now();
+
+		return $this->execute(
+			$this->db->prepare(
+				"UPDATE {$this->table()} SET last_seen_at = %s WHERE id = %d AND ( last_seen_at IS NULL OR last_seen_at < %s )",
+				$now,
+				$id,
+				gmdate( 'Y-m-d H:i:s', time() - 30 )
+			)
+		) > 0;
+	}
+
+	/**
+	 * Sets an agent's availability.
+	 *
+	 * @param int    $id     Agent ID.
+	 * @param string $status Agent::STATUS_ONLINE or Agent::STATUS_AWAY.
+	 * @return bool Whether the row changed.
+	 */
+	public function set_status( int $id, string $status ): bool {
+		if ( $id <= 0 || ! in_array( $status, array( Agent::STATUS_ONLINE, Agent::STATUS_AWAY ), true ) ) {
+			return false;
+		}
+
+		return $this->update_row( $id, array( 'status' => $status ) );
+	}
+
+	/**
+	 * Counts agents who are available right now (see Agent::is_available()).
+	 */
+	public function count_available(): int {
+		return (int) $this->db->get_var(
+			$this->db->prepare(
+				"SELECT COUNT(*) FROM {$this->table()} WHERE is_active = 1 AND status = %s AND last_seen_at >= %s",
+				Agent::STATUS_ONLINE,
+				gmdate( 'Y-m-d H:i:s', time() - Agent::PRESENCE_SECONDS )
+			)
+		);
 	}
 
 	/**

@@ -113,6 +113,32 @@ final class Settings {
 	/**
 	 * Returns the welcome message to show, or an empty string when it is off.
 	 */
+	public function default_offline_message(): string {
+		return __( "We're away right now. Leave a message and we'll get back to you soon.", 'chatchi' );
+	}
+
+	/**
+	 * The text offline visitors see, or the translated default.
+	 */
+	public function offline_message(): string {
+		$message = (string) $this->get( 'offline_message' );
+
+		return '' !== $message ? $message : $this->default_offline_message();
+	}
+
+	/**
+	 * Where notifications about offline messages go; empty when turned off.
+	 */
+	public function notify_email(): string {
+		if ( ! $this->get( 'notify_email_enabled' ) ) {
+			return '';
+		}
+
+		$email = (string) $this->get( 'notify_email' );
+
+		return '' !== $email ? $email : (string) get_option( 'admin_email' );
+	}
+
 	public function welcome_message(): string {
 		if ( ! $this->get( 'welcome_enabled' ) ) {
 			return '';

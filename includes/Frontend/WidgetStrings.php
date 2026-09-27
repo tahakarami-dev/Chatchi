@@ -56,6 +56,23 @@ final class WidgetStrings {
 			'sendHint'       => __( 'Enter to send, Shift+Enter for a new line', 'chatchi' ),
 			'newMessage'     => __( 'New message', 'chatchi' ),
 			'jumpLatest'     => __( 'Go to the latest message', 'chatchi' ),
+			'statusOnlineLabel'=> __( 'Online', 'chatchi' ),
+			'statusAway'     => __( 'We\'ll reply as soon as we can', 'chatchi' ),
+			'statusOffline'  => __( 'Offline right now', 'chatchi' ),
+			/* translators: %s: day and time support is back, e.g. "Saturday 09:00". */
+			'backAt'         => __( 'Back %s', 'chatchi' ),
+			'awayBanner'     => __( 'Nobody is online right now. Leave your message and we\'ll reply as soon as we\'re back.', 'chatchi' ),
+			'offlineBanner'  => __( 'We\'re offline right now. We\'ll answer as soon as we\'re back.', 'chatchi' ),
+			'yourMessage'    => __( 'Your message', 'chatchi' ),
+			'messageRequired'=> __( 'Write your message.', 'chatchi' ),
+			'sendMessage'    => __( 'Send message', 'chatchi' ),
+			'offlineSent'    => __( 'Message received. We\'ll get back to you here or by email.', 'chatchi' ),
+			'attach'         => __( 'Send a file', 'chatchi' ),
+			'download'       => __( 'Download', 'chatchi' ),
+			'uploading'      => __( 'Uploading…', 'chatchi' ),
+			'dropFiles'      => __( 'Drop files here to send them', 'chatchi' ),
+			/* translators: %s: maximum file size, e.g. "5 MB". */
+			'fileTooLarge'   => __( 'Too large to send (the limit is %s). Tap to remove.', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
 			'yesterday'      => __( 'Yesterday', 'chatchi' ),
 			/* translators: %d: number of unread messages. */
