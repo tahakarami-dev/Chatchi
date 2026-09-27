@@ -4,12 +4,25 @@
  * Design tokens come from assets/shared/tokens.css.
  */
 
+/* The bundled font is only applied once the chat is opened, so pages whose
+   visitors never chat do not download it. Before that only the launcher
+   shows, which has no text. */
 .chatchi {
-	font-family: var(--chatchi-font);
+	--chatchi-bubble-radius: 20px;
+	--chatchi-bubble-tail: 6px;
+	--chatchi-gradient: linear-gradient(135deg, var(--chatchi-primary) 0%, var(--chatchi-primary-hover) 100%);
+	/* Brand-colored shadow; browsers without color-mix() simply show none. */
+	--chatchi-glow: color-mix(in srgb, var(--chatchi-primary) 55%, transparent);
+
+	font-family: inherit;
 	font-size: 14px;
 	line-height: 1.7;
 	color: var(--chatchi-text);
 	-webkit-font-smoothing: antialiased;
+}
+
+.chatchi.has-font {
+	font-family: var(--chatchi-font);
 }
 
 .chatchi *,
@@ -30,6 +43,7 @@
 	background: none;
 	border: 0;
 	padding: 0;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .chatchi :focus-visible {
@@ -42,7 +56,7 @@
 	height: 20px;
 	fill: none;
 	stroke: currentColor;
-	stroke-width: 1.5;
+	stroke-width: 1.75;
 	stroke-linecap: round;
 	stroke-linejoin: round;
 	flex-shrink: 0;
@@ -67,68 +81,115 @@
 	position: fixed;
 	bottom: 24px;
 	z-index: 2147483000;
-	width: 56px;
-	height: 56px;
+	width: 60px;
+	height: 60px;
 	border-radius: 50%;
 	display: grid;
 	place-items: center;
-	background: var(--chatchi-primary) !important;
+	background: var(--chatchi-gradient) !important;
 	color: var(--chatchi-primary-contrast) !important;
-	box-shadow: var(--chatchi-shadow-lg);
-	transition: transform var(--chatchi-duration-fast) var(--chatchi-ease-out), background-color var(--chatchi-duration-fast);
+	box-shadow: 0 10px 28px -6px var(--chatchi-glow), var(--chatchi-shadow-md);
+	transition: transform var(--chatchi-duration-base) var(--chatchi-ease-out), box-shadow var(--chatchi-duration-base);
 }
 
 .chatchi--left .chatchi-launcher { left: 24px; }
 .chatchi--right .chatchi-launcher { right: 24px; }
 
 .chatchi-launcher:hover {
-	background: var(--chatchi-primary-hover) !important;
-	transform: scale(1.05);
+	transform: translateY(-2px) scale(1.04);
+	box-shadow: 0 14px 32px -6px var(--chatchi-glow), var(--chatchi-shadow-md);
 }
 
-.chatchi-launcher svg {
-	width: 26px;
-	height: 26px;
+.chatchi-launcher:active {
+	transform: scale(.96);
+}
+
+/* The chat and close icons sit on top of each other and swap on open. */
+.chatchi-launcher__icon {
+	grid-area: 1 / 1;
+	display: grid;
+	place-items: center;
+	transition: opacity var(--chatchi-duration-base), transform var(--chatchi-duration-slow) var(--chatchi-ease-out);
+}
+
+.chatchi-launcher__icon svg {
+	width: 28px;
+	height: 28px;
+}
+
+.chatchi-launcher__icon--close {
+	opacity: 0;
+	transform: rotate(-90deg) scale(.6);
+}
+
+.chatchi.is-open .chatchi-launcher__icon--chat {
+	opacity: 0;
+	transform: rotate(90deg) scale(.6);
+}
+
+.chatchi.is-open .chatchi-launcher__icon--close {
+	opacity: 1;
+	transform: none;
 }
 
 .chatchi-badge {
 	position: absolute;
-	top: -2px;
-	inset-inline-end: -2px;
-	min-width: 20px;
-	height: 20px;
+	top: -3px;
+	inset-inline-end: -3px;
+	min-width: 22px;
+	height: 22px;
 	padding: 0 6px;
 	border-radius: 9999px;
 	background: var(--chatchi-accent);
-	color: #1a1a2e;
+	color: #fff;
 	font-size: 12px;
 	font-weight: 700;
-	line-height: 20px;
+	line-height: 22px;
 	text-align: center;
-	box-shadow: 0 0 0 2px var(--chatchi-surface);
+	box-shadow: 0 0 0 3px var(--chatchi-surface);
+	animation: chatchi-pop var(--chatchi-duration-slow) var(--chatchi-ease-out);
+}
+
+.chatchi-badge::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	box-shadow: 0 0 0 0 var(--chatchi-accent);
+	animation: chatchi-ring 2s ease-out infinite;
 }
 
 .chatchi-badge[hidden] {
 	display: none;
 }
 
+@keyframes chatchi-ring {
+	0% { box-shadow: 0 0 0 0 rgba(255, 122, 89, .55); }
+	70%, 100% { box-shadow: 0 0 0 10px rgba(255, 122, 89, 0); }
+}
+
+@keyframes chatchi-pop {
+	from { transform: scale(.4); opacity: 0; }
+	to { transform: none; opacity: 1; }
+}
+
 /* Panel */
 
 .chatchi-panel {
 	position: fixed;
-	bottom: 96px;
+	bottom: 100px;
 	z-index: 2147483000;
-	width: 380px;
-	height: min(640px, calc(100vh - 120px));
+	width: 384px;
+	height: min(660px, calc(100vh - 124px));
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
-	border-radius: 20px;
+	border-radius: 24px;
 	background: var(--chatchi-surface);
-	box-shadow: var(--chatchi-shadow-lg);
+	box-shadow: 0 24px 60px -12px rgba(26, 26, 46, .28), 0 0 0 1px rgba(26, 26, 46, .05);
 	opacity: 0;
 	visibility: hidden;
-	transform: translateY(12px) scale(.98);
+	transform: translateY(16px) scale(.97);
 	transition: opacity var(--chatchi-duration-slow) var(--chatchi-ease-out), transform var(--chatchi-duration-slow) var(--chatchi-ease-out), visibility 0s linear var(--chatchi-duration-slow);
 }
 
@@ -145,12 +206,32 @@
 /* Header */
 
 .chatchi-header {
+	position: relative;
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: 16px;
-	background: var(--chatchi-primary);
+	padding: 18px 16px;
+	overflow: hidden;
+	background: var(--chatchi-gradient);
 	color: var(--chatchi-primary-contrast);
+}
+
+/* A soft light shape; decoration only. */
+.chatchi-header::before {
+	content: "";
+	position: absolute;
+	width: 180px;
+	height: 180px;
+	top: -110px;
+	inset-inline-end: -40px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, .08);
+	pointer-events: none;
+}
+
+.chatchi-header > * {
+	position: relative;
+	z-index: 1;
 }
 
 .chatchi-header__text {
@@ -171,60 +252,93 @@
 .chatchi-subtitle {
 	margin: 0;
 	font-size: 12px;
-	opacity: .85;
+	line-height: 1.6;
+	opacity: .88;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.chatchi-subtitle.is-typing {
+	opacity: 1;
+	font-weight: 500;
+}
+
+.chatchi-header__actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
 
 .chatchi-icon-button {
 	width: 36px;
 	height: 36px;
-	border-radius: var(--chatchi-radius-sm);
+	border-radius: 50%;
 	display: grid;
 	place-items: center;
-	transition: background-color var(--chatchi-duration-fast);
+	transition: background-color var(--chatchi-duration-fast), transform var(--chatchi-duration-fast);
 }
 
-.chatchi-icon-button:hover {
-	background: rgba(255, 255, 255, .16);
+.chatchi-header .chatchi-icon-button:hover {
+	background: rgba(255, 255, 255, .18);
+}
+
+.chatchi-header .chatchi-icon-button:active {
+	transform: scale(.92);
 }
 
 .chatchi-text-button {
-	padding: 4px 10px;
-	border-radius: var(--chatchi-radius-sm);
+	padding: 5px 12px;
+	border-radius: 9999px;
 	font-size: 12px;
 	font-weight: 500;
 	white-space: nowrap;
 	transition: background-color var(--chatchi-duration-fast);
 }
 
+.chatchi-header .chatchi-text-button {
+	background: rgba(255, 255, 255, .14);
+}
+
 .chatchi-header .chatchi-text-button:hover {
-	background: rgba(255, 255, 255, .16);
+	background: rgba(255, 255, 255, .24);
 }
 
 /* Avatar */
 
 .chatchi-avatar {
+	position: relative;
 	width: 36px;
 	height: 36px;
 	border-radius: 50%;
 	flex-shrink: 0;
 	display: grid;
 	place-items: center;
-	overflow: hidden;
 	background: var(--chatchi-primary-soft);
 	color: var(--chatchi-primary);
 	font-size: 14px;
 	font-weight: 700;
 }
 
-.chatchi-header .chatchi-avatar {
-	background: rgba(255, 255, 255, .2);
-	color: inherit;
-}
-
 .chatchi-avatar img {
 	width: 100%;
 	height: 100%;
+	border-radius: inherit;
 	object-fit: cover;
+}
+
+.chatchi-header .chatchi-avatar {
+	width: 44px;
+	height: 44px;
+	background: rgba(255, 255, 255, .2);
+	color: inherit;
+	font-size: 16px;
+	box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+}
+
+.chatchi-header .chatchi-avatar svg {
+	width: 22px;
+	height: 22px;
 }
 
 .chatchi-avatar--sm {
@@ -236,6 +350,7 @@
 /* Body */
 
 .chatchi-body {
+	position: relative;
 	flex: 1;
 	min-height: 0;
 	display: flex;
@@ -275,7 +390,7 @@
 	display: block;
 	height: 40px;
 	width: 62%;
-	border-radius: var(--chatchi-radius-lg);
+	border-radius: var(--chatchi-bubble-radius);
 	background: linear-gradient(90deg, var(--chatchi-surface-muted), var(--chatchi-border), var(--chatchi-surface-muted));
 	background-size: 200% 100%;
 	animation: chatchi-shimmer 1.2s linear infinite;
@@ -299,12 +414,22 @@
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
-	padding: 24px 16px;
+	padding: 20px 16px;
 }
 
 .chatchi-form__intro {
 	margin: 0;
 	color: var(--chatchi-text-muted);
+}
+
+.chatchi-form__card {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px;
+	border-radius: 18px;
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-sm), 0 0 0 1px var(--chatchi-border);
 }
 
 .chatchi-trap {
@@ -318,18 +443,19 @@
 }
 
 .chatchi-form .chatchi-row--welcome {
-	margin: 0 0 4px;
+	margin: 0;
 }
 
 .chatchi-field {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 6px;
 }
 
 .chatchi-label {
+	font-size: 13px;
 	font-weight: 500;
-	color: #4a4a5e;
+	color: var(--chatchi-gray-700);
 }
 
 .chatchi-label small {
@@ -339,19 +465,24 @@
 
 .chatchi-input {
 	width: 100%;
-	height: 44px;
-	padding: 0 12px;
-	border: 1px solid var(--chatchi-border-strong);
-	border-radius: var(--chatchi-radius-sm);
-	background: var(--chatchi-surface);
+	height: 46px;
+	padding: 0 14px;
+	border: 1.5px solid var(--chatchi-border);
+	border-radius: 12px;
+	background: var(--chatchi-bg);
 	font-size: 16px;
-	transition: border-color var(--chatchi-duration-fast), box-shadow var(--chatchi-duration-fast);
+	transition: border-color var(--chatchi-duration-fast), box-shadow var(--chatchi-duration-fast), background-color var(--chatchi-duration-fast);
+}
+
+.chatchi-input:hover {
+	border-color: var(--chatchi-border-strong);
 }
 
 .chatchi-input:focus {
 	outline: none;
 	border-color: var(--chatchi-primary);
-	box-shadow: var(--chatchi-focus-ring);
+	background: var(--chatchi-surface);
+	box-shadow: 0 0 0 4px var(--chatchi-primary-soft);
 }
 
 .chatchi-input[aria-invalid="true"] {
@@ -369,38 +500,47 @@
 }
 
 .chatchi-button {
-	height: 44px;
-	padding: 0 16px;
-	border-radius: var(--chatchi-radius-sm);
-	background: var(--chatchi-primary);
+	height: 46px;
+	padding: 0 18px;
+	border-radius: 12px;
+	background: var(--chatchi-gradient);
 	color: var(--chatchi-primary-contrast);
-	font-weight: 500;
-	transition: background-color var(--chatchi-duration-fast);
+	font-weight: 700;
+	box-shadow: 0 6px 16px -6px var(--chatchi-glow);
+	transition: transform var(--chatchi-duration-fast), box-shadow var(--chatchi-duration-fast), opacity var(--chatchi-duration-fast);
 }
 
 .chatchi-button:hover {
-	background: var(--chatchi-primary-hover);
+	box-shadow: 0 8px 20px -6px var(--chatchi-glow);
+}
+
+.chatchi-button:active {
+	transform: scale(.98);
 }
 
 .chatchi-button[disabled] {
 	opacity: .6;
 	cursor: default;
+	transform: none;
 }
 
 .chatchi-button--secondary {
 	background: var(--chatchi-surface);
 	color: var(--chatchi-text);
 	border: 1px solid var(--chatchi-border-strong);
+	box-shadow: none;
+	font-weight: 500;
 }
 
 .chatchi-button--secondary:hover {
 	background: var(--chatchi-surface-muted);
+	box-shadow: none;
 }
 
 .chatchi-alert {
 	margin: 0;
 	padding: 8px 12px;
-	border-radius: var(--chatchi-radius-sm);
+	border-radius: 10px;
 	background: var(--chatchi-error-soft);
 	color: var(--chatchi-error-text);
 	font-size: 12px;
@@ -408,38 +548,57 @@
 
 /* Messages */
 
+.chatchi-log-wrap {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
 .chatchi-log {
 	flex: 1;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	padding: 16px;
+	padding: 16px 14px 12px;
 	display: flex;
 	flex-direction: column;
+	scrollbar-width: thin;
+	scrollbar-color: var(--chatchi-border-strong) transparent;
 }
 
 .chatchi-earlier {
 	align-self: center;
 	margin-bottom: 12px;
-	padding: 4px 12px;
+	padding: 4px 14px;
 	border-radius: 9999px;
 	background: var(--chatchi-surface);
-	border: 1px solid var(--chatchi-border);
+	box-shadow: 0 0 0 1px var(--chatchi-border);
 	font-size: 12px;
 	color: var(--chatchi-text-muted);
+	transition: color var(--chatchi-duration-fast);
+}
+
+.chatchi-earlier:hover {
+	color: var(--chatchi-primary);
 }
 
 .chatchi-day {
 	align-self: center;
-	margin: 12px 0 8px;
-	font-size: 12px;
-	color: var(--chatchi-text-subtle);
+	margin: 14px 0 6px;
+	padding: 2px 12px;
+	border-radius: 9999px;
+	background: var(--chatchi-surface-muted);
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--chatchi-text-muted);
 }
 
 .chatchi-row {
 	display: flex;
 	align-items: flex-end;
 	gap: 8px;
-	margin-top: 4px;
+	margin-top: 3px;
 }
 
 .chatchi-row.is-group-start {
@@ -479,14 +638,17 @@
 }
 
 .chatchi-sender {
-	margin-bottom: 2px;
+	margin: 0 6px 3px;
 	font-size: 12px;
+	font-weight: 500;
 	color: var(--chatchi-text-muted);
 }
 
 .chatchi-bubble {
-	padding: 8px 12px;
-	border-radius: var(--chatchi-radius-lg);
+	padding: 9px 14px;
+	border-radius: var(--chatchi-bubble-radius);
+	font-size: 14px;
+	line-height: 1.75;
 	/* Each paragraph takes the direction of its first letter, so English lines read left-to-right. */
 	unicode-bidi: plaintext;
 	text-align: start;
@@ -496,21 +658,23 @@
 }
 
 .chatchi-row--mine .chatchi-bubble {
-	background: var(--chatchi-primary);
+	background: var(--chatchi-gradient);
 	color: var(--chatchi-primary-contrast);
+	box-shadow: 0 4px 12px -6px var(--chatchi-glow);
 }
 
 .chatchi-row--theirs .chatchi-bubble {
-	background: var(--chatchi-surface-muted);
+	background: var(--chatchi-surface);
 	color: var(--chatchi-text);
+	box-shadow: var(--chatchi-shadow-sm), 0 0 0 1px var(--chatchi-border);
 }
 
 .chatchi-row--mine.is-group-end .chatchi-bubble {
-	border-end-start-radius: 6px;
+	border-end-start-radius: var(--chatchi-bubble-tail);
 }
 
 .chatchi-row--theirs.is-group-end .chatchi-bubble {
-	border-end-end-radius: 6px;
+	border-end-end-radius: var(--chatchi-bubble-tail);
 }
 
 .chatchi-row--theirs .chatchi-avatar {
@@ -527,8 +691,8 @@
 .chatchi[dir="ltr"] .chatchi-row--mine .chatchi-stack { align-items: flex-end; }
 .chatchi[dir="ltr"] .chatchi-row--theirs .chatchi-stack { align-items: flex-start; }
 .chatchi[dir="ltr"] .chatchi-row--theirs .chatchi-avatar { order: -1; }
-.chatchi[dir="ltr"] .chatchi-row--mine.is-group-end .chatchi-bubble { border-end-start-radius: var(--chatchi-radius-lg); border-end-end-radius: 6px; }
-.chatchi[dir="ltr"] .chatchi-row--theirs.is-group-end .chatchi-bubble { border-end-end-radius: var(--chatchi-radius-lg); border-end-start-radius: 6px; }
+.chatchi[dir="ltr"] .chatchi-row--mine.is-group-end .chatchi-bubble { border-end-start-radius: var(--chatchi-bubble-radius); border-end-end-radius: var(--chatchi-bubble-tail); }
+.chatchi[dir="ltr"] .chatchi-row--theirs.is-group-end .chatchi-bubble { border-end-end-radius: var(--chatchi-bubble-radius); border-end-start-radius: var(--chatchi-bubble-tail); }
 
 .chatchi-bubble a {
 	color: inherit;
@@ -536,17 +700,26 @@
 	text-underline-offset: 2px;
 }
 
+/* A message made of one to three emoji shows them large, without a bubble. */
+.chatchi-bubble.is-emoji {
+	padding: 0 2px;
+	font-size: 34px;
+	line-height: 1.3;
+	background: none !important;
+	box-shadow: none !important;
+}
+
 .chatchi-row.is-new {
-	animation: chatchi-in var(--chatchi-duration-base) var(--chatchi-ease-out);
+	animation: chatchi-in var(--chatchi-duration-slow) var(--chatchi-ease-out);
 }
 
 @keyframes chatchi-in {
-	from { opacity: 0; transform: translateY(6px); }
+	from { opacity: 0; transform: translateY(8px) scale(.98); }
 	to { opacity: 1; transform: none; }
 }
 
 .chatchi-row.is-pending .chatchi-bubble {
-	opacity: .7;
+	opacity: .75;
 }
 
 .chatchi-row.is-failed .chatchi-bubble {
@@ -560,8 +733,8 @@
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	margin-top: 2px;
-	font-size: 12px;
+	margin: 3px 6px 0;
+	font-size: 11px;
 	color: var(--chatchi-text-subtle);
 }
 
@@ -575,83 +748,310 @@
 }
 
 .chatchi-retry {
+	margin: 3px 6px 0;
 	font-size: 12px;
 	color: var(--chatchi-error-text);
 	text-decoration: underline;
 }
 
-/* Footer */
+/* Typing indicator */
+
+.chatchi-row--typing .chatchi-bubble {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-height: 40px;
+	padding: 0 16px;
+}
+
+.chatchi-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--chatchi-text-subtle);
+	animation: chatchi-bounce 1.2s ease-in-out infinite;
+}
+
+.chatchi-dot:nth-child(2) { animation-delay: .15s; }
+.chatchi-dot:nth-child(3) { animation-delay: .3s; }
+
+@keyframes chatchi-bounce {
+	0%, 60%, 100% { transform: translateY(0); opacity: .45; }
+	30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Jump to the latest message, shown when scrolled up. */
+
+.chatchi-jump {
+	position: absolute;
+	bottom: 12px;
+	inset-inline-start: 50%;
+	z-index: 2;
+	width: 38px;
+	height: 38px;
+	margin-inline-start: -19px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	background: var(--chatchi-surface);
+	color: var(--chatchi-text-muted);
+	box-shadow: var(--chatchi-shadow-md), 0 0 0 1px var(--chatchi-border);
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(8px);
+	transition: opacity var(--chatchi-duration-base), transform var(--chatchi-duration-base) var(--chatchi-ease-out), visibility 0s linear var(--chatchi-duration-base), color var(--chatchi-duration-fast);
+}
+
+.chatchi-jump.is-visible {
+	opacity: 1;
+	visibility: visible;
+	transform: none;
+	transition-delay: 0s;
+}
+
+.chatchi-jump:hover {
+	color: var(--chatchi-primary);
+}
+
+.chatchi-jump.has-new::after {
+	content: "";
+	position: absolute;
+	top: 1px;
+	inset-inline-end: 1px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--chatchi-accent);
+	box-shadow: 0 0 0 2px var(--chatchi-surface);
+}
+
+/* Footer and composer */
 
 .chatchi-footer {
+	position: relative;
+	padding: 10px 12px 10px;
 	border-top: 1px solid var(--chatchi-border);
 	background: var(--chatchi-surface);
 }
 
 .chatchi-composer {
+	margin: 0;
+}
+
+.chatchi-composer__box {
 	display: flex;
 	align-items: flex-end;
-	gap: 8px;
-	padding: 12px;
+	gap: 2px;
+	padding: 5px;
+	border: 1.5px solid var(--chatchi-border);
+	border-radius: 26px;
+	background: var(--chatchi-bg);
+	transition: border-color var(--chatchi-duration-fast), box-shadow var(--chatchi-duration-fast), background-color var(--chatchi-duration-fast);
+}
+
+.chatchi-composer__box:hover {
+	border-color: var(--chatchi-border-strong);
+}
+
+.chatchi-composer__box:focus-within {
+	border-color: var(--chatchi-primary);
+	background: var(--chatchi-surface);
+	box-shadow: 0 0 0 4px var(--chatchi-primary-soft);
+}
+
+.chatchi-composer__box.is-over {
+	border-color: var(--chatchi-error);
+	box-shadow: 0 0 0 4px var(--chatchi-error-soft);
 }
 
 .chatchi-textarea {
 	flex: 1;
-	min-height: 40px;
-	max-height: 120px;
-	padding: 8px 12px;
-	border: 1px solid var(--chatchi-border-strong);
-	border-radius: var(--chatchi-radius-md);
-	background: var(--chatchi-surface);
+	min-width: 0;
+	min-height: 38px;
+	max-height: 136px;
+	padding: 7px 6px;
+	border: 0;
+	background: transparent;
 	resize: none;
 	font-size: 16px;
 	line-height: 1.5;
-	transition: border-color var(--chatchi-duration-fast), box-shadow var(--chatchi-duration-fast);
+	/* Persian and English each read in their own direction. */
+	unicode-bidi: plaintext;
+	scrollbar-width: thin;
 }
 
-.chatchi-textarea:focus {
+.chatchi-textarea::placeholder {
+	color: var(--chatchi-text-subtle);
+	opacity: 1;
+}
+
+.chatchi-textarea:focus,
+.chatchi-textarea:focus-visible {
 	outline: none;
-	border-color: var(--chatchi-primary);
-	box-shadow: var(--chatchi-focus-ring);
+	box-shadow: none;
+}
+
+.chatchi-tool {
+	width: 38px;
+	height: 38px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	flex-shrink: 0;
+	color: var(--chatchi-text-subtle);
+	transition: color var(--chatchi-duration-fast), background-color var(--chatchi-duration-fast), transform var(--chatchi-duration-fast);
+}
+
+.chatchi-tool:hover,
+.chatchi-tool[aria-expanded="true"] {
+	color: var(--chatchi-primary);
+	background: var(--chatchi-primary-soft);
+}
+
+.chatchi-tool svg {
+	width: 22px;
+	height: 22px;
 }
 
 .chatchi-send {
-	width: 40px;
-	height: 40px;
-	border-radius: var(--chatchi-radius-md);
+	width: 38px;
+	height: 38px;
+	border-radius: 50%;
 	display: grid;
 	place-items: center;
-	background: var(--chatchi-primary);
+	flex-shrink: 0;
+	background: var(--chatchi-gradient);
 	color: var(--chatchi-primary-contrast);
-	transition: background-color var(--chatchi-duration-fast), opacity var(--chatchi-duration-fast);
+	box-shadow: 0 4px 12px -4px var(--chatchi-glow);
+	transition: transform var(--chatchi-duration-base) var(--chatchi-ease-out), opacity var(--chatchi-duration-fast), box-shadow var(--chatchi-duration-fast), background var(--chatchi-duration-fast);
+}
+
+.chatchi-send svg {
+	width: 18px;
+	height: 18px;
+	/* The paper plane's visual centre sits slightly off its box. */
+	margin-top: 1px;
+	margin-inline-end: 2px;
 }
 
 .chatchi-send:hover {
-	background: var(--chatchi-primary-hover);
+	transform: scale(1.06);
+}
+
+.chatchi-send:active {
+	transform: scale(.92);
 }
 
 .chatchi-send[disabled] {
-	opacity: .4;
+	background: var(--chatchi-surface-muted);
+	color: var(--chatchi-text-subtle);
+	box-shadow: none;
 	cursor: default;
+	transform: none;
+}
+
+.chatchi-composer__meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-height: 18px;
+	padding: 5px 12px 0;
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--chatchi-text-subtle);
+}
+
+/* Keyboard hints only mean something with a keyboard. */
+@media (hover: none) {
+	.chatchi-hint {
+		display: none;
+	}
+
+	.chatchi-composer__meta {
+		min-height: 0;
+		padding-top: 0;
+	}
+
+	.chatchi-counter {
+		padding-top: 5px;
+	}
 }
 
 .chatchi-counter {
-	margin: -4px 12px 8px;
-	font-size: 12px;
-	color: var(--chatchi-text-subtle);
+	margin: 0;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
 }
 
 .chatchi-counter[hidden] {
 	display: none;
 }
 
+.chatchi-counter.is-warning {
+	color: var(--chatchi-warning-text);
+}
+
+.chatchi-counter.is-over {
+	color: var(--chatchi-error-text);
+	font-weight: 700;
+}
+
+/* Emoji picker */
+
+.chatchi-emoji {
+	position: absolute;
+	bottom: calc(100% - 4px);
+	inset-inline: 12px;
+	z-index: 3;
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: 2px;
+	max-height: 196px;
+	overflow-y: auto;
+	padding: 8px;
+	border-radius: 18px;
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-lg), 0 0 0 1px var(--chatchi-border);
+	animation: chatchi-in var(--chatchi-duration-base) var(--chatchi-ease-out);
+	scrollbar-width: thin;
+}
+
+.chatchi-emoji[hidden] {
+	display: none;
+}
+
+.chatchi-emoji button {
+	aspect-ratio: 1;
+	border-radius: 10px;
+	display: grid;
+	place-items: center;
+	font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+	font-size: 22px;
+	line-height: 1;
+	transition: background-color var(--chatchi-duration-fast), transform var(--chatchi-duration-fast);
+}
+
+.chatchi-emoji button:hover,
+.chatchi-emoji button:focus-visible {
+	background: var(--chatchi-primary-soft);
+	transform: scale(1.12);
+}
+
+/* Closed conversation and end confirmation */
+
 .chatchi-notice {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 8px;
-	padding: 16px;
+	gap: 10px;
+	padding: 8px 8px 4px;
 	text-align: center;
 	color: var(--chatchi-text-muted);
+}
+
+.chatchi-notice p {
+	margin: 0;
 }
 
 .chatchi-confirm {
@@ -659,9 +1059,10 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
-	padding: 8px 16px;
+	padding: 10px 16px;
 	background: var(--chatchi-primary-soft);
-	font-size: 12px;
+	font-size: 13px;
+	animation: chatchi-in var(--chatchi-duration-base) var(--chatchi-ease-out);
 }
 
 .chatchi-confirm div {
@@ -674,8 +1075,13 @@
 }
 
 .chatchi-confirm .chatchi-text-button--danger {
-	color: var(--chatchi-error-text);
+	background: var(--chatchi-error);
+	color: #fff;
 	font-weight: 700;
+}
+
+.chatchi-confirm .chatchi-text-button--danger:hover {
+	background: var(--chatchi-error-text);
 }
 
 /* Mobile: the panel takes the whole screen. */
@@ -700,6 +1106,14 @@
 
 	.chatchi.is-open .chatchi-launcher {
 		display: none;
+	}
+
+	.chatchi-footer {
+		padding-bottom: max(10px, env(safe-area-inset-bottom));
+	}
+
+	.chatchi-emoji {
+		grid-template-columns: repeat(7, 1fr);
 	}
 }
 

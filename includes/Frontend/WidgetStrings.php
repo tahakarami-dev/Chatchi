@@ -49,6 +49,13 @@ final class WidgetStrings {
 			'earlier'        => __( 'Load earlier messages', 'chatchi' ),
 			'closed'         => __( 'This conversation has ended.', 'chatchi' ),
 			'newChat'        => __( 'Start a new conversation', 'chatchi' ),
+			'typing'         => __( 'Typing…', 'chatchi' ),
+			/* translators: %s: name of the support agent. */
+			'typingNamed'    => __( '%s is typing…', 'chatchi' ),
+			'emoji'          => __( 'Emoji', 'chatchi' ),
+			'sendHint'       => __( 'Enter to send, Shift+Enter for a new line', 'chatchi' ),
+			'newMessage'     => __( 'New message', 'chatchi' ),
+			'jumpLatest'     => __( 'Go to the latest message', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
 			'yesterday'      => __( 'Yesterday', 'chatchi' ),
 			/* translators: %d: number of unread messages. */

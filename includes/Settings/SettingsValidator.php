@@ -94,6 +94,7 @@ final class SettingsValidator {
 	private function general_defaults(): array {
 		$defaults = array(
 			'widget_enabled'           => true,
+			'widget_sound'             => true,
 			// Keeping conversations when the plugin is deleted is the safe default.
 			'delete_data_on_uninstall' => false,
 			'form_name'                => 'required',
@@ -245,6 +246,7 @@ final class SettingsValidator {
 					break;
 
 				case 'widget_enabled':
+				case 'widget_sound':
 				case 'delete_data_on_uninstall':
 				case 'spam_protection':
 					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
@@ -324,6 +326,7 @@ final class SettingsValidator {
 				return $this->short_text( $value, self::FORM_INTRO_MAX_LENGTH );
 
 			case 'widget_enabled':
+			case 'widget_sound':
 			case 'delete_data_on_uninstall':
 			case 'spam_protection':
 				return rest_sanitize_boolean( $value );

@@ -21,6 +21,13 @@ final class VisitorCookie {
 
 	public const NAME = 'chatchi_visitor';
 
+	/**
+	 * A readable companion cookie holding only "1": it tells the widget a
+	 * visitor identity exists, so pages of visitors who never chatted skip
+	 * the session request until the chat is opened. It carries no secret.
+	 */
+	public const MARKER = 'chatchi_active';
+
 	private const DEFAULT_LIFETIME = 30 * DAY_IN_SECONDS;
 
 	private const MIN_LIFETIME = HOUR_IN_SECONDS;
@@ -100,17 +107,21 @@ final class VisitorCookie {
 			return false;
 		}
 
-		return setcookie(
-			self::NAME,
-			$value,
-			array(
-				'expires'  => $expires,
-				'path'     => defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/',
-				'domain'   => defined( 'COOKIE_DOMAIN' ) && COOKIE_DOMAIN ? COOKIE_DOMAIN : '',
-				'secure'   => is_ssl(),
-				'httponly' => true,
-				'samesite' => 'Lax',
-			)
+		$options = array(
+			'expires'  => $expires,
+			'path'     => defined( 'COOKIEPATH' ) && COOKIEPATH ? COOKIEPATH : '/',
+			'domain'   => defined( 'COOKIE_DOMAIN' ) && COOKIE_DOMAIN ? COOKIE_DOMAIN : '',
+			'secure'   => is_ssl(),
+			'httponly' => true,
+			'samesite' => 'Lax',
 		);
+
+		$sent = setcookie( self::NAME, $value, $options );
+
+		// The marker follows the identity cookie: set with it, expired with it.
+		$options['httponly'] = false;
+		setcookie( self::MARKER, '' !== $value ? '1' : '', $options );
+
+		return $sent;
 	}
 }

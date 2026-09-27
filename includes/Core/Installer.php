@@ -8,6 +8,7 @@
 namespace ChatChi\Core;
 
 use ChatChi\Database\Schema;
+use ChatChi\Settings\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -88,6 +89,10 @@ final class Installer {
 			$this->schema->install();
 
 			add_option( self::INSTALLED_AT_OPTION, time(), '', false );
+
+			// Created up front and autoloaded, so page views read the settings
+			// without a database query even before anything was saved.
+			add_option( Settings::OPTION, array(), '', true );
 
 			update_option( self::VERSION_OPTION, CHATCHI_VERSION, true );
 

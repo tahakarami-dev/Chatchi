@@ -136,6 +136,11 @@ final class MessageService {
 
 			$this->conversation_repository->record_message( $conversation->id, $message->id, $message->created_at );
 			$this->messages->mark_read( $conversation->id, $this->other_side( $actor ), $message->id );
+
+			// The message is what they were typing; stop showing the indicator.
+			if ( $conversation->is_typing( $this->sender_type( $actor ) ) ) {
+				$this->conversation_repository->set_typing( $conversation->id, $this->sender_type( $actor ), false );
+			}
 		} catch ( \Throwable $e ) {
 			return $this->failure( $e );
 		}
@@ -198,7 +203,36 @@ final class MessageService {
 			return $this->failure( $e );
 		}
 
-		return new MessagePage( $messages, $agents, $has_more );
+		return new MessagePage( $messages, $agents, $has_more, $conversation->is_typing( $this->other_side( $actor ) ) );
+	}
+
+	/**
+	 * Records that the actor is typing (or stopped) in a conversation, so the
+	 * other side can show an indicator. Ignored for closed conversations.
+	 *
+	 * @param Actor $actor           Who is typing.
+	 * @param int   $conversation_id Conversation ID.
+	 * @param bool  $typing          False when they stopped, e.g. cleared the text.
+	 * @return bool|\WP_Error Whether the signal was recorded.
+	 */
+	public function typing( Actor $actor, int $conversation_id, bool $typing ) {
+		$conversation = $this->conversations->get( $actor, $conversation_id );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		if ( $conversation->is_closed() ) {
+			return false;
+		}
+
+		try {
+			$this->conversation_repository->set_typing( $conversation->id, $this->sender_type( $actor ), $typing );
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		return true;
 	}
 
 	/**

@@ -36,6 +36,7 @@
 	var HIDDEN_POLL = 30000;
 	var MAX_BACKOFF = 60000;
 	var DETAIL_EVERY = 5;
+	var TYPING_EVERY = 3000;
 	var GROUP_GAP_MS = 2 * 60 * 1000;
 	var SEARCH_DELAY = 300;
 
@@ -60,6 +61,9 @@
 		},
 		close: function ( id ) {
 			return request( 'POST', '/agent/conversations/' + id + '/close' );
+		},
+		typing: function ( id, typing ) {
+			return request( 'POST', '/agent/conversations/' + id + '/typing', { body: { typing: typing } } );
 		},
 		agents: function () {
 			return request( 'GET', '/agent/agents' );
@@ -583,8 +587,10 @@
 		state.convError = '';
 		state.confirmingClose = false;
 		state.convLoading = !! id;
+		state.visitorTyping = false;
 		this.lastReadMarked = 0;
 		this.convTicks = 0;
+		this.typingSentAt = 0;
 
 		this.shell.classList.toggle( 'is-viewing', !! id );
 		this.renderList();
@@ -717,6 +723,8 @@
 			if ( self.state.selectedId !== id ) {
 				return;
 			}
+			self.state.visitorTyping = !! page.typing && ! page.items.length;
+			self.updateTyping();
 			if ( page.items.length ) {
 				var atBottom = self.isAtBottom();
 				self.merge( page.items );
@@ -802,6 +810,9 @@
 
 	Panel.prototype.send = function ( text ) {
 		var pending = { clientId: Core.uuid(), body: text, failed: false, convId: this.state.selectedId };
+
+		// Sending ends the typing signal on the server as well.
+		this.typingSentAt = 0;
 
 		this.state.pending.push( pending );
 		this.drafts[ pending.convId ] = '';
@@ -1175,6 +1186,45 @@
 		return row;
 	};
 
+	/**
+	 * Lets the visitor see that an agent is writing. Sent at most every few
+	 * seconds while typing, and once when the text is cleared.
+	 */
+	Panel.prototype.signalTyping = function ( id, typing ) {
+		var now = Date.now();
+
+		if ( ! id || ! this.state.conv || this.state.conv.status === 'closed' ) {
+			return;
+		}
+
+		if ( typing ) {
+			if ( now - this.typingSentAt < TYPING_EVERY ) {
+				return;
+			}
+			this.typingSentAt = now;
+		} else {
+			if ( ! this.typingSentAt ) {
+				return;
+			}
+			this.typingSentAt = 0;
+		}
+
+		api.typing( id, typing ).catch( function () {
+			// A lost typing signal only hides an indicator; nothing to retry.
+		} );
+	};
+
+	/**
+	 * Shows or hides "typing…" for the visitor, in place.
+	 */
+	Panel.prototype.updateTyping = function () {
+		var line = this.convPane.querySelector( '.cc-typing' );
+
+		if ( line ) {
+			line.hidden = ! this.state.visitorTyping;
+		}
+	};
+
 	Panel.prototype.buildComposer = function () {
 		var self = this;
 		var id = this.state.selectedId;
@@ -1200,6 +1250,7 @@
 		textarea.addEventListener( 'input', function () {
 			self.drafts[ id ] = textarea.value;
 			refresh();
+			self.signalTyping( id, !! textarea.value.trim() );
 		} );
 
 		textarea.addEventListener( 'keydown', function ( event ) {
@@ -1212,6 +1263,10 @@
 		window.requestAnimationFrame( refresh );
 
 		return h( 'div', { className: 'cc-composer' }, [
+			h( 'div', { className: 'cc-typing', role: 'status', hidden: ! this.state.visitorTyping }, [
+				h( 'span', { className: 'cc-typing__dots', 'aria-hidden': 'true' }, [ h( 'span' ), h( 'span' ), h( 'span' ) ] ),
+				h( 'span', { text: S.visitorTyping } )
+			] ),
 			h( 'form', {
 				onSubmit: function ( event ) {
 					event.preventDefault();
@@ -1760,7 +1815,7 @@
 	 * errors and unsaved changes stay where they belong.
 	 */
 	var SETTINGS_SECTIONS = [
-		{ id: 'general', icon: 'power', keys: [ 'widget_enabled', 'visitor_cookie_days', 'delete_data_on_uninstall' ] },
+		{ id: 'general', icon: 'power', keys: [ 'widget_enabled', 'widget_sound', 'visitor_cookie_days', 'delete_data_on_uninstall' ] },
 		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
@@ -2399,6 +2454,18 @@
 				] ),
 				offWarning,
 				this.fieldError( 'widget_enabled' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sound-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-sound-title', text: S.soundTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.soundIntro } )
+					] ),
+					this.buildSwitch( 'cc-widget-sound', S.soundOn, draft.widget_sound, function ( on ) {
+						draft.widget_sound = on;
+					} )
+				] ),
+				this.fieldError( 'widget_sound' )
 			] ),
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-visitors-title' }, [
 				h( 'h2', { id: 'cc-visitors-title', text: S.visitorsTitle } ),

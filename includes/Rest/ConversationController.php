@@ -137,6 +137,25 @@ abstract class ConversationController implements RouteProvider {
 			)
 		);
 
+		register_rest_route(
+			self::NAMESPACE,
+			$route . '/typing',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'typing' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'typing' => array(
+							'type'    => 'boolean',
+							'default' => true,
+						),
+					)
+				),
+			)
+		);
+
 		$this->register_extra_routes();
 	}
 
@@ -249,6 +268,28 @@ abstract class ConversationController implements RouteProvider {
 		}
 
 		return $this->respond( array( 'marked' => $marked ) );
+	}
+
+	/**
+	 * POST …/typing: the actor is typing (or stopped).
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function typing( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$recorded = $this->messages->typing( $actor, (int) $request['id'], (bool) $request['typing'] );
+
+		if ( $recorded instanceof \WP_Error ) {
+			return $recorded;
+		}
+
+		return $this->respond( array( 'recorded' => $recorded ) );
 	}
 
 	/**

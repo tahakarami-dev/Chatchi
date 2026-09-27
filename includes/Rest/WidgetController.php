@@ -175,7 +175,14 @@ final class WidgetController extends ConversationController {
 
 		return $this->once(
 			$request,
-			function () {
+			function () use ( $request ) {
+				// A merely quick person is asked to wait without using up their allowance.
+				$too_fast = $this->spam->too_fast( (string) $request->get_param( 'form_token' ) );
+
+				if ( $too_fast instanceof \WP_Error ) {
+					return $too_fast;
+				}
+
 				$visitor = $this->visitors->current();
 
 				return $this->limiter->check( 'start', $visitor instanceof Visitor ? $visitor->id : null );
@@ -322,7 +329,8 @@ final class WidgetController extends ConversationController {
 	}
 
 	/**
-	 * Counts visitor writes: sending messages, marking read and closing.
+	 * Counts visitor writes: sending messages, typing signals, marking read
+	 * and closing.
 	 * Reads (polling) are not limited.
 	 *
 	 * {@inheritDoc}
@@ -332,7 +340,14 @@ final class WidgetController extends ConversationController {
 			return null;
 		}
 
-		$action = '/messages' === substr( (string) $request->get_route(), -9 ) ? 'message' : 'write';
+		$route  = (string) $request->get_route();
+		$action = 'write';
+
+		if ( '/messages' === substr( $route, -9 ) ) {
+			$action = 'message';
+		} elseif ( '/typing' === substr( $route, -7 ) ) {
+			$action = 'typing';
+		}
 
 		return $this->once(
 			$request,

@@ -113,6 +113,7 @@ final class SettingsController implements RouteProvider {
 		$flag = array( 'type' => 'boolean' );
 		$args = array(
 			'widget_enabled'           => $flag,
+			'widget_sound'             => $flag,
 			'delete_data_on_uninstall' => $flag,
 			'primary_color'            => $text( 20 ),
 			'widget_position'          => $enum( SettingsValidator::POSITIONS ),

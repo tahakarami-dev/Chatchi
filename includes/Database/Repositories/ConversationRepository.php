@@ -46,7 +46,9 @@ final class ConversationRepository extends Repository {
 			'created_at'      => '%s',
 			'updated_at'      => '%s',
 			'closed_at'       => '%s',
-			'open_visitor_id' => '%d',
+			'open_visitor_id'   => '%d',
+			'visitor_typing_at' => '%s',
+			'agent_typing_at'   => '%s',
 		);
 	}
 
@@ -159,6 +161,32 @@ final class ConversationRepository extends Repository {
 				$now,
 				$id
 			);
+		}
+
+		return $this->execute( $sql ) > 0;
+	}
+
+	/**
+	 * Records or clears a side's typing signal.
+	 *
+	 * @param int    $id     Conversation ID.
+	 * @param string $side   "visitor" or "agent".
+	 * @param bool   $typing True to record now, false to clear.
+	 * @return bool Whether the row changed.
+	 *
+	 * @throws DatabaseException When the update fails.
+	 */
+	public function set_typing( int $id, string $side, bool $typing ): bool {
+		if ( $id <= 0 ) {
+			return false;
+		}
+
+		$column = 'agent' === $side ? 'agent_typing_at' : 'visitor_typing_at';
+
+		if ( $typing ) {
+			$sql = $this->db->prepare( "UPDATE {$this->table()} SET {$column} = %s WHERE id = %d", $this->now(), $id );
+		} else {
+			$sql = $this->db->prepare( "UPDATE {$this->table()} SET {$column} = NULL WHERE id = %d AND {$column} IS NOT NULL", $id );
 		}
 
 		return $this->execute( $sql ) > 0;
