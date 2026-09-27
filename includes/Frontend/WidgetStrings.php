@@ -86,6 +86,12 @@ final class WidgetStrings {
 			'rating4'        => __( 'Good', 'chatchi' ),
 			'rating5'        => __( 'Excellent', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
+			'faqTitle'       => __( 'Frequently asked questions', 'chatchi' ),
+			'faqSearch'      => __( 'Search the questions', 'chatchi' ),
+			'faqNone'        => __( 'No matching question. Ask us in the chat.', 'chatchi' ),
+			/* translators: %d: number of questions. */
+			'faqAll'         => __( 'Show all %d questions', 'chatchi' ),
+			'faqHint'        => __( 'Didn\'t find your answer? Ask us below.', 'chatchi' ),
 			'channelsTitle'  => __( 'Contact us', 'chatchi' ),
 			'channelChat'    => __( 'Chat with us', 'chatchi' ),
 			'channelWhatsapp' => __( 'WhatsApp', 'chatchi' ),

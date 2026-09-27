@@ -1703,6 +1703,7 @@
 			this.backAt() ? h( 'p', { className: 'chatchi-form__intro chatchi-form__back' }, [ icon( 'clock' ), this.backAt() ] ) : null
 		] : [
 			this.welcomeText() ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			this.faqElement(),
 			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
 		] );
 
@@ -1819,7 +1820,13 @@
 			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
 		}
 
+		// Before the first message, the common questions are offered.
+		var faq = ! state.conversation && ! state.pending.length ? this.faqElement() : null;
+
 		if ( ! entries.length ) {
+			if ( faq ) {
+				log.appendChild( faq );
+			}
 			log.appendChild( h( 'div', { className: 'chatchi-state' }, [ h( 'p', { text: S.empty } ) ] ) );
 			return log;
 		}
@@ -1842,6 +1849,10 @@
 			log.appendChild( self.renderMessage( entry, groupStart, groupEnd ) );
 		} );
 
+		if ( faq ) {
+			log.appendChild( faq );
+		}
+
 		if ( state.offlineSent ) {
 			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.offlineSent } ) ] ) );
 		}
@@ -1851,6 +1862,103 @@
 		}
 
 		return log;
+	};
+
+	/* ------------------------------- FAQ -------------------------------- */
+
+	var FAQ_PREVIEW = 5;
+
+	/**
+	 * The common questions, built once and moved between the start form
+	 * and the empty chat, so open answers and the search survive re-renders.
+	 * Null when there are none.
+	 */
+	Widget.prototype.faqElement = function () {
+		var items = config.faq || [];
+
+		if ( ! items.length ) {
+			return null;
+		}
+		if ( this.faq ) {
+			return this.faq;
+		}
+
+		var showAll = false;
+		var list = h( 'div', { className: 'chatchi-faq__list' } );
+		var none = h( 'p', { className: 'chatchi-faq__none', hidden: true, text: S.faqNone } );
+		var more = h( 'button', {
+			type: 'button',
+			className: 'chatchi-faq__more',
+			onClick: function () {
+				showAll = true;
+				filter();
+			}
+		} );
+		var search = items.length > FAQ_PREVIEW ? h( 'input', {
+			type: 'search',
+			className: 'chatchi-faq__search',
+			placeholder: S.faqSearch,
+			'aria-label': S.faqSearch,
+			enterkeyhint: 'search'
+		} ) : null;
+
+		var rows = items.map( function ( item ) {
+			var details = h( 'details', { className: 'chatchi-faq__item' }, [
+				h( 'summary', {}, [ h( 'span', { text: item.question } ), icon( 'chevron' ) ] ),
+				h( 'div', { className: 'chatchi-faq__answer' }, [ linkify( item.answer ) ] )
+			] );
+			// One answer open at a time keeps the list short.
+			details.addEventListener( 'toggle', function () {
+				if ( details.open ) {
+					rows.forEach( function ( row ) {
+						if ( row.el !== details ) {
+							row.el.open = false;
+						}
+					} );
+				}
+			} );
+			list.appendChild( details );
+			return { el: details, text: ( item.question + ' ' + item.answer ).toLowerCase() };
+		} );
+
+		function normalize( text ) {
+			// Persian and Arabic forms of ye and kaf match each other.
+			return String( text ).toLowerCase().replace( /ي/g, 'ی' ).replace( /ك/g, 'ک' ).trim();
+		}
+
+		function filter() {
+			var term = search ? normalize( search.value ) : '';
+			var shown = 0;
+			var matches = 0;
+
+			rows.forEach( function ( row ) {
+				var match = ! term || normalize( row.text ).indexOf( term ) !== -1;
+				matches += match ? 1 : 0;
+				var visible = match && ( term || showAll || shown < FAQ_PREVIEW );
+				row.el.hidden = ! visible;
+				shown += visible ? 1 : 0;
+			} );
+
+			none.hidden = matches > 0;
+			more.hidden = !! term || showAll || rows.length <= FAQ_PREVIEW;
+			more.textContent = format( S.faqAll, rows.length );
+		}
+
+		if ( search ) {
+			search.addEventListener( 'input', filter );
+		}
+		filter();
+
+		this.faq = h( 'section', { className: 'chatchi-faq', 'aria-labelledby': 'chatchi-faq-title' }, [
+			h( 'p', { id: 'chatchi-faq-title', className: 'chatchi-faq__title' }, [ icon( 'help' ), S.faqTitle ] ),
+			search,
+			list,
+			none,
+			more,
+			h( 'p', { className: 'chatchi-faq__hint', text: S.faqHint } )
+		] );
+
+		return this.faq;
 	};
 
 	/**
