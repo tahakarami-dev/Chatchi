@@ -367,7 +367,17 @@
 		this.render();
 
 		this.ensureConversation().then( function ( conversation ) {
-			return api.send( conversation.id, pending.body, pending.clientId );
+			return api.send( conversation.id, pending.body, pending.clientId ).catch( function ( error ) {
+				// One quiet retry after a server error; client_id prevents duplicates.
+				if ( error.status >= 500 ) {
+					return new Promise( function ( resolve ) {
+						window.setTimeout( resolve, 400 );
+					} ).then( function () {
+						return api.send( conversation.id, pending.body, pending.clientId );
+					} );
+				}
+				throw error;
+			} );
 		} ).then( function ( message ) {
 			self.merge( [ message ] );
 			self.render();
@@ -450,6 +460,15 @@
 		return api.start( body ).catch( function ( error ) {
 			if ( attempt >= 2 ) {
 				throw error;
+			}
+			if ( error.status >= 500 ) {
+				// The server may have just repaired itself (see Support\Failure);
+				// starting again returns the same conversation if one was made.
+				return new Promise( function ( resolve ) {
+					window.setTimeout( resolve, 400 );
+				} ).then( function () {
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
 			}
 			if ( error.code === 'chatchi_too_fast' ) {
 				var wait = Math.max( 1, ( error.data && error.data.retry_after ) || 1 ) * 1000;

@@ -58,8 +58,11 @@ final class Schema {
 
 		dbDelta( $this->definitions() );
 
-		// Read before missing_tables() runs its own queries and resets it.
-		$error   = $this->db->last_error;
+		// Read before the checks below run their own queries and reset it.
+		$error = $this->db->last_error;
+
+		$this->reconcile();
+
 		$missing = $this->missing_tables();
 
 		if ( ! $missing ) {
@@ -99,6 +102,135 @@ final class Schema {
 		}
 
 		return $missing;
+	}
+
+	/**
+	 * Removes what stops ChatChi from writing to its own tables.
+	 *
+	 * A table can carry columns and indexes that are not ChatChi's, left by
+	 * an older or different plugin that used the same table name. dbDelta()
+	 * only adds, so they stay. Two kinds break every insert and are fixed:
+	 *
+	 * - a unique index that is not ChatChi's: rows ChatChi writes leave its
+	 *   column at the default, so the second row is a duplicate. The index
+	 *   is dropped; no data is removed.
+	 * - a NOT NULL column without a default: strict SQL modes refuse rows
+	 *   that do not set it. The column is made nullable; its data is kept.
+	 *
+	 * MySQL and MariaDB only; other engines are left alone.
+	 *
+	 * @return string[] What was changed, for the log.
+	 */
+	public function reconcile(): array {
+		if ( ! $this->is_mysql() ) {
+			return array();
+		}
+
+		$changes = array();
+
+		foreach ( $this->expected() as $table => $expected ) {
+			$name = $this->db->prefix . $table;
+
+			if ( $this->db->get_var( $this->db->prepare( 'SHOW TABLES LIKE %s', $this->db->esc_like( $name ) ) ) !== $name ) {
+				continue;
+			}
+
+			// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Fixed table names; repairing the plugin's own tables.
+			$unique = array();
+			foreach ( (array) $this->db->get_results( "SHOW INDEX FROM `{$name}`" ) as $index ) {
+				if ( 0 === (int) $index->Non_unique && 'PRIMARY' !== $index->Key_name ) {
+					$unique[ $index->Key_name ] = true;
+				}
+			}
+
+			foreach ( array_keys( $unique ) as $key ) {
+				if ( ! in_array( strtolower( $key ), $expected['indexes'], true ) && preg_match( '/^[A-Za-z0-9_]+$/', $key ) ) {
+					$this->db->query( "ALTER TABLE `{$name}` DROP INDEX `{$key}`" );
+					$changes[] = "dropped unique index {$name}.{$key}";
+				}
+			}
+
+			foreach ( (array) $this->db->get_results( "SHOW FULL COLUMNS FROM `{$name}`" ) as $column ) {
+				$field = (string) $column->Field;
+
+				if ( in_array( strtolower( $field ), $expected['columns'], true ) || 'NO' !== $column->Null || null !== $column->Default
+					|| false !== stripos( (string) $column->Extra, 'auto_increment' ) || ! preg_match( '/^[A-Za-z0-9_]+$/', $field )
+					|| ! preg_match( '/^[a-z]+(\([0-9, ]+\))?( unsigned)?$/i', (string) $column->Type ) ) {
+					continue;
+				}
+
+				$this->db->query( "ALTER TABLE `{$name}` MODIFY `{$field}` {$column->Type} NULL" );
+				$changes[] = "made {$name}.{$field} nullable";
+			}
+			// phpcs:enable
+		}
+
+		if ( $changes ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Schema repairs must reach the server log.
+			error_log( '[ChatChi] Repaired tables: ' . implode( '; ', $changes ) );
+		}
+
+		return $changes;
+	}
+
+	/**
+	 * Whether a unique key name belongs to ChatChi's own tables.
+	 *
+	 * @param string $key Index name, as in a duplicate-entry error.
+	 */
+	public function is_own_key( string $key ): bool {
+		$key = strtolower( $key );
+
+		foreach ( $this->expected() as $expected ) {
+			if ( 'primary' === $key || in_array( $key, $expected['indexes'], true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Returns ChatChi's columns and index names per table, read from the
+	 * CREATE TABLE statements.
+	 *
+	 * @return array<string, array{columns: string[], indexes: string[]}>
+	 */
+	private function expected(): array {
+		$tables = array();
+
+		foreach ( $this->definitions() as $sql ) {
+			if ( ! preg_match( '/CREATE TABLE \S*?(chatchi_[a-z_]+) \(/', $sql, $m ) ) {
+				continue;
+			}
+
+			$columns = array();
+			$indexes = array();
+
+			foreach ( preg_split( '/\R/', $sql ) as $line ) {
+				$line = trim( $line );
+
+				if ( preg_match( '/^(?:UNIQUE )?KEY ([a-z_]+) \(/i', $line, $k ) ) {
+					$indexes[] = strtolower( $k[1] );
+				} elseif ( preg_match( '/^([a-z_]+) [a-z]+/i', $line, $c ) && ! preg_match( '/^(PRIMARY|CREATE)\b/i', $line ) ) {
+					$columns[] = strtolower( $c[1] );
+				}
+			}
+
+			$tables[ $m[1] ] = array(
+				'columns' => $columns,
+				'indexes' => $indexes,
+			);
+		}
+
+		return $tables;
+	}
+
+	/**
+	 * Whether the database is MySQL or MariaDB (not, e.g., SQLite).
+	 */
+	private function is_mysql(): bool {
+		return ! ( defined( 'DB_ENGINE' ) && 'sqlite' === DB_ENGINE ) && ! is_a( $this->db, 'WP_SQLite_DB' );
 	}
 
 	/**

@@ -189,7 +189,7 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 ## Troubleshooting
 
 - **"Not sent" in the widget:** when a site administrator is logged in, the widget shows the technical cause under a failed message (HTTP status, error code, and the server's explanation). Visitors never see it. The same message is always written to the server's PHP error log as `[ChatChi] … error: …`.
-- **Unfinished database upgrades** repair themselves: an error about a missing table or column makes the installer run again on the next request. The installer also checks that required columns exist, and shows an admin notice when it cannot fix them (for example when the database user may not `ALTER` tables).
+- **Unfinished database upgrades and leftover tables** repair themselves: an error about a missing table or column, a NOT NULL column without a default, or a duplicate on a unique index that is not ChatChi's (for example left by an older or different plugin that used the same table name) runs the installer right away, and the widget retries once. After `dbDelta`, the installer drops unique indexes on ChatChi's tables that are not its own and makes unknown NOT NULL columns without a default nullable (MySQL/MariaDB; no data is removed). The installer also checks that required columns exist, and shows an admin notice when it cannot fix them (for example when the database user may not `ALTER` tables).
 - **Other plugins printing into responses** (PHP notices, stray whitespace) no longer break the chat: that output is removed from ChatChi's REST responses, and the widget can read the JSON even when something was printed before it.
 
 ## Security
