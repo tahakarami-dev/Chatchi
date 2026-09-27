@@ -23,7 +23,7 @@ final class ProfileValidator {
 	/**
 	 * Persian (۰-۹) and Arabic-Indic (٠-٩) digits mapped to ASCII.
 	 */
-	private const DIGIT_MAP = array(
+	public const DIGIT_MAP = array(
 		'۰' => '0',
 		'۱' => '1',
 		'۲' => '2',

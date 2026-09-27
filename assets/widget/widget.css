@@ -1635,3 +1635,10 @@
 	width: 18px;
 	height: 18px;
 }
+
+/* Brand icons drawn as filled shapes */
+
+.cc-fill {
+	fill: currentColor;
+	stroke: none;
+}

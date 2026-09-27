@@ -10,6 +10,7 @@ namespace ChatChi\Settings;
 use ChatChi\Availability\Schedule;
 use ChatChi\Security\IpRange;
 use ChatChi\Support\PlainText;
+use ChatChi\Visitors\ProfileValidator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -47,6 +48,12 @@ final class SettingsValidator {
 
 	public const BOT_SERVICES = array( 'telegram', 'bale' );
 
+	public const THEMES = array( 'light', 'dark', 'auto' );
+
+	public const SMS_PROVIDERS = array( 'kavenegar', 'melipayamak' );
+
+	public const SMS_MESSAGE_MAX_LENGTH = 300;
+
 	/**
 	 * Whole-number settings: name => array( min, max, default ).
 	 */
@@ -58,6 +65,8 @@ final class SettingsValidator {
 		'limit_starts_visitor'   => array( 1, 100, 5 ),
 		'limit_starts_ip'        => array( 1, 1000, 10 ),
 		'attachment_max_mb'      => array( 1, 50, 5 ),
+		// Minutes an agent's reply waits unread before the visitor gets an SMS.
+		'sms_delay'              => array( 1, 60, 3 ),
 	);
 
 	public const MAX_TRUSTED_PROXIES = 100;
@@ -90,6 +99,8 @@ final class SettingsValidator {
 			// Empty means "use the default color".
 			'primary_color'   => '',
 			'widget_position' => 'left',
+			// "light", "dark", or "auto" (follows the visitor's device).
+			'widget_theme'    => 'light',
 			// Empty means "use the translated default text".
 			'widget_title'    => '',
 			'widget_subtitle' => '',
@@ -140,6 +151,22 @@ final class SettingsValidator {
 			'proactive'                => array(),
 			// Ask visitors to rate the chat when it ends.
 			'rating_enabled'           => true,
+			// Other ways to reach the site, in the widget's menu (see ContactChannels).
+			'channels_enabled'         => false,
+			'channels'                 => array(),
+			// Questions visitors can read before chatting (see FaqItems).
+			'faq_enabled'              => false,
+			'faq'                      => array(),
+			// Text visitors who left their mobile number when an agent replies
+			// and they are not on the site (see Notifications\SmsNotifier).
+			'sms_enabled'              => false,
+			'sms_provider'             => 'kavenegar',
+			'sms_api_key'              => '',
+			'sms_username'             => '',
+			'sms_password'             => '',
+			'sms_sender'               => '',
+			// Empty means "use the translated default text".
+			'sms_message'              => '',
 		);
 
 		foreach ( self::NUMBERS as $key => $range ) {
@@ -223,6 +250,24 @@ final class SettingsValidator {
 				}
 				if ( '' === $settings[ $service . '_chat_id' ] ) {
 					$errors[ $service . '_chat_id' ] = __( 'Enter the chat ID the bot sends to.', 'chatchi' );
+				}
+			}
+		}
+
+		// SMS needs the provider's credentials.
+		if ( ! empty( $settings['sms_enabled'] ) ) {
+			if ( 'kavenegar' === $settings['sms_provider'] && '' === $settings['sms_api_key'] ) {
+				$errors['sms_api_key'] = __( 'Enter the API key of your Kavenegar account.', 'chatchi' );
+			}
+			if ( 'melipayamak' === $settings['sms_provider'] ) {
+				if ( '' === $settings['sms_username'] ) {
+					$errors['sms_username'] = __( 'Enter the username of your Melipayamak panel.', 'chatchi' );
+				}
+				if ( '' === $settings['sms_password'] ) {
+					$errors['sms_password'] = __( 'Enter the password of your Melipayamak panel.', 'chatchi' );
+				}
+				if ( '' === $settings['sms_sender'] ) {
+					$errors['sms_sender'] = __( 'Enter the sender line number of your Melipayamak panel.', 'chatchi' );
 				}
 			}
 		}
@@ -312,7 +357,34 @@ final class SettingsValidator {
 				case 'bale_enabled':
 				case 'transcript_enabled':
 				case 'rating_enabled':
+				case 'channels_enabled':
+				case 'faq_enabled':
+				case 'sms_enabled':
 					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'widget_theme':
+					$settings[ $key ] = in_array( $value, self::THEMES, true ) ? $value : $default;
+					break;
+
+				case 'channels':
+					$settings[ $key ] = ContactChannels::repair( $value );
+					break;
+
+				case 'faq':
+					$settings[ $key ] = FaqItems::repair( $value );
+					break;
+
+				case 'sms_provider':
+					$settings[ $key ] = in_array( $value, self::SMS_PROVIDERS, true ) ? $value : $default;
+					break;
+
+				case 'sms_api_key':
+				case 'sms_username':
+				case 'sms_password':
+				case 'sms_sender':
+				case 'sms_message':
+					$settings[ $key ] = is_string( $value ) ? $value : $default;
 					break;
 
 				case 'proactive':
@@ -438,7 +510,51 @@ final class SettingsValidator {
 			case 'bale_enabled':
 			case 'transcript_enabled':
 			case 'rating_enabled':
+			case 'channels_enabled':
+			case 'faq_enabled':
+			case 'sms_enabled':
 				return rest_sanitize_boolean( $value );
+
+			case 'widget_theme':
+				return in_array( $value, self::THEMES, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose light, dark or automatic.', 'chatchi' ) );
+
+			case 'channels':
+				return ContactChannels::clean( $value );
+
+			case 'faq':
+				return FaqItems::clean( $value );
+
+			case 'sms_provider':
+				return in_array( $value, self::SMS_PROVIDERS, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose an SMS service.', 'chatchi' ) );
+
+			case 'sms_api_key':
+				$value = is_string( $value ) ? trim( $value ) : null;
+
+				return null !== $value && preg_match( '#^[A-Za-z0-9+/=_\-]{0,200}$#', $value )
+					? $value
+					: new \WP_Error( 'invalid', __( 'The API key looks wrong. Copy it again from your SMS panel.', 'chatchi' ) );
+
+			case 'sms_username':
+				return $this->short_text( $value, 100 );
+
+			case 'sms_password':
+				return is_string( $value ) && strlen( $value ) <= 200 && '' === (string) preg_replace( '/[^\x00-\x1F\x7F]/', '', $value )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Enter the password of your SMS panel.', 'chatchi' ) );
+
+			case 'sms_sender':
+				$value = is_string( $value ) ? (string) preg_replace( '/[\s\-]/', '', strtr( $value, ProfileValidator::DIGIT_MAP ) ) : null;
+
+				return null !== $value && preg_match( '/^\+?\d{0,20}$/', $value )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Enter the sender line number, digits only.', 'chatchi' ) );
+
+			case 'sms_message':
+				return $this->long_text( $value, self::SMS_MESSAGE_MAX_LENGTH );
 
 			case 'proactive':
 				return ProactiveRules::clean( $value );

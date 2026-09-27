@@ -100,7 +100,7 @@ svg {
 	align-items: center;
 	gap: 8px;
 	padding: 12px 0;
-	background: var(--chatchi-text);
+	background: var(--cc-rail-bg);
 	color: #c9c9d6;
 }
 
@@ -250,8 +250,8 @@ svg {
 }
 
 .cc-badge--new {
-	background: #fff1ec;
-	color: #b4432a;
+	background: var(--cc-new-bg);
+	color: var(--cc-new-text);
 }
 
 .cc-badge--active {
@@ -1411,7 +1411,7 @@ label.cc-button {
 	padding: 10px 16px;
 	border-radius: var(--chatchi-radius-md);
 	background: var(--chatchi-text);
-	color: #fff;
+	color: var(--chatchi-surface);
 	box-shadow: var(--chatchi-shadow-md);
 	font-size: 13px;
 }
@@ -2134,6 +2134,10 @@ label.cc-button {
 	height: 16px;
 }
 
+:where(.cc-preview__frame) {
+	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #eeeefc);
+}
+
 .cc-preview__launcher {
 	position: absolute;
 	bottom: 12px;
@@ -2626,7 +2630,7 @@ label.cc-button {
 	place-items: center;
 	border: 2px dashed var(--chatchi-primary);
 	border-radius: var(--chatchi-radius-md);
-	background: rgba(255, 255, 255, .9);
+	background: var(--cc-drop-bg);
 	color: var(--chatchi-primary);
 	font-size: 16px;
 	font-weight: 700;
@@ -2640,9 +2644,9 @@ label.cc-button {
 	margin: 12px 8% 4px;
 	padding: 10px 14px;
 	border-radius: var(--chatchi-radius-md);
-	background: #fff8e1;
-	box-shadow: inset 0 0 0 1px #f5d77a;
-	color: #5c4400;
+	background: var(--cc-note-bg);
+	box-shadow: inset 0 0 0 1px var(--cc-note-border);
+	color: var(--cc-note-text);
 }
 
 .cc-note.is-new {
@@ -2744,13 +2748,13 @@ label.cc-button {
 }
 
 .cc-compose-mode__tab--note[aria-selected="true"] {
-	background: #fff1c2;
-	color: #7a5a00;
+	background: var(--cc-note-tab);
+	color: var(--cc-note-tab-text);
 }
 
 .cc-composer__inner.is-note textarea {
 	border-color: #f0c64a;
-	background: #fffbeb;
+	background: var(--cc-note-input);
 }
 
 .cc-composer__inner.is-note textarea:focus {
@@ -3850,4 +3854,73 @@ a.cc-order-head:hover strong {
 	.cc-page-head {
 		flex-wrap: wrap;
 	}
+}
+
+/* Brand icons drawn as filled shapes */
+
+.cc-fill {
+	fill: currentColor;
+	stroke: none;
+}
+
+/* Colors of notes and highlights that have no design token, per theme */
+
+:root {
+	--cc-note-bg: #fff8e1;
+	--cc-note-border: #f5d77a;
+	--cc-note-text: #5c4400;
+	--cc-note-tab: #fff1c2;
+	--cc-note-tab-text: #7a5a00;
+	--cc-note-input: #fffbeb;
+	--cc-new-bg: #fff1ec;
+	--cc-new-text: #b4432a;
+	--cc-drop-bg: rgba(255, 255, 255, .9);
+	--cc-rail-bg: #1a1a2e;
+}
+
+:root[data-theme="dark"] {
+	--cc-note-bg: rgba(240, 198, 74, .12);
+	--cc-note-border: rgba(240, 198, 74, .35);
+	--cc-note-text: #f3dd9b;
+	--cc-note-tab: rgba(240, 198, 74, .18);
+	--cc-note-tab-text: #f3dd9b;
+	--cc-note-input: rgba(240, 198, 74, .08);
+	--cc-new-bg: rgba(255, 122, 89, .16);
+	--cc-new-text: #ffab94;
+	--cc-drop-bg: rgba(19, 19, 29, .9);
+	--cc-rail-bg: #0d0d15;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-theme="auto"] {
+		--cc-note-bg: rgba(240, 198, 74, .12);
+		--cc-note-border: rgba(240, 198, 74, .35);
+		--cc-note-text: #f3dd9b;
+		--cc-note-tab: rgba(240, 198, 74, .18);
+		--cc-note-tab-text: #f3dd9b;
+		--cc-note-input: rgba(240, 198, 74, .08);
+		--cc-new-bg: rgba(255, 122, 89, .16);
+		--cc-new-text: #ffab94;
+		--cc-drop-bg: rgba(19, 19, 29, .9);
+		--cc-rail-bg: #0d0d15;
+	}
+}
+
+/* Widget theme choice */
+
+.cc-radios--row {
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+.cc-theme-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.cc-theme-option svg {
+	width: 18px;
+	height: 18px;
+	color: var(--chatchi-text-muted);
 }

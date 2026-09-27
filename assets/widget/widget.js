@@ -227,7 +227,7 @@
 		} );
 
 		this.root = h( 'div', {
-			className: 'chatchi chatchi--' + ( config.position === 'right' ? 'right' : 'left' ),
+			className: 'chatchi chatchi--' + ( config.position === 'right' ? 'right' : 'left' ) + ( config.theme === 'dark' || config.theme === 'auto' ? ' chatchi--' + config.theme : '' ),
 			dir: config.dir || 'rtl',
 			lang: locale.split( '-' )[ 0 ]
 		} );
@@ -235,7 +235,7 @@
 		var colors = config.colors || {};
 		this.root.style.setProperty( '--chatchi-primary', colors.primary );
 		this.root.style.setProperty( '--chatchi-primary-hover', colors.primaryHover );
-		this.root.style.setProperty( '--chatchi-primary-soft', colors.primarySoft );
+		this.root.style.setProperty( '--chatchi-primary-soft-light', colors.primarySoft );
 		this.root.style.setProperty( '--chatchi-primary-contrast', colors.primaryContrast );
 
 		this.badge = h( 'span', { className: 'chatchi-badge', hidden: true, 'aria-hidden': 'true' } );

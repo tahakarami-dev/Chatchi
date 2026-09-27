@@ -118,6 +118,22 @@ final class Settings {
 	}
 
 	/**
+	 * The default SMS text; {site} is the site name and {link} the page.
+	 */
+	public function default_sms_message(): string {
+		return __( 'You have a reply from {site} support. Read it here: {link}', 'chatchi' );
+	}
+
+	/**
+	 * The SMS text visitors get, or the translated default.
+	 */
+	public function sms_message(): string {
+		$message = (string) $this->get( 'sms_message' );
+
+		return '' !== $message ? $message : $this->default_sms_message();
+	}
+
+	/**
 	 * The text offline visitors see, or the translated default.
 	 */
 	public function offline_message(): string {

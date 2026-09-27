@@ -8,8 +8,10 @@
 namespace ChatChi\Frontend;
 
 use ChatChi\Core\Contracts\Module;
+use ChatChi\Settings\ContactChannels;
 use ChatChi\Settings\ProactiveRules;
 use ChatChi\Settings\Settings;
+use ChatChi\Settings\SettingsValidator;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -168,6 +170,10 @@ final class WidgetModule implements Module {
 				esc_url_raw( add_query_arg( 'ver', CHATCHI_VERSION, CHATCHI_URL . 'assets/widget/widget.css' ) ),
 			),
 			'position'  => $this->position(),
+			'theme'     => $this->theme(),
+			// Other ways to reach the site, shown in the launcher's menu.
+			'channels'  => $this->settings->get( 'channels_enabled' ) ? ContactChannels::links( (array) $this->settings->get( 'channels' ) ) : array(),
+			'faq'       => $this->settings->get( 'faq_enabled' ) ? array_values( (array) $this->settings->get( 'faq' ) ) : array(),
 			'colors'    => $this->palette->tokens(),
 			'locale'    => str_replace( '_', '-', determine_locale() ),
 			'dir'       => is_rtl() ? 'rtl' : 'ltr',
@@ -246,6 +252,20 @@ final class WidgetModule implements Module {
 		}
 
 		return 'other';
+	}
+
+	/**
+	 * Returns the widget's color theme: "light", "dark" or "auto".
+	 */
+	private function theme(): string {
+		/**
+		 * Filters the widget theme: "light", "dark" or "auto" (the visitor's device decides).
+		 *
+		 * @param string $theme Theme chosen in the settings.
+		 */
+		$theme = apply_filters( 'chatchi_widget_theme', $this->settings->get( 'widget_theme' ) );
+
+		return in_array( $theme, SettingsValidator::THEMES, true ) ? $theme : 'light';
 	}
 
 	/**

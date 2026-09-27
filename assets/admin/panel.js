@@ -172,6 +172,9 @@
 		setStatus: function ( status ) {
 			return request( 'PATCH', '/agent/me', { body: { status: status } } );
 		},
+		setTheme: function ( theme ) {
+			return request( 'PATCH', '/agent/me', { body: { theme: theme } } );
+		},
 		inbox: function ( query ) {
 			return request( 'GET', '/agent/conversations', { query: query } );
 		},
@@ -441,6 +444,7 @@
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
+			this.buildThemeButton(),
 			this.buildAlertsButton(),
 			agent ? this.buildStatusButton( agent ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
@@ -451,6 +455,35 @@
 	 * Turns new-message alerts on or off for this browser; turning them on
 	 * also asks for permission to show desktop notifications.
 	 */
+	/**
+	 * Light, dark, or the device's choice; saved on the agent's account.
+	 */
+	var PANEL_THEMES = [ 'light', 'dark', 'auto' ];
+
+	Panel.prototype.buildThemeButton = function () {
+		var self = this;
+		var current = document.documentElement.getAttribute( 'data-theme' ) || 'light';
+		var labels = { light: S.themeLight, dark: S.themeDark, auto: S.themeAuto };
+		var icons = { light: 'sun', dark: 'moon', auto: 'monitor' };
+		var label = S.panelTheme + ': ' + labels[ current ];
+
+		return h( 'button', {
+			type: 'button',
+			className: 'cc-rail-item cc-theme-toggle',
+			title: label,
+			'aria-label': label,
+			onClick: function () {
+				var next = PANEL_THEMES[ ( PANEL_THEMES.indexOf( current ) + 1 ) % PANEL_THEMES.length ];
+				document.documentElement.setAttribute( 'data-theme', next );
+				self.renderRail();
+				self.notify( S.panelTheme + ': ' + labels[ next ] );
+				api.setTheme( next ).catch( function ( error ) {
+					self.notify( error.message, true );
+				} );
+			}
+		}, [ icon( icons[ current ] ) ] );
+	};
+
 	Panel.prototype.buildAlertsButton = function () {
 		var self = this;
 		var on = alerts.enabled();
@@ -3549,7 +3582,7 @@
 	 */
 	var SETTINGS_SECTIONS = [
 		{ id: 'general', icon: 'power', keys: [ 'widget_enabled', 'widget_sound', 'visitor_cookie_days', 'delete_data_on_uninstall' ] },
-		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
+		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_theme', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
 		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
@@ -3932,7 +3965,7 @@
 
 		el.style.setProperty( '--chatchi-primary', tokens.primary );
 		el.style.setProperty( '--chatchi-primary-hover', tokens.primaryHover );
-		el.style.setProperty( '--chatchi-primary-soft', tokens.primarySoft );
+		el.style.setProperty( '--chatchi-primary-soft-light', tokens.primarySoft );
 		el.style.setProperty( '--chatchi-primary-contrast', tokens.primaryContrast );
 	}
 
@@ -4054,6 +4087,25 @@
 			] );
 		} ) );
 
+		// Light, dark or the visitor's device.
+		var themes = h( 'div', { className: 'cc-radios cc-radios--row', role: 'radiogroup', 'aria-labelledby': 'cc-theme-label' }, [
+			[ 'light', S.themeLight, 'sun' ],
+			[ 'dark', S.themeDark, 'moon' ],
+			[ 'auto', S.themeAutoVisitor, 'monitor' ]
+		].map( function ( option ) {
+			var id = 'cc-theme-' + option[ 0 ];
+			var input = h( 'input', { id: id, type: 'radio', name: 'cc-theme', value: option[ 0 ], checked: draft.widget_theme === option[ 0 ] } );
+
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.widget_theme = option[ 0 ];
+					self.updatePreview();
+				}
+			} );
+
+			return h( 'label', { className: 'cc-radio cc-theme-option', for: id }, [ input, icon( option[ 2 ] ), h( 'span', { text: option[ 1 ] } ) ] );
+		} ) );
+
 		// Title and subtitle.
 		function textField( key, id, label ) {
 			var input = h( 'input', {
@@ -4092,7 +4144,11 @@
 			overridden,
 			h( 'span', { className: 'cc-label', id: 'cc-position-label', text: S.position } ),
 			positions,
-			this.fieldError( 'widget_position' )
+			this.fieldError( 'widget_position' ),
+			h( 'span', { className: 'cc-label', id: 'cc-theme-label', text: S.widgetTheme } ),
+			themes,
+			h( 'p', { className: 'cc-hint', text: S.widgetThemeHint } ),
+			this.fieldError( 'widget_theme' )
 		].concat(
 			textField( 'widget_title', 'cc-widget-title', S.widgetTitle ),
 			textField( 'widget_subtitle', 'cc-widget-subtitle', S.widgetSubtitle ),
@@ -4150,6 +4206,8 @@
 
 		setColorVars( preview.frame, normalizeHex( draft.primary_color ) || defaults.primary_color );
 		preview.frame.classList.toggle( 'is-right', draft.widget_position === 'right' );
+		preview.frame.classList.toggle( 'chatchi--dark', draft.widget_theme === 'dark' );
+		preview.frame.classList.toggle( 'chatchi--auto', draft.widget_theme === 'auto' );
 		preview.title.textContent = draft.widget_title.trim() || defaults.widget_title;
 		preview.subtitle.textContent = draft.widget_subtitle.trim() || defaults.widget_subtitle;
 
