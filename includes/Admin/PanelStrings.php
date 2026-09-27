@@ -158,6 +158,7 @@ final class PanelStrings {
 			'aiBaseUrlOpenAiHint'  => __( 'The service\'s address, usually ending in /v1. Leave empty for OpenAI itself.', 'chatchi' ),
 			'aiModel'              => __( 'Model', 'chatchi' ),
 			'aiModelPlaceholder'   => __( 'model name from your service', 'chatchi' ),
+			/* translators: %s: default model ID. */
 			'aiModelClaudeHint'    => __( 'Empty means %s. A smaller model costs less but answers less well.', 'chatchi' ),
 			'aiModelOpenAiHint'    => __( 'Write the model name exactly as your service lists it.', 'chatchi' ),
 			'aiTest'               => __( 'Test the connection', 'chatchi' ),
@@ -174,6 +175,7 @@ final class PanelStrings {
 			'aiInstructions'       => __( 'Extra instructions (optional)', 'chatchi' ),
 			'aiInstructionsPlaceholder' => __( 'e.g. Be friendly and use informal Persian. We ship only inside Iran. Never promise discounts.', 'chatchi' ),
 			'aiInstructionsHint'   => __( 'Tone, rules and facts the bot should know. Prices and stock of the products you choose are read from the shop automatically.', 'chatchi' ),
+			/* translators: %d: maximum number of pages. */
 			'aiKnowledge'          => __( 'Pages the bot knows (up to %d)', 'chatchi' ),
 			'aiKnowledgeHint'      => __( 'The FAQ is always included. Choose pages, posts or products with the answers visitors look for: shipping, returns, contact, popular products.', 'chatchi' ),
 			'aiKnowledgeSearch'    => __( 'Search pages, posts and products', 'chatchi' ),
