@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-27T13:11:03+00:00\n"
+"POT-Creation-Date: 2026-09-27T17:24:14+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -69,8 +69,8 @@ msgid "The ChatChi panel needs JavaScript."
 msgstr "پنل چت‌چی برای کار کردن به JavaScript نیاز دارد."
 
 #: includes/Admin/PanelStrings.php:23
-#: includes/Admin/PanelStrings.php:159
-#: includes/Admin/PanelStrings.php:186
+#: includes/Admin/PanelStrings.php:223
+#: includes/Admin/PanelStrings.php:250
 msgid "Conversations"
 msgstr "گفتگوها"
 
@@ -83,7 +83,7 @@ msgid "Search name, email, phone or number"
 msgstr "جستجوی نام، ایمیل، موبایل یا شماره"
 
 #: includes/Admin/PanelStrings.php:26
-#: includes/Admin/PanelStrings.php:278
+#: includes/Admin/PanelStrings.php:342
 msgid "All"
 msgstr "همه"
 
@@ -93,12 +93,12 @@ msgstr "جدید"
 
 #: includes/Admin/PanelStrings.php:28
 #: includes/Admin/PanelStrings.php:93
-#: includes/Admin/PanelStrings.php:210
+#: includes/Admin/PanelStrings.php:274
 msgid "Active"
 msgstr "فعال"
 
 #: includes/Admin/PanelStrings.php:29
-#: includes/Admin/PanelStrings.php:332
+#: includes/Admin/PanelStrings.php:396
 msgid "Closed"
 msgstr "بسته"
 
@@ -171,6 +171,7 @@ msgid "Email"
 msgstr "ایمیل"
 
 #: includes/Admin/PanelStrings.php:47
+#: includes/Admin/PanelStrings.php:201
 #: includes/Frontend/WidgetStrings.php:35
 msgid "Mobile number"
 msgstr "شماره موبایل"
@@ -277,7 +278,7 @@ msgid "Today"
 msgstr "امروز"
 
 #: includes/Admin/PanelStrings.php:71
-#: includes/Frontend/WidgetStrings.php:89
+#: includes/Frontend/WidgetStrings.php:102
 msgid "Yesterday"
 msgstr "دیروز"
 
@@ -301,13 +302,13 @@ msgstr "اتصال برقرار نشد. اینترنتت را چک کن و دو�
 
 #. translators: %d: number of unread messages.
 #: includes/Admin/PanelStrings.php:77
-#: includes/Frontend/WidgetStrings.php:91
+#: includes/Frontend/WidgetStrings.php:104
 #, php-format
 msgid "%d unread messages"
 msgstr "%d پیام خوانده‌نشده"
 
 #: includes/Admin/PanelStrings.php:78
-#: includes/Admin/PanelStrings.php:184
+#: includes/Admin/PanelStrings.php:248
 msgid "Agents"
 msgstr "اپراتورها"
 
@@ -396,7 +397,7 @@ msgid "Saving…"
 msgstr "در حال ذخیره…"
 
 #: includes/Admin/PanelStrings.php:101
-#: includes/Admin/PanelStrings.php:299
+#: includes/Admin/PanelStrings.php:363
 #: includes/Frontend/WidgetStrings.php:72
 msgid "Uploading…"
 msgstr "در حال بارگذاری…"
@@ -430,7 +431,8 @@ msgid "Show a welcome message"
 msgstr "نمایش پیام خوش‌آمد"
 
 #: includes/Admin/PanelStrings.php:109
-#: includes/Admin/PanelStrings.php:212
+#: includes/Admin/PanelStrings.php:194
+#: includes/Admin/PanelStrings.php:276
 msgid "Message"
 msgstr "متن پیام"
 
@@ -455,7 +457,7 @@ msgid "On every page except the ones I choose"
 msgstr "در همه‌ی صفحه‌ها به‌جز صفحه‌هایی که انتخاب می‌کنم"
 
 #: includes/Admin/PanelStrings.php:115
-#: includes/Admin/PanelStrings.php:214
+#: includes/Admin/PanelStrings.php:278
 msgid "Show on"
 msgstr "نمایش در"
 
@@ -464,12 +466,12 @@ msgid "Hide on"
 msgstr "عدم نمایش در"
 
 #: includes/Admin/PanelStrings.php:117
-#: includes/Admin/PanelStrings.php:216
+#: includes/Admin/PanelStrings.php:280
 msgid "Home page"
 msgstr "صفحه‌ی اصلی"
 
 #: includes/Admin/PanelStrings.php:118
-#: includes/Admin/PanelStrings.php:215
+#: includes/Admin/PanelStrings.php:279
 msgid "All pages"
 msgstr "همه‌ی برگه‌ها"
 
@@ -496,7 +498,7 @@ msgstr "چیزی پیدا نشد."
 #. translators: %s: page or post title.
 #. translators: %s: tag.
 #: includes/Admin/PanelStrings.php:125
-#: includes/Admin/PanelStrings.php:289
+#: includes/Admin/PanelStrings.php:353
 #, php-format
 msgid "Remove %s"
 msgstr "حذف %s"
@@ -507,7 +509,7 @@ msgstr "هنوز چیزی انتخاب نشده؛ پس ویجت فقط در صف
 
 #. translators: %d: maximum number of items.
 #: includes/Admin/PanelStrings.php:128
-#: includes/Settings/SettingsValidator.php:629
+#: includes/Settings/SettingsValidator.php:745
 #, php-format
 msgid "You can choose at most %d items."
 msgstr "حداکثر %d مورد می‌توانی انتخاب کنی."
@@ -583,371 +585,617 @@ msgid "IP & security"
 msgstr "IP و امنیت"
 
 #: includes/Admin/PanelStrings.php:147
+msgid "Channels & FAQ"
+msgstr "راه‌های ارتباطی و سؤالات"
+
+#: includes/Admin/PanelStrings.php:148
+msgid "SMS"
+msgstr "پیامک"
+
+#: includes/Admin/PanelStrings.php:149
+msgid "Move up"
+msgstr "انتقال به بالا"
+
+#: includes/Admin/PanelStrings.php:150
+msgid "Remove"
+msgstr "حذف"
+
+#: includes/Admin/PanelStrings.php:151
+msgid "minutes"
+msgstr "دقیقه"
+
+#: includes/Admin/PanelStrings.php:152
+msgid "Other ways to reach you"
+msgstr "راه‌های ارتباطی دیگر"
+
+#: includes/Admin/PanelStrings.php:153
+msgid "Show WhatsApp, Telegram, Bale or a phone number next to the chat. The chat button then opens a small menu so visitors can pick how to contact you."
+msgstr "واتساپ، تلگرام، بله یا شماره تلفن را کنار چت نمایش بده. آن‌وقت دکمه‌ی چت یک منوی کوچک باز می‌کند تا بازدیدکننده راه ارتباطی دلخواهش را انتخاب کند."
+
+#: includes/Admin/PanelStrings.php:154
+msgid "Show the menu"
+msgstr "نمایش منو"
+
+#: includes/Admin/PanelStrings.php:155
+msgid "Add channel"
+msgstr "افزودن راه ارتباطی"
+
+#: includes/Admin/PanelStrings.php:156
+msgid "No channels yet."
+msgstr "هنوز راه ارتباطی اضافه نکرده‌ای."
+
+#. translators: %s: channel number.
+#: includes/Admin/PanelStrings.php:158
+#, php-format
+msgid "Channel %s"
+msgstr "راه ارتباطی %s"
+
+#: includes/Admin/PanelStrings.php:159
+msgid "Channel"
+msgstr "نوع"
+
+#: includes/Admin/PanelStrings.php:160
+msgid "Number or username"
+msgstr "شماره یا نام کاربری"
+
+#. translators: %d: maximum characters.
+#: includes/Admin/PanelStrings.php:162
+#, php-format
+msgid "Label (optional, up to %d characters)"
+msgstr "عنوان (اختیاری، حداکثر %d کاراکتر)"
+
+#: includes/Admin/PanelStrings.php:163
+msgid "e.g. Sales"
+msgstr "مثلاً واحد فروش"
+
+#: includes/Admin/PanelStrings.php:164
+#: includes/Frontend/WidgetStrings.php:97
+msgid "WhatsApp"
+msgstr "واتساپ"
+
+#: includes/Admin/PanelStrings.php:165
+#: includes/Frontend/WidgetStrings.php:98
+msgid "Telegram"
+msgstr "تلگرام"
+
+#: includes/Admin/PanelStrings.php:166
+#: includes/Frontend/WidgetStrings.php:99
+msgid "Bale"
+msgstr "بله"
+
+#: includes/Admin/PanelStrings.php:167
+msgid "Phone call"
+msgstr "تماس تلفنی"
+
+#: includes/Admin/PanelStrings.php:168
+#: includes/Frontend/WidgetStrings.php:89
+msgid "Frequently asked questions"
+msgstr "سؤالات متداول"
+
+#: includes/Admin/PanelStrings.php:169
+msgid "Visitors see these questions before they start a chat and can often find the answer themselves. Links in answers become clickable."
+msgstr "بازدیدکننده‌ها این سؤال‌ها را قبل از شروع گفتگو می‌بینند و خیلی وقت‌ها جوابشان را خودشان پیدا می‌کنند. لینک‌های داخل جواب قابل کلیک می‌شوند."
+
+#: includes/Admin/PanelStrings.php:170
+msgid "Show the questions"
+msgstr "نمایش سؤال‌ها"
+
+#: includes/Admin/PanelStrings.php:171
+msgid "Add question"
+msgstr "افزودن سؤال"
+
+#: includes/Admin/PanelStrings.php:172
+msgid "No questions yet."
+msgstr "هنوز سؤالی اضافه نکرده‌ای."
+
+#. translators: %s: question number.
+#: includes/Admin/PanelStrings.php:174
+#, php-format
+msgid "Question %s"
+msgstr "سؤال %s"
+
+#: includes/Admin/PanelStrings.php:175
+msgid "Question"
+msgstr "سؤال"
+
+#: includes/Admin/PanelStrings.php:176
+msgid "Answer"
+msgstr "جواب"
+
+#: includes/Admin/PanelStrings.php:177
+msgid "e.g. How long does delivery take?"
+msgstr "مثلاً ارسال سفارش چقدر طول می‌کشد؟"
+
+#: includes/Admin/PanelStrings.php:178
+msgid "e.g. Orders in Tehran arrive the next day; other cities in 2 to 4 working days."
+msgstr "مثلاً سفارش‌های تهران روز بعد و شهرستان‌ها ۲ تا ۴ روز کاری می‌رسند."
+
+#: includes/Admin/PanelStrings.php:179
+msgid "SMS to visitors"
+msgstr "پیامک به بازدیدکننده"
+
+#: includes/Admin/PanelStrings.php:180
+msgid "When an agent replies and the visitor has already left the site, text them so they can come back and read it. Only visitors who gave their mobile number get one, at most one SMS per conversation every few hours."
+msgstr "وقتی اپراتور جواب داد و بازدیدکننده سایت را ترک کرده بود، برایش پیامک بفرست تا برگردد و جواب را بخواند. فقط بازدیدکننده‌هایی که شماره موبایلشان را وارد کرده‌اند پیامک می‌گیرند؛ برای هر گفتگو حداکثر یک پیامک در هر چند ساعت."
+
+#: includes/Admin/PanelStrings.php:181
+msgid "Send SMS"
+msgstr "ارسال پیامک"
+
+#: includes/Admin/PanelStrings.php:182
+msgid "The mobile field of the start form is off, so no visitor can get an SMS. Turn it on under Start form."
+msgstr "فیلد موبایل در فرم شروع خاموش است، پس هیچ بازدیدکننده‌ای پیامک نمی‌گیرد. آن را در بخش «فرم شروع» روشن کن."
+
+#: includes/Admin/PanelStrings.php:183
+msgid "SMS service"
+msgstr "سامانه‌ی پیامک"
+
+#: includes/Admin/PanelStrings.php:184
+msgid "Kavenegar"
+msgstr "کاوه‌نگار"
+
+#: includes/Admin/PanelStrings.php:185
+msgid "Uses the API key from your Kavenegar panel."
+msgstr "با کلید API پنل کاوه‌نگارت کار می‌کند."
+
+#: includes/Admin/PanelStrings.php:186
+msgid "Melipayamak"
+msgstr "ملی‌پیامک"
+
+#: includes/Admin/PanelStrings.php:187
+msgid "Uses the username and password of your Melipayamak panel."
+msgstr "با نام کاربری و رمز پنل ملی‌پیامکت کار می‌کند."
+
+#: includes/Admin/PanelStrings.php:188
+msgid "API key"
+msgstr "کلید API"
+
+#: includes/Admin/PanelStrings.php:189
+msgid "Username"
+msgstr "نام کاربری"
+
+#: includes/Admin/PanelStrings.php:190
+msgid "Password"
+msgstr "رمز عبور"
+
+#: includes/Admin/PanelStrings.php:191
+msgid "Sender line number"
+msgstr "شماره خط فرستنده"
+
+#: includes/Admin/PanelStrings.php:192
+msgid "Optional: Kavenegar uses your default line when empty."
+msgstr "اختیاری: اگر خالی بماند، کاوه‌نگار از خط پیش‌فرضت استفاده می‌کند."
+
+#: includes/Admin/PanelStrings.php:193
+msgid "The dedicated or shared line of your panel."
+msgstr "خط اختصاصی یا خدماتی پنلت."
+
+#: includes/Admin/PanelStrings.php:195
+msgid "SMS text"
+msgstr "متن پیامک"
+
+#: includes/Admin/PanelStrings.php:196
+msgid "{site} is replaced with your site name and {link} with the page the visitor chatted on. Keep it short: long messages cost more than one SMS."
+msgstr "{site} با نام سایتت و {link} با صفحه‌ای که بازدیدکننده در آن گفتگو کرده جایگزین می‌شود. کوتاه بنویس: پیام بلند هزینه‌ی بیش از یک پیامک دارد."
+
+#: includes/Admin/PanelStrings.php:197
+msgid "Wait before sending"
+msgstr "صبر قبل از ارسال"
+
+#: includes/Admin/PanelStrings.php:198
+msgid "The SMS is sent only if the visitor has not read the reply by then."
+msgstr "پیامک فقط وقتی فرستاده می‌شود که بازدیدکننده تا آن موقع جواب را نخوانده باشد."
+
+#: includes/Admin/PanelStrings.php:199
+msgid "Send a test"
+msgstr "ارسال آزمایشی"
+
+#: includes/Admin/PanelStrings.php:200
+msgid "Sends a test SMS with the values above, saved or not."
+msgstr "با مقادیر بالا (ذخیره‌شده یا نه) یک پیامک آزمایشی می‌فرستد."
+
+#: includes/Admin/PanelStrings.php:202
+msgid "Send test SMS"
+msgstr "ارسال پیامک آزمایشی"
+
+#: includes/Admin/PanelStrings.php:203
+msgid "Sent. Check the phone."
+msgstr "ارسال شد. گوشی را چک کن."
+
+#: includes/Admin/PanelStrings.php:204
+msgid "Theme"
+msgstr "پوسته"
+
+#: includes/Admin/PanelStrings.php:205
+msgid "Light"
+msgstr "روشن"
+
+#: includes/Admin/PanelStrings.php:206
+msgid "Dark"
+msgstr "تیره"
+
+#: includes/Admin/PanelStrings.php:207
+msgid "Match my device"
+msgstr "مطابق دستگاه من"
+
+#: includes/Admin/PanelStrings.php:208
+msgid "Match the visitor's device"
+msgstr "مطابق دستگاه بازدیدکننده"
+
+#: includes/Admin/PanelStrings.php:209
+msgid "Widget theme"
+msgstr "پوسته‌ی ویجت"
+
+#: includes/Admin/PanelStrings.php:210
+msgid "\"Match the visitor's device\" shows the dark widget to visitors whose phone or computer is set to dark mode."
+msgstr "«مطابق دستگاه بازدیدکننده» ویجت تیره را به کسانی نشان می‌دهد که گوشی یا کامپیوترشان روی حالت تیره است."
+
+#: includes/Admin/PanelStrings.php:211
 msgid "Reports"
 msgstr "گزارش‌ها"
 
-#: includes/Admin/PanelStrings.php:148
+#: includes/Admin/PanelStrings.php:212
 msgid "How your chat is doing: volume, response times and customer satisfaction."
 msgstr "وضعیت چت سایتت در یک نگاه: حجم گفتگوها، سرعت پاسخ و رضایت مشتری‌ها."
 
-#: includes/Admin/PanelStrings.php:149
+#: includes/Admin/PanelStrings.php:213
 msgid "Period"
 msgstr "بازه"
 
 #. translators: %d: number of days.
-#: includes/Admin/PanelStrings.php:151
+#: includes/Admin/PanelStrings.php:215
 #, php-format
 msgid "%d days"
 msgstr "%d روز"
 
-#: includes/Admin/PanelStrings.php:152
+#: includes/Admin/PanelStrings.php:216
 msgid "The report could not be loaded."
 msgstr "گزارش بارگذاری نشد."
 
-#: includes/Admin/PanelStrings.php:153
+#: includes/Admin/PanelStrings.php:217
 msgid "No conversations in this period"
 msgstr "در این بازه گفتگویی نبوده"
 
-#: includes/Admin/PanelStrings.php:154
+#: includes/Admin/PanelStrings.php:218
 msgid "Reports fill in as visitors start chatting."
 msgstr "با شروع گفتگوی بازدیدکننده‌ها، گزارش‌ها پر می‌شوند."
 
-#: includes/Admin/PanelStrings.php:155
+#: includes/Admin/PanelStrings.php:219
 msgid "No earlier data to compare"
 msgstr "داده‌ای برای مقایسه با قبل نیست"
 
-#: includes/Admin/PanelStrings.php:156
+#: includes/Admin/PanelStrings.php:220
 msgid "No change"
 msgstr "بدون تغییر"
 
 #. translators: %d: number of days.
-#: includes/Admin/PanelStrings.php:158
+#: includes/Admin/PanelStrings.php:222
 #, php-format
 msgid "vs. the previous %d days"
 msgstr "نسبت به %d روز قبل"
 
 #. translators: 1: messages from visitors, 2: replies from agents.
-#: includes/Admin/PanelStrings.php:161
+#: includes/Admin/PanelStrings.php:225
 #, php-format
 msgid "%1$s visitor messages, %2$s replies"
 msgstr "%1$s پیام بازدیدکننده، %2$s پاسخ"
 
-#: includes/Admin/PanelStrings.php:162
-#: includes/Admin/PanelStrings.php:181
+#: includes/Admin/PanelStrings.php:226
+#: includes/Admin/PanelStrings.php:245
 msgid "Answered"
 msgstr "پاسخ‌داده‌شده"
 
 #. translators: %d: number of conversations.
-#: includes/Admin/PanelStrings.php:164
+#: includes/Admin/PanelStrings.php:228
 #, php-format
 msgid "%d without a reply"
 msgstr "%d گفتگو بی‌پاسخ ماند"
 
-#: includes/Admin/PanelStrings.php:165
+#: includes/Admin/PanelStrings.php:229
 msgid "Every conversation got a reply"
 msgstr "همه‌ی گفتگوها پاسخ گرفتند"
 
-#: includes/Admin/PanelStrings.php:166
+#: includes/Admin/PanelStrings.php:230
 msgid "First response time"
 msgstr "زمان اولین پاسخ"
 
-#: includes/Admin/PanelStrings.php:167
+#: includes/Admin/PanelStrings.php:231
 msgid "Median time until an agent first replied."
 msgstr "میانه‌ی زمانی که طول کشید تا اپراتور اولین پاسخ را بدهد."
 
 #. translators: %s: a duration, e.g. 3 min.
-#: includes/Admin/PanelStrings.php:169
+#: includes/Admin/PanelStrings.php:233
 #, php-format
 msgid "Average %s"
 msgstr "میانگین %s"
 
-#: includes/Admin/PanelStrings.php:170
+#: includes/Admin/PanelStrings.php:234
 msgid "Satisfaction"
 msgstr "رضایت مشتری"
 
 #. translators: %d: number of ratings.
-#: includes/Admin/PanelStrings.php:172
+#: includes/Admin/PanelStrings.php:236
 #, php-format
 msgid "%d ratings"
 msgstr "%d امتیاز"
 
 #. translators: %s: a percentage.
-#: includes/Admin/PanelStrings.php:174
+#: includes/Admin/PanelStrings.php:238
 #, php-format
 msgid "%s satisfied"
 msgstr "%s راضی"
 
-#: includes/Admin/PanelStrings.php:175
+#: includes/Admin/PanelStrings.php:239
 msgid "No ratings yet"
 msgstr "هنوز امتیازی ثبت نشده"
 
-#: includes/Admin/PanelStrings.php:176
+#: includes/Admin/PanelStrings.php:240
 msgid "Conversations per day"
 msgstr "گفتگوها در هر روز"
 
 #. translators: %d: number of conversations.
-#: includes/Admin/PanelStrings.php:178
+#: includes/Admin/PanelStrings.php:242
 #, php-format
 msgid "%d conversations"
 msgstr "%d گفتگو"
 
 #. translators: %d: number of conversations.
-#: includes/Admin/PanelStrings.php:180
+#: includes/Admin/PanelStrings.php:244
 #, php-format
 msgid "%d answered"
 msgstr "%d پاسخ‌داده‌شده"
 
-#: includes/Admin/PanelStrings.php:182
+#: includes/Admin/PanelStrings.php:246
 msgid "Not answered"
 msgstr "بی‌پاسخ"
 
-#: includes/Admin/PanelStrings.php:183
+#: includes/Admin/PanelStrings.php:247
 msgid "Ratings"
 msgstr "امتیازها"
 
-#: includes/Admin/PanelStrings.php:185
+#: includes/Admin/PanelStrings.php:249
 msgid "Agent"
 msgstr "اپراتور"
 
-#: includes/Admin/PanelStrings.php:187
+#: includes/Admin/PanelStrings.php:251
 msgid "Replies"
 msgstr "پاسخ‌ها"
 
-#: includes/Admin/PanelStrings.php:188
+#: includes/Admin/PanelStrings.php:252
 msgid "First response"
 msgstr "اولین پاسخ"
 
-#: includes/Admin/PanelStrings.php:189
-#: includes/Admin/PanelStrings.php:200
+#: includes/Admin/PanelStrings.php:253
+#: includes/Admin/PanelStrings.php:264
 msgid "Rating"
 msgstr "امتیاز"
 
-#: includes/Admin/PanelStrings.php:190
+#: includes/Admin/PanelStrings.php:254
 msgid "No agent has replied in this period."
 msgstr "در این بازه هیچ اپراتوری پاسخ نداده."
 
 #. translators: %d: number of conversations.
-#: includes/Admin/PanelStrings.php:192
+#: includes/Admin/PanelStrings.php:256
 #, php-format
 msgid "%d conversations were not assigned to anyone."
 msgstr "%d گفتگو به کسی سپرده نشد."
 
-#: includes/Admin/PanelStrings.php:193
+#: includes/Admin/PanelStrings.php:257
 msgid "Busiest hours"
 msgstr "ساعت‌های شلوغ"
 
-#: includes/Admin/PanelStrings.php:194
+#: includes/Admin/PanelStrings.php:258
 msgid "When conversations start, in your site's time zone."
 msgstr "زمان شروع گفتگوها، به وقت منطقه‌ی زمانی سایت."
 
-#: includes/Admin/PanelStrings.php:195
+#: includes/Admin/PanelStrings.php:259
 msgid "Fewer"
 msgstr "کمتر"
 
-#: includes/Admin/PanelStrings.php:196
+#: includes/Admin/PanelStrings.php:260
 msgid "More"
 msgstr "بیشتر"
 
-#: includes/Admin/PanelStrings.php:197
+#: includes/Admin/PanelStrings.php:261
 msgid "Common topics"
 msgstr "موضوع‌های پرتکرار"
 
-#: includes/Admin/PanelStrings.php:198
+#: includes/Admin/PanelStrings.php:262
 msgid "No tags were used in this period."
 msgstr "در این بازه برچسبی استفاده نشده."
 
-#: includes/Admin/PanelStrings.php:199
+#: includes/Admin/PanelStrings.php:263
 msgid "Latest comments"
 msgstr "آخرین نظرها"
 
 #. translators: %d: number of stars, 1–5.
-#: includes/Admin/PanelStrings.php:202
+#: includes/Admin/PanelStrings.php:266
 #, php-format
 msgid "Rated %d out of 5"
 msgstr "امتیاز %d از ۵"
 
-#: includes/Admin/PanelStrings.php:203
+#: includes/Admin/PanelStrings.php:267
 msgid "Sales"
 msgstr "فروش"
 
-#: includes/Admin/PanelStrings.php:204
+#: includes/Admin/PanelStrings.php:268
 msgid "Chat invitations"
 msgstr "دعوت به گفتگو"
 
-#: includes/Admin/PanelStrings.php:205
+#: includes/Admin/PanelStrings.php:269
 msgid "Invite visitors to chat on the pages where they need help most, such as product pages or the checkout. The first invitation that fits a page is shown."
 msgstr "بازدیدکننده‌ها را در صفحه‌هایی که بیشتر به کمک نیاز دارند، مثل صفحه‌ی محصول یا تسویه‌حساب، به گفتگو دعوت کن. در هر صفحه، اولین دعوتی که با آن جور باشد نمایش داده می‌شود."
 
-#: includes/Admin/PanelStrings.php:206
+#: includes/Admin/PanelStrings.php:270
 msgid "Add invitation"
 msgstr "افزودن دعوت"
 
-#: includes/Admin/PanelStrings.php:207
+#: includes/Admin/PanelStrings.php:271
 msgid "No invitations yet."
 msgstr "هنوز دعوتی نساخته‌ای."
 
 #. translators: %s: invitation number.
-#: includes/Admin/PanelStrings.php:209
+#: includes/Admin/PanelStrings.php:273
 #, php-format
 msgid "Invitation %s"
 msgstr "دعوت %s"
 
-#: includes/Admin/PanelStrings.php:211
+#: includes/Admin/PanelStrings.php:275
 msgid "Delete invitation"
 msgstr "حذف دعوت"
 
-#: includes/Admin/PanelStrings.php:213
+#: includes/Admin/PanelStrings.php:277
 msgid "Questions about this product? We are here to help."
 msgstr "درباره‌ی این محصول سؤالی داری؟ ما اینجاییم که کمکت کنیم."
 
-#: includes/Admin/PanelStrings.php:217
+#: includes/Admin/PanelStrings.php:281
 msgid "Product pages"
 msgstr "صفحه‌های محصول"
 
-#: includes/Admin/PanelStrings.php:218
+#: includes/Admin/PanelStrings.php:282
 msgid "Shop and categories"
 msgstr "فروشگاه و دسته‌بندی‌ها"
 
-#: includes/Admin/PanelStrings.php:219
-#: includes/Admin/PanelStrings.php:232
+#: includes/Admin/PanelStrings.php:283
+#: includes/Admin/PanelStrings.php:296
 msgid "Cart"
 msgstr "سبد خرید"
 
-#: includes/Admin/PanelStrings.php:220
+#: includes/Admin/PanelStrings.php:284
 msgid "Checkout"
 msgstr "تسویه‌حساب"
 
-#: includes/Admin/PanelStrings.php:221
+#: includes/Admin/PanelStrings.php:285
 msgid "Pages whose address contains…"
 msgstr "صفحه‌هایی که آدرسشان شامل…"
 
-#: includes/Admin/PanelStrings.php:222
+#: includes/Admin/PanelStrings.php:286
 msgid "Text the page address contains"
 msgstr "متنی که در آدرس صفحه هست"
 
-#: includes/Admin/PanelStrings.php:223
+#: includes/Admin/PanelStrings.php:287
 msgid "After (seconds)"
 msgstr "بعد از (ثانیه)"
 
-#: includes/Admin/PanelStrings.php:224
+#: includes/Admin/PanelStrings.php:288
 msgid "How often"
 msgstr "هر چند وقت"
 
-#: includes/Admin/PanelStrings.php:225
+#: includes/Admin/PanelStrings.php:289
 msgid "Once per visit"
 msgstr "یک بار در هر بازدید"
 
-#: includes/Admin/PanelStrings.php:226
+#: includes/Admin/PanelStrings.php:290
 msgid "Once a day"
 msgstr "روزی یک بار"
 
-#: includes/Admin/PanelStrings.php:227
+#: includes/Admin/PanelStrings.php:291
 msgid "On every page view"
 msgstr "در هر بار باز شدن صفحه"
 
-#: includes/Admin/PanelStrings.php:228
+#: includes/Admin/PanelStrings.php:292
 msgid "Rate the chat"
 msgstr "امتیاز به گفتگو"
 
-#: includes/Admin/PanelStrings.php:229
+#: includes/Admin/PanelStrings.php:293
 msgid "When a chat ends, ask the visitor to rate it from 1 to 5 stars and leave a comment. The results appear in the reports."
 msgstr "وقتی گفتگو تمام شد، از بازدیدکننده بخواه از ۱ تا ۵ ستاره امتیاز بدهد و اگر خواست نظرش را بنویسد. نتیجه در گزارش‌ها نمایش داده می‌شود."
 
-#: includes/Admin/PanelStrings.php:230
+#: includes/Admin/PanelStrings.php:294
 msgid "Ask for a rating"
 msgstr "درخواست امتیاز"
 
-#: includes/Admin/PanelStrings.php:231
+#: includes/Admin/PanelStrings.php:295
 msgid "Viewing now"
 msgstr "در حال مشاهده"
 
-#: includes/Admin/PanelStrings.php:233
+#: includes/Admin/PanelStrings.php:297
 msgid "Cart total"
 msgstr "جمع سبد"
 
-#: includes/Admin/PanelStrings.php:234
+#: includes/Admin/PanelStrings.php:298
 msgid "The cart is empty."
 msgstr "سبد خرید خالی است."
 
-#: includes/Admin/PanelStrings.php:235
+#: includes/Admin/PanelStrings.php:299
 msgid "Orders"
 msgstr "سفارش‌ها"
 
-#: includes/Admin/PanelStrings.php:236
+#: includes/Admin/PanelStrings.php:300
 msgid "No orders yet."
 msgstr "هنوز سفارشی ثبت نکرده."
 
 #. translators: %s: number of items.
-#: includes/Admin/PanelStrings.php:238
+#: includes/Admin/PanelStrings.php:302
 #, php-format
 msgid "Cart (%s items)"
 msgstr "سبد خرید (%s کالا)"
 
 #. translators: 1: number of orders, 2: amount spent.
-#: includes/Admin/PanelStrings.php:240
+#: includes/Admin/PanelStrings.php:304
 #, php-format
 msgid "%1$s orders, %2$s spent in total"
 msgstr "%1$s سفارش، در مجموع %2$s خرید"
 
-#: includes/Admin/PanelStrings.php:241
+#: includes/Admin/PanelStrings.php:305
 msgid "Chat transcript for visitors"
 msgstr "رونوشت گفتگو برای بازدیدکننده"
 
-#: includes/Admin/PanelStrings.php:242
+#: includes/Admin/PanelStrings.php:306
 msgid "When a conversation ends, email the visitor a copy of it (visitors who gave an email address). Internal notes are never included."
 msgstr "وقتی گفتگو تمام می‌شود، یک نسخه از آن برای بازدیدکننده ایمیل شود (اگر ایمیل داده باشد). یادداشت‌های داخلی هیچ‌وقت ارسال نمی‌شوند."
 
-#: includes/Admin/PanelStrings.php:243
+#: includes/Admin/PanelStrings.php:307
 msgid "Email transcripts automatically"
 msgstr "ارسال خودکار رونوشت"
 
-#: includes/Admin/PanelStrings.php:244
+#: includes/Admin/PanelStrings.php:308
 msgid "Email the transcript to the visitor"
 msgstr "ارسال رونوشت به ایمیل بازدیدکننده"
 
 #. translators: %s: email address.
-#: includes/Admin/PanelStrings.php:246
+#: includes/Admin/PanelStrings.php:310
 #, php-format
 msgid "Transcript sent to %s."
 msgstr "رونوشت به %s ارسال شد."
 
-#: includes/Admin/PanelStrings.php:247
+#: includes/Admin/PanelStrings.php:311
 msgid "Notifications"
 msgstr "اعلان‌ها"
 
-#: includes/Admin/PanelStrings.php:248
+#: includes/Admin/PanelStrings.php:312
 msgid "Telegram and Bale messages"
 msgstr "پیام تلگرام و بله"
 
-#: includes/Admin/PanelStrings.php:249
+#: includes/Admin/PanelStrings.php:313
 msgid "When the bots below send a message to your phone."
 msgstr "ربات‌های زیر چه زمانی روی گوشی‌ات پیام بفرستند."
 
-#: includes/Admin/PanelStrings.php:250
+#: includes/Admin/PanelStrings.php:314
 msgid "For every new chat"
 msgstr "برای هر گفتگوی جدید"
 
-#: includes/Admin/PanelStrings.php:251
+#: includes/Admin/PanelStrings.php:315
 msgid "One message for the first message of each conversation."
 msgstr "یک پیام برای اولین پیام هر گفتگو."
 
-#: includes/Admin/PanelStrings.php:252
+#: includes/Admin/PanelStrings.php:316
 msgid "Only when nobody is online"
 msgstr "فقط وقتی کسی آنلاین نیست"
 
-#: includes/Admin/PanelStrings.php:253
+#: includes/Admin/PanelStrings.php:317
 msgid "Only when no agent is available to answer in the panel."
 msgstr "فقط وقتی هیچ اپراتوری در پنل برای پاسخ در دسترس نیست."
 
-#: includes/Admin/PanelStrings.php:254
+#: includes/Admin/PanelStrings.php:318
 msgid "Bale bot"
 msgstr "ربات بله"
 
-#: includes/Admin/PanelStrings.php:255
+#: includes/Admin/PanelStrings.php:319
 msgid "Telegram bot"
 msgstr "ربات تلگرام"
 
-#: includes/Admin/PanelStrings.php:256
+#: includes/Admin/PanelStrings.php:320
 msgid ""
 "1. In Bale, open @botfather, create a bot and copy its token.\n"
 "2. Send any message to your bot (or add it to a group or channel as an admin).\n"
@@ -957,7 +1205,7 @@ msgstr ""
 "۲. یک پیام به رباتت بفرست (یا آن را به‌عنوان مدیر به گروه یا کانالت اضافه کن).\n"
 "۳. آدرس tapi.bale.ai/bot<token>/getUpdates را در مرورگر باز کن و عدد بعد از \"chat\":{\"id\": را کپی کن."
 
-#: includes/Admin/PanelStrings.php:257
+#: includes/Admin/PanelStrings.php:321
 msgid ""
 "1. In Telegram, open @BotFather, create a bot and copy its token.\n"
 "2. Send any message to your bot (or add it to a group or channel as an admin).\n"
@@ -967,591 +1215,591 @@ msgstr ""
 "۲. یک پیام به رباتت بفرست (یا آن را به‌عنوان مدیر به گروه یا کانالت اضافه کن).\n"
 "۳. آدرس api.telegram.org/bot<token>/getUpdates را در مرورگر باز کن و عدد بعد از \"chat\":{\"id\": را کپی کن."
 
-#: includes/Admin/PanelStrings.php:258
+#: includes/Admin/PanelStrings.php:322
 msgid "Send messages"
 msgstr "ارسال پیام"
 
-#: includes/Admin/PanelStrings.php:259
+#: includes/Admin/PanelStrings.php:323
 msgid "Bot token"
 msgstr "توکن ربات"
 
-#: includes/Admin/PanelStrings.php:260
+#: includes/Admin/PanelStrings.php:324
 msgid "Chat ID"
 msgstr "شناسه‌ی چت"
 
-#: includes/Admin/PanelStrings.php:261
+#: includes/Admin/PanelStrings.php:325
 msgid "Send a test message"
 msgstr "ارسال پیام آزمایشی"
 
-#: includes/Admin/PanelStrings.php:262
+#: includes/Admin/PanelStrings.php:326
 msgid "Test message sent. Check your chat."
 msgstr "پیام آزمایشی ارسال شد. چتت را چک کن."
 
-#: includes/Admin/PanelStrings.php:263
+#: includes/Admin/PanelStrings.php:327
 msgid "API address (optional)"
 msgstr "آدرس API (اختیاری)"
 
-#: includes/Admin/PanelStrings.php:264
+#: includes/Admin/PanelStrings.php:328
 msgid "Many servers in Iran cannot reach Telegram. If the test fails, enter the address of a relay here, or use Bale instead."
 msgstr "بسیاری از سرورهای داخل ایران به تلگرام دسترسی ندارند. اگر پیام آزمایشی نرسید، آدرس یک واسط (relay) را اینجا بگذار یا از بله استفاده کن."
 
-#: includes/Admin/PanelStrings.php:265
+#: includes/Admin/PanelStrings.php:329
 msgid "New-message alerts are on. Click to turn them off."
 msgstr "اعلان پیام جدید روشن است. برای خاموش کردن کلیک کن."
 
-#: includes/Admin/PanelStrings.php:266
+#: includes/Admin/PanelStrings.php:330
 msgid "New-message alerts are off. Click to turn them on."
 msgstr "اعلان پیام جدید خاموش است. برای روشن کردن کلیک کن."
 
-#: includes/Admin/PanelStrings.php:267
+#: includes/Admin/PanelStrings.php:331
 msgid "You will hear a sound and see a notification for new messages."
 msgstr "برای پیام‌های جدید صدا پخش می‌شود و اعلان نمایش داده می‌شود."
 
-#: includes/Admin/PanelStrings.php:268
+#: includes/Admin/PanelStrings.php:332
 msgid "New-message alerts are off in this browser."
 msgstr "اعلان پیام جدید در این مرورگر خاموش شد."
 
-#: includes/Admin/PanelStrings.php:269
+#: includes/Admin/PanelStrings.php:333
 msgid "Internal note"
 msgstr "یادداشت داخلی"
 
-#: includes/Admin/PanelStrings.php:270
+#: includes/Admin/PanelStrings.php:334
 msgid "Only your team sees this note…"
 msgstr "این یادداشت را فقط تیمت می‌بیند…"
 
-#: includes/Admin/PanelStrings.php:271
+#: includes/Admin/PanelStrings.php:335
 msgid "Add note"
 msgstr "ثبت یادداشت"
 
-#: includes/Admin/PanelStrings.php:272
+#: includes/Admin/PanelStrings.php:336
 msgid "Reply"
 msgstr "پاسخ"
 
-#: includes/Admin/PanelStrings.php:273
+#: includes/Admin/PanelStrings.php:337
 msgid "Message type"
 msgstr "نوع پیام"
 
-#: includes/Admin/PanelStrings.php:274
+#: includes/Admin/PanelStrings.php:338
 msgid "Transfer"
 msgstr "واگذاری"
 
-#: includes/Admin/PanelStrings.php:275
+#: includes/Admin/PanelStrings.php:339
 msgid "Remove the agent"
 msgstr "حذف اپراتور مسئول"
 
-#: includes/Admin/PanelStrings.php:276
+#: includes/Admin/PanelStrings.php:340
 msgid "you"
 msgstr "خودت"
 
-#: includes/Admin/PanelStrings.php:277
+#: includes/Admin/PanelStrings.php:341
 msgid "The conversation has no agent now."
 msgstr "این گفتگو حالا اپراتور مسئول ندارد."
 
-#: includes/Admin/PanelStrings.php:279
+#: includes/Admin/PanelStrings.php:343
 msgid "Mine"
 msgstr "مال من"
 
-#: includes/Admin/PanelStrings.php:280
+#: includes/Admin/PanelStrings.php:344
 msgid "Whose conversations"
 msgstr "گفتگوهای چه کسی"
 
-#: includes/Admin/PanelStrings.php:281
+#: includes/Admin/PanelStrings.php:345
 msgid "Filter by tag"
 msgstr "فیلتر با برچسب"
 
-#: includes/Admin/PanelStrings.php:282
+#: includes/Admin/PanelStrings.php:346
 msgid "All tags"
 msgstr "همه‌ی برچسب‌ها"
 
-#: includes/Admin/PanelStrings.php:283
+#: includes/Admin/PanelStrings.php:347
 msgid "Tags"
 msgstr "برچسب‌ها"
 
-#: includes/Admin/PanelStrings.php:284
+#: includes/Admin/PanelStrings.php:348
 msgid "Add a tag…"
 msgstr "افزودن برچسب…"
 
-#: includes/Admin/PanelStrings.php:285
+#: includes/Admin/PanelStrings.php:349
 msgid "No tags yet"
 msgstr "هنوز برچسبی ندارد"
 
 #. translators: %s: agent name.
-#: includes/Admin/PanelStrings.php:287
+#: includes/Admin/PanelStrings.php:351
 #, php-format
 msgid "Transferred to %s."
 msgstr "به %s واگذار شد."
 
-#: includes/Admin/PanelStrings.php:290
+#: includes/Admin/PanelStrings.php:354
 msgid "Files and pictures"
 msgstr "فایل و عکس"
 
-#: includes/Admin/PanelStrings.php:291
+#: includes/Admin/PanelStrings.php:355
 msgid "Visitors can send pictures, PDF, Word, Excel, text and ZIP files. Agents can always send files."
 msgstr "بازدیدکننده‌ها می‌توانند عکس، PDF، ورد، اکسل، فایل متنی و ZIP بفرستند. اپراتورها همیشه می‌توانند فایل بفرستند."
 
-#: includes/Admin/PanelStrings.php:292
+#: includes/Admin/PanelStrings.php:356
 msgid "Visitors can send files"
 msgstr "بازدیدکننده‌ها بتوانند فایل بفرستند"
 
-#: includes/Admin/PanelStrings.php:293
+#: includes/Admin/PanelStrings.php:357
 msgid "Largest file"
 msgstr "بیشترین حجم فایل"
 
-#: includes/Admin/PanelStrings.php:294
+#: includes/Admin/PanelStrings.php:358
 msgid "MB"
 msgstr "مگابایت"
 
 #. translators: %s: number of megabytes.
-#: includes/Admin/PanelStrings.php:296
+#: includes/Admin/PanelStrings.php:360
 #, php-format
 msgid "Your server accepts uploads of up to %s MB; larger values are capped to it."
 msgstr "هاست تو حداکثر %s مگابایت آپلود قبول می‌کند؛ مقدار بیشتر از این به همین سقف محدود می‌شود."
 
-#: includes/Admin/PanelStrings.php:297
+#: includes/Admin/PanelStrings.php:361
 #: includes/Frontend/WidgetStrings.php:70
 msgid "Send a file"
 msgstr "ارسال فایل"
 
-#: includes/Admin/PanelStrings.php:298
+#: includes/Admin/PanelStrings.php:362
 #: includes/Frontend/WidgetStrings.php:71
 msgid "Download"
 msgstr "دانلود"
 
-#: includes/Admin/PanelStrings.php:300
+#: includes/Admin/PanelStrings.php:364
 #: includes/Frontend/WidgetStrings.php:73
 msgid "Drop files here to send them"
 msgstr "فایل را اینجا رها کن تا ارسال شود"
 
 #. translators: %s: maximum file size, e.g. "5 MB".
-#: includes/Admin/PanelStrings.php:302
+#: includes/Admin/PanelStrings.php:366
 #, php-format
 msgid "Too large to send (the limit is %s). Click to remove."
 msgstr "حجمش زیاد است (حداکثر %s). برای حذف کلیک کن."
 
-#: includes/Admin/PanelStrings.php:303
-#: includes/Admin/PanelStrings.php:317
+#: includes/Admin/PanelStrings.php:367
+#: includes/Admin/PanelStrings.php:381
 msgid "Saved replies"
 msgstr "پاسخ‌های آماده"
 
-#: includes/Admin/PanelStrings.php:304
+#: includes/Admin/PanelStrings.php:368
 msgid "Short answers your team inserts in a click. Every agent can use them; only administrators can change them."
 msgstr "جواب‌های کوتاهی که تیمت با یک کلیک درج می‌کند. همه‌ی اپراتورها می‌توانند استفاده کنند؛ فقط مدیرها می‌توانند تغییرشان بدهند."
 
-#: includes/Admin/PanelStrings.php:305
+#: includes/Admin/PanelStrings.php:369
 msgid "Add reply"
 msgstr "افزودن پاسخ"
 
-#: includes/Admin/PanelStrings.php:306
+#: includes/Admin/PanelStrings.php:370
 msgid "No saved replies yet"
 msgstr "هنوز پاسخ آماده‌ای نداری"
 
-#: includes/Admin/PanelStrings.php:307
+#: includes/Admin/PanelStrings.php:371
 msgid "Save answers you type often, like shipping times or opening hours."
 msgstr "جواب‌هایی را که زیاد تایپ می‌کنی ذخیره کن؛ مثل زمان ارسال یا ساعت کاری."
 
-#: includes/Admin/PanelStrings.php:308
+#: includes/Admin/PanelStrings.php:372
 msgid "In a conversation, type / in the message box (or press the ⚡ button) to pick a reply. {name} becomes the visitor's name and {agent} yours."
 msgstr "داخل گفتگو، در کادر پیام / بزن (یا دکمه‌ی ⚡ را بزن) تا پاسخ را انتخاب کنی. {name} با نام بازدیدکننده و {agent} با نام خودت جایگزین می‌شود."
 
-#: includes/Admin/PanelStrings.php:309
-#: includes/Admin/PanelStrings.php:366
+#: includes/Admin/PanelStrings.php:373
+#: includes/Admin/PanelStrings.php:430
 msgid "Title"
 msgstr "عنوان"
 
-#: includes/Admin/PanelStrings.php:310
+#: includes/Admin/PanelStrings.php:374
 msgid "Shortcut (optional)"
 msgstr "میان‌بر (اختیاری)"
 
-#: includes/Admin/PanelStrings.php:311
+#: includes/Admin/PanelStrings.php:375
 msgid "Type /shortcut to find it fast."
 msgstr "با تایپ /میان‌بر سریع پیدایش کن."
 
-#: includes/Admin/PanelStrings.php:312
+#: includes/Admin/PanelStrings.php:376
 msgid "Reply text"
 msgstr "متن پاسخ"
 
-#: includes/Admin/PanelStrings.php:313
+#: includes/Admin/PanelStrings.php:377
 msgid "You can use {name} and {agent}."
 msgstr "می‌توانی از {name} و {agent} استفاده کنی."
 
-#: includes/Admin/PanelStrings.php:314
+#: includes/Admin/PanelStrings.php:378
 msgid "Delete this reply?"
 msgstr "این پاسخ حذف شود؟"
 
-#: includes/Admin/PanelStrings.php:315
+#: includes/Admin/PanelStrings.php:379
 msgid "Reply deleted."
 msgstr "پاسخ حذف شد."
 
-#: includes/Admin/PanelStrings.php:316
+#: includes/Admin/PanelStrings.php:380
 msgid "Delete"
 msgstr "حذف"
 
-#: includes/Admin/PanelStrings.php:318
+#: includes/Admin/PanelStrings.php:382
 msgid "No saved reply matches."
 msgstr "پاسخ آماده‌ای پیدا نشد."
 
-#: includes/Admin/PanelStrings.php:319
+#: includes/Admin/PanelStrings.php:383
 msgid "Manage saved replies"
 msgstr "مدیریت پاسخ‌های آماده"
 
-#: includes/Admin/PanelStrings.php:320
+#: includes/Admin/PanelStrings.php:384
 msgid "Hours & offline"
 msgstr "ساعت کاری و آفلاین"
 
-#: includes/Admin/PanelStrings.php:321
+#: includes/Admin/PanelStrings.php:385
 #: includes/Frontend/WidgetStrings.php:59
 msgid "Online"
 msgstr "آنلاین"
 
-#: includes/Admin/PanelStrings.php:322
+#: includes/Admin/PanelStrings.php:386
 msgid "Away"
 msgstr "غایب"
 
-#: includes/Admin/PanelStrings.php:323
+#: includes/Admin/PanelStrings.php:387
 msgid "Click to set yourself away."
 msgstr "برای غایب شدن کلیک کن."
 
-#: includes/Admin/PanelStrings.php:324
+#: includes/Admin/PanelStrings.php:388
 msgid "Click to go online."
 msgstr "برای آنلاین شدن کلیک کن."
 
-#: includes/Admin/PanelStrings.php:325
+#: includes/Admin/PanelStrings.php:389
 msgid "You're away. Visitors see that nobody is online."
 msgstr "حالا غایبی. بازدیدکننده‌ها می‌بینند کسی آنلاین نیست."
 
-#: includes/Admin/PanelStrings.php:326
+#: includes/Admin/PanelStrings.php:390
 msgid "You're online."
 msgstr "حالا آنلاینی."
 
-#: includes/Admin/PanelStrings.php:327
+#: includes/Admin/PanelStrings.php:391
 msgid "Business hours"
 msgstr "ساعت کاری"
 
-#: includes/Admin/PanelStrings.php:328
+#: includes/Admin/PanelStrings.php:392
 msgid "Outside these hours the chat shows as offline."
 msgstr "بیرون از این ساعت‌ها، چت آفلاین نشان داده می‌شود."
 
-#: includes/Admin/PanelStrings.php:329
+#: includes/Admin/PanelStrings.php:393
 msgid "Use business hours"
 msgstr "ساعت کاری فعال باشد"
 
-#: includes/Admin/PanelStrings.php:330
+#: includes/Admin/PanelStrings.php:394
 msgid "from"
 msgstr "از"
 
-#: includes/Admin/PanelStrings.php:331
+#: includes/Admin/PanelStrings.php:395
 msgid "to"
 msgstr "تا"
 
 #. translators: %s: time zone, e.g. Asia/Tehran.
-#: includes/Admin/PanelStrings.php:334
+#: includes/Admin/PanelStrings.php:398
 #, php-format
 msgid "Times are in the site time zone (%s), set under Settings → General in WordPress."
 msgstr "ساعت‌ها به وقت منطقه‌ی زمانی سایت (%s) است که در تنظیمات ← عمومی وردپرس تعیین می‌شود."
 
-#: includes/Admin/PanelStrings.php:335
+#: includes/Admin/PanelStrings.php:399
 msgid "When nobody is available"
 msgstr "وقتی کسی در دسترس نیست"
 
-#: includes/Admin/PanelStrings.php:336
+#: includes/Admin/PanelStrings.php:400
 msgid "What visitors see outside business hours, and when no agent is online if you turn that on."
 msgstr "چیزی که بازدیدکننده بیرون از ساعت کاری می‌بیند؛ و اگر بخواهی، وقتی هیچ اپراتوری آنلاین نیست."
 
-#: includes/Admin/PanelStrings.php:337
+#: includes/Admin/PanelStrings.php:401
 msgid "Offline visitors see"
 msgstr "بازدیدکننده‌ی آفلاین ببیند"
 
-#: includes/Admin/PanelStrings.php:338
+#: includes/Admin/PanelStrings.php:402
 msgid "A leave-a-message form"
 msgstr "فرم «پیام بگذارید»"
 
-#: includes/Admin/PanelStrings.php:339
+#: includes/Admin/PanelStrings.php:403
 msgid "Visitors enter their name, email and message, and you answer later."
 msgstr "بازدیدکننده نام، ایمیل و پیامش را وارد می‌کند و تو بعداً جواب می‌دهی."
 
-#: includes/Admin/PanelStrings.php:340
+#: includes/Admin/PanelStrings.php:404
 msgid "The normal chat with a notice"
 msgstr "چت معمولی با یک اطلاعیه"
 
-#: includes/Admin/PanelStrings.php:341
+#: includes/Admin/PanelStrings.php:405
 msgid "Visitors can still chat; a notice says you will reply when you are back."
 msgstr "بازدیدکننده همچنان چت می‌کند؛ یک اطلاعیه می‌گوید وقتی برگشتید جواب می‌دهید."
 
-#: includes/Admin/PanelStrings.php:342
+#: includes/Admin/PanelStrings.php:406
 msgid "Also count as offline when no agent is online"
 msgstr "وقتی هیچ اپراتوری آنلاین نیست هم آفلاین حساب شود"
 
-#: includes/Admin/PanelStrings.php:343
+#: includes/Admin/PanelStrings.php:407
 msgid "Offline message"
 msgstr "پیام حالت آفلاین"
 
-#: includes/Admin/PanelStrings.php:344
+#: includes/Admin/PanelStrings.php:408
 msgid "Leave empty for the default text."
 msgstr "برای متن پیش‌فرض خالی بگذار."
 
-#: includes/Admin/PanelStrings.php:345
+#: includes/Admin/PanelStrings.php:409
 msgid "Email notifications"
 msgstr "اعلان ایمیلی"
 
-#: includes/Admin/PanelStrings.php:346
+#: includes/Admin/PanelStrings.php:410
 msgid "Get an email when a visitor writes while nobody is online, so no message is missed."
 msgstr "وقتی بازدیدکننده‌ای پیام می‌دهد و کسی آنلاین نیست ایمیل بگیر تا هیچ پیامی از دست نرود."
 
-#: includes/Admin/PanelStrings.php:347
+#: includes/Admin/PanelStrings.php:411
 msgid "Email me about offline messages"
 msgstr "پیام‌های آفلاین را ایمیل کن"
 
-#: includes/Admin/PanelStrings.php:348
+#: includes/Admin/PanelStrings.php:412
 msgid "Send to"
 msgstr "ارسال به"
 
-#: includes/Admin/PanelStrings.php:349
+#: includes/Admin/PanelStrings.php:413
 msgid "Leave empty to use the site admin email."
 msgstr "برای استفاده از ایمیل مدیر سایت خالی بگذار."
 
-#: includes/Admin/PanelStrings.php:350
+#: includes/Admin/PanelStrings.php:414
 msgid "Unsaved changes"
 msgstr "تغییرات ذخیره‌نشده"
 
-#: includes/Admin/PanelStrings.php:351
+#: includes/Admin/PanelStrings.php:415
 msgid "Widget appearance"
 msgstr "ظاهر ویجت"
 
-#: includes/Admin/PanelStrings.php:352
+#: includes/Admin/PanelStrings.php:416
 msgid "Your brand color, the corner the widget sits in, and its heading. The agent panel uses the same color."
 msgstr "رنگ برندت، گوشه‌ای که ویجت در آن قرار می‌گیرد و عنوانش. پنل اپراتور هم همین رنگ را می‌گیرد."
 
-#: includes/Admin/PanelStrings.php:353
+#: includes/Admin/PanelStrings.php:417
 msgid "Brand color"
 msgstr "رنگ برند"
 
-#: includes/Admin/PanelStrings.php:354
+#: includes/Admin/PanelStrings.php:418
 msgid "Color code"
 msgstr "کد رنگ"
 
-#: includes/Admin/PanelStrings.php:355
+#: includes/Admin/PanelStrings.php:419
 msgid "Pick a color"
 msgstr "انتخاب رنگ"
 
 #. translators: %s: color code.
-#: includes/Admin/PanelStrings.php:357
+#: includes/Admin/PanelStrings.php:421
 #, php-format
 msgid "Use %s"
 msgstr "استفاده از %s"
 
-#: includes/Admin/PanelStrings.php:358
+#: includes/Admin/PanelStrings.php:422
 msgid "Use the default color"
 msgstr "برگشت به رنگ پیش‌فرض"
 
-#: includes/Admin/PanelStrings.php:359
+#: includes/Admin/PanelStrings.php:423
 msgid "Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed."
 msgstr "یک رنگ انتخاب کن یا کدی مثل #5B5BD6 بنویس. اگر لازم باشد، متن روی آن خودکار تیره می‌شود."
 
-#: includes/Admin/PanelStrings.php:360
+#: includes/Admin/PanelStrings.php:424
 msgid "This color is light: icons and links in this color may be hard to see on white."
 msgstr "این رنگ روشن است؛ آیکون‌ها و لینک‌ها با این رنگ روی زمینه‌ی سفید ممکن است کم‌رنگ دیده شوند."
 
 #. translators: %s: color code.
-#: includes/Admin/PanelStrings.php:362
+#: includes/Admin/PanelStrings.php:426
 #, php-format
 msgid "Code on your site sets the color to %s, so the widget uses that."
 msgstr "کدی در سایتت رنگ را روی %s گذاشته، پس ویجت از همان استفاده می‌کند."
 
-#: includes/Admin/PanelStrings.php:363
+#: includes/Admin/PanelStrings.php:427
 msgid "Position"
 msgstr "جایگاه"
 
-#: includes/Admin/PanelStrings.php:364
+#: includes/Admin/PanelStrings.php:428
 msgid "Bottom left"
 msgstr "پایین چپ"
 
-#: includes/Admin/PanelStrings.php:365
+#: includes/Admin/PanelStrings.php:429
 msgid "Bottom right"
 msgstr "پایین راست"
 
-#: includes/Admin/PanelStrings.php:367
+#: includes/Admin/PanelStrings.php:431
 msgid "Subtitle"
 msgstr "زیرعنوان"
 
-#: includes/Admin/PanelStrings.php:368
+#: includes/Admin/PanelStrings.php:432
 msgid "Leave a field empty to use the default text, which follows the site language."
 msgstr "اگر فیلدی خالی بماند، متن پیش‌فرض (هم‌زبان با سایت) نمایش داده می‌شود."
 
-#: includes/Admin/PanelStrings.php:369
+#: includes/Admin/PanelStrings.php:433
 msgid "Preview"
 msgstr "پیش‌نمایش"
 
-#: includes/Admin/PanelStrings.php:370
+#: includes/Admin/PanelStrings.php:434
 msgid "Hi, I have a question 🙂"
 msgstr "سلام، یک سؤال داشتم 🙂"
 
-#: includes/Admin/PanelStrings.php:371
+#: includes/Admin/PanelStrings.php:435
 #: includes/Frontend/WidgetStrings.php:38
 msgid "Write a message…"
 msgstr "پیامت را بنویس…"
 
-#: includes/Admin/PanelStrings.php:372
+#: includes/Admin/PanelStrings.php:436
 msgid "General"
 msgstr "عمومی"
 
-#: includes/Admin/PanelStrings.php:373
+#: includes/Admin/PanelStrings.php:437
 msgid "Start form"
 msgstr "فرم شروع"
 
-#: includes/Admin/PanelStrings.php:374
+#: includes/Admin/PanelStrings.php:438
 msgid "Spam & limits"
 msgstr "ضد اسپم و محدودیت‌ها"
 
-#: includes/Admin/PanelStrings.php:375
+#: includes/Admin/PanelStrings.php:439
 msgid "Chat widget"
 msgstr "ویجت گفتگو"
 
-#: includes/Admin/PanelStrings.php:376
+#: includes/Admin/PanelStrings.php:440
 msgid "Turn the widget off to hide it from your whole site, shortcodes included. The agent panel keeps working."
 msgstr "با خاموش کردن، ویجت از کل سایت (حتی صفحه‌های دارای شورت‌کد) پنهان می‌شود. پنل اپراتور همچنان کار می‌کند."
 
-#: includes/Admin/PanelStrings.php:377
+#: includes/Admin/PanelStrings.php:441
 msgid "Show the chat widget"
 msgstr "نمایش ویجت گفتگو"
 
-#: includes/Admin/PanelStrings.php:378
+#: includes/Admin/PanelStrings.php:442
 msgid "Notification sound"
 msgstr "صدای اعلان"
 
-#: includes/Admin/PanelStrings.php:379
+#: includes/Admin/PanelStrings.php:443
 msgid "Play a soft sound in the widget when a reply arrives while the visitor is looking elsewhere."
 msgstr "وقتی جواب تازه می‌رسد و بازدیدکننده حواسش جای دیگری است (پنجره‌ی چت بسته است یا در تب دیگری است)، ویجت یک صدای ملایم پخش می‌کند."
 
-#: includes/Admin/PanelStrings.php:380
+#: includes/Admin/PanelStrings.php:444
 msgid "Play a sound for new replies"
 msgstr "پخش صدا برای پاسخ‌های جدید"
 
-#: includes/Admin/PanelStrings.php:381
+#: includes/Admin/PanelStrings.php:445
 #: includes/Frontend/WidgetStrings.php:52
 msgid "Typing…"
 msgstr "در حال نوشتن…"
 
-#: includes/Admin/PanelStrings.php:382
+#: includes/Admin/PanelStrings.php:446
 msgid "The widget is off: visitors cannot start new chats."
 msgstr "ویجت خاموش است؛ بازدیدکننده‌ها نمی‌توانند گفتگوی جدید شروع کنند."
 
-#: includes/Admin/PanelStrings.php:383
+#: includes/Admin/PanelStrings.php:447
 msgid "Visitors"
 msgstr "بازدیدکننده‌ها"
 
-#: includes/Admin/PanelStrings.php:384
+#: includes/Admin/PanelStrings.php:448
 msgid "Remember returning visitors for"
 msgstr "به‌خاطر سپردن بازدیدکننده‌ها به مدت"
 
-#: includes/Admin/PanelStrings.php:385
+#: includes/Admin/PanelStrings.php:449
 msgid "days"
 msgstr "روز"
 
-#: includes/Admin/PanelStrings.php:386
+#: includes/Admin/PanelStrings.php:450
 msgid "Visitors who come back within this time see their earlier conversation. The time restarts on every visit."
 msgstr "بازدیدکننده‌ای که در این مدت برگردد، گفتگوی قبلی‌اش را می‌بیند. این مدت با هر بازدید از نو شروع می‌شود."
 
-#: includes/Admin/PanelStrings.php:387
+#: includes/Admin/PanelStrings.php:451
 msgid "Data when the plugin is deleted"
 msgstr "داده‌ها هنگام حذف افزونه"
 
-#: includes/Admin/PanelStrings.php:388
+#: includes/Admin/PanelStrings.php:452
 msgid "By default conversations, visitors, agents and settings are kept, so reinstalling brings everything back."
 msgstr "به‌طور پیش‌فرض گفتگوها، بازدیدکننده‌ها، اپراتورها و تنظیمات نگه داشته می‌شوند تا با نصب دوباره همه‌چیز برگردد."
 
-#: includes/Admin/PanelStrings.php:389
+#: includes/Admin/PanelStrings.php:453
 msgid "Delete all data"
 msgstr "حذف همه‌ی داده‌ها"
 
-#: includes/Admin/PanelStrings.php:390
+#: includes/Admin/PanelStrings.php:454
 msgid "Deleting the plugin will permanently delete every conversation and all ChatChi data. This cannot be undone."
 msgstr "با حذف افزونه، همه‌ی گفتگوها و داده‌های چت‌چی برای همیشه پاک می‌شوند. این کار برگشت‌پذیر نیست."
 
-#: includes/Admin/PanelStrings.php:391
+#: includes/Admin/PanelStrings.php:455
 msgid "Start form fields"
 msgstr "فیلدهای فرم شروع"
 
-#: includes/Admin/PanelStrings.php:392
+#: includes/Admin/PanelStrings.php:456
 msgid "What visitors are asked before their first message."
 msgstr "اطلاعاتی که قبل از اولین پیام از بازدیدکننده پرسیده می‌شود."
 
-#: includes/Admin/PanelStrings.php:393
+#: includes/Admin/PanelStrings.php:457
 msgid "Off"
 msgstr "خاموش"
 
-#: includes/Admin/PanelStrings.php:394
+#: includes/Admin/PanelStrings.php:458
 msgid "Optional"
 msgstr "اختیاری"
 
-#: includes/Admin/PanelStrings.php:395
+#: includes/Admin/PanelStrings.php:459
 msgid "Required"
 msgstr "اجباری"
 
-#: includes/Admin/PanelStrings.php:396
+#: includes/Admin/PanelStrings.php:460
 msgid "Every field is off: visitors start chatting right away, without a form."
 msgstr "همه‌ی فیلدها خاموش‌اند؛ بازدیدکننده بدون فرم، مستقیم گفتگو را شروع می‌کند."
 
-#: includes/Admin/PanelStrings.php:397
+#: includes/Admin/PanelStrings.php:461
 msgid "Text above the form"
 msgstr "متن بالای فرم"
 
-#: includes/Admin/PanelStrings.php:398
+#: includes/Admin/PanelStrings.php:462
 msgid "Bot protection"
 msgstr "محافظت در برابر ربات"
 
-#: includes/Admin/PanelStrings.php:399
+#: includes/Admin/PanelStrings.php:463
 msgid "Stops simple bots from starting chats, invisibly for people. Turn it off only if another program starts chats through the API."
 msgstr "جلوی شروع گفتگو توسط ربات‌های ساده را می‌گیرد، بدون اینکه آدم‌ها چیزی ببینند. فقط اگر برنامه‌ی دیگری از طریق API گفتگو شروع می‌کند خاموشش کن."
 
-#: includes/Admin/PanelStrings.php:400
+#: includes/Admin/PanelStrings.php:464
 msgid "Protect the start form"
 msgstr "محافظت از فرم شروع"
 
-#: includes/Admin/PanelStrings.php:401
+#: includes/Admin/PanelStrings.php:465
 msgid "Rate limits"
 msgstr "محدودیت ارسال"
 
-#: includes/Admin/PanelStrings.php:402
+#: includes/Admin/PanelStrings.php:466
 msgid "How much one visitor or one IP address may send. Keep the per-address limits generous: offices and mobile networks put many people behind one address."
 msgstr "هر بازدیدکننده یا هر آدرس IP چقدر می‌تواند بفرستد. سقف هر IP را بالا نگه دار؛ در ادارات و اینترنت موبایل خیلی‌ها پشت یک آدرس هستند."
 
-#: includes/Admin/PanelStrings.php:403
+#: includes/Admin/PanelStrings.php:467
 msgid "Messages per visitor"
 msgstr "پیام برای هر بازدیدکننده"
 
-#: includes/Admin/PanelStrings.php:404
+#: includes/Admin/PanelStrings.php:468
 msgid "Messages per IP address"
 msgstr "پیام برای هر آدرس IP"
 
-#: includes/Admin/PanelStrings.php:405
+#: includes/Admin/PanelStrings.php:469
 msgid "New chats per visitor"
 msgstr "گفتگوی جدید برای هر بازدیدکننده"
 
-#: includes/Admin/PanelStrings.php:406
+#: includes/Admin/PanelStrings.php:470
 msgid "New chats per IP address"
 msgstr "گفتگوی جدید برای هر آدرس IP"
 
-#: includes/Admin/PanelStrings.php:407
+#: includes/Admin/PanelStrings.php:471
 msgid "per minute"
 msgstr "در دقیقه"
 
-#: includes/Admin/PanelStrings.php:408
+#: includes/Admin/PanelStrings.php:472
 msgid "per hour"
 msgstr "در ساعت"
 
-#: includes/Admin/PanelStrings.php:409
+#: includes/Admin/PanelStrings.php:473
 msgid "per 10 minutes"
 msgstr "در ۱۰ دقیقه"
 
-#: includes/Admin/PanelStrings.php:410
+#: includes/Admin/PanelStrings.php:474
 msgid "Messages"
 msgstr "پیام‌ها"
 
-#: includes/Admin/PanelStrings.php:411
+#: includes/Admin/PanelStrings.php:475
 msgid "Longest message"
 msgstr "حداکثر طول پیام"
 
-#: includes/Admin/PanelStrings.php:412
+#: includes/Admin/PanelStrings.php:476
 msgid "characters"
 msgstr "نویسه"
 
@@ -1688,8 +1936,8 @@ msgstr "برای پاسخ یک عنوان بنویس."
 #. translators: %d: maximum number of characters.
 #: includes/Canned/CannedResponses.php:163
 #: includes/Canned/CannedResponses.php:170
-#: includes/Settings/SettingsValidator.php:588
-#: includes/Settings/SettingsValidator.php:758
+#: includes/Settings/SettingsValidator.php:704
+#: includes/Settings/SettingsValidator.php:874
 #, php-format
 msgid "Use at most %d characters."
 msgstr "حداکثر %d نویسه مجاز است."
@@ -1821,6 +2069,7 @@ msgid "Close chat"
 msgstr "بستن پنجره‌ی گفتگو"
 
 #: includes/Frontend/WidgetStrings.php:25
+#: includes/Frontend/WidgetStrings.php:96
 msgid "Chat with us"
 msgstr "گفتگو با ما"
 
@@ -1981,20 +2230,50 @@ msgstr "خوب"
 msgid "Excellent"
 msgstr "عالی"
 
-#. translators: %d: number of characters left.
+#: includes/Frontend/WidgetStrings.php:90
+msgid "Search the questions"
+msgstr "جستجو در سؤال‌ها"
+
+#: includes/Frontend/WidgetStrings.php:91
+msgid "No matching question. Ask us in the chat."
+msgstr "سؤال مشابهی پیدا نشد. در چت از ما بپرس."
+
+#. translators: %d: number of questions.
 #: includes/Frontend/WidgetStrings.php:93
+#, php-format
+msgid "Show all %d questions"
+msgstr "نمایش همه‌ی %d سؤال"
+
+#: includes/Frontend/WidgetStrings.php:94
+msgid "Didn't find your answer? Ask us below."
+msgstr "جوابت را پیدا نکردی؟ همین پایین از ما بپرس."
+
+#: includes/Frontend/WidgetStrings.php:95
+msgid "Contact us"
+msgstr "تماس با ما"
+
+#: includes/Frontend/WidgetStrings.php:100
+msgid "Call us"
+msgstr "تماس تلفنی"
+
+#: includes/Frontend/WidgetStrings.php:101
+msgid "Close menu"
+msgstr "بستن منو"
+
+#. translators: %d: number of characters left.
+#: includes/Frontend/WidgetStrings.php:106
 #, php-format
 msgid "%d characters left"
 msgstr "%d حرف باقی مانده"
 
 #. translators: %d: number of seconds.
-#: includes/Frontend/WidgetStrings.php:95
+#: includes/Frontend/WidgetStrings.php:108
 #, php-format
 msgid "Too many messages. Try again in %d seconds."
 msgstr "پیام‌ها زیاد شد. %d ثانیه دیگر دوباره بفرست."
 
 #. translators: %d: number of minutes.
-#: includes/Frontend/WidgetStrings.php:97
+#: includes/Frontend/WidgetStrings.php:110
 #, php-format
 msgid "Too many attempts. Try again in %d minutes."
 msgstr "تلاش‌ها زیاد شد. %d دقیقه دیگر دوباره امتحان کن."
@@ -2031,6 +2310,97 @@ msgstr "اتصال به سرویس برقرار نشد: %s"
 msgid "The service refused the message: %s"
 msgstr "سرویس پیام را نپذیرفت: %s"
 
+#: includes/Notifications/SmsGateway.php:43
+#: includes/Settings/SettingsValidator.php:532
+msgid "Choose an SMS service."
+msgstr "یک سامانه‌ی پیامک انتخاب کن."
+
+#: includes/Notifications/SmsGateway.php:50
+#: includes/Settings/SettingsValidator.php:260
+msgid "Enter the API key of your Kavenegar account."
+msgstr "کلید API حساب کاوه‌نگارت را وارد کن."
+
+#: includes/Notifications/SmsGateway.php:64
+msgid "Enter the username, password and sender line of your Melipayamak panel."
+msgstr "نام کاربری، رمز و خط فرستنده‌ی پنل ملی‌پیامکت را وارد کن."
+
+#. translators: %s: technical reason.
+#: includes/Notifications/SmsGateway.php:92
+#, php-format
+msgid "The SMS service could not be reached (%s). Some servers cannot connect to it; ask your host."
+msgstr "اتصال به سامانه‌ی پیامک برقرار نشد (%s). بعضی سرورها به آن دسترسی ندارند؛ از هاستت بپرس."
+
+#: includes/Notifications/SmsGateway.php:129
+#: includes/Notifications/SmsGateway.php:130
+msgid "The API key is not valid or the account is not active."
+msgstr "کلید API معتبر نیست یا حساب فعال نیست."
+
+#: includes/Notifications/SmsGateway.php:131
+msgid "The mobile number is not valid."
+msgstr "شماره موبایل معتبر نیست."
+
+#: includes/Notifications/SmsGateway.php:132
+#: includes/Notifications/SmsGateway.php:158
+msgid "The sender line is not valid or does not belong to this account."
+msgstr "خط فرستنده معتبر نیست یا متعلق به این حساب نیست."
+
+#: includes/Notifications/SmsGateway.php:133
+#: includes/Notifications/SmsGateway.php:155
+msgid "The account does not have enough credit."
+msgstr "اعتبار حساب کافی نیست."
+
+#: includes/Notifications/SmsGateway.php:154
+msgid "The username or password is wrong."
+msgstr "نام کاربری یا رمز اشتباه است."
+
+#: includes/Notifications/SmsGateway.php:156
+msgid "The daily sending limit was reached."
+msgstr "سقف ارسال روزانه پر شده است."
+
+#: includes/Notifications/SmsGateway.php:157
+msgid "The sending limit was reached."
+msgstr "سقف ارسال پر شده است."
+
+#: includes/Notifications/SmsGateway.php:159
+msgid "The SMS service is being updated; try again later."
+msgstr "سامانه‌ی پیامک در حال به‌روزرسانی است؛ بعداً دوباره امتحان کن."
+
+#: includes/Notifications/SmsGateway.php:160
+msgid "The message contains a blocked word."
+msgstr "متن پیام کلمه‌ی غیرمجاز دارد."
+
+#: includes/Notifications/SmsGateway.php:161
+msgid "Shared lines cannot send through the web service; use a dedicated line."
+msgstr "از خط‌های عمومی نمی‌شود از طریق وب‌سرویس فرستاد؛ از خط اختصاصی استفاده کن."
+
+#: includes/Notifications/SmsGateway.php:162
+msgid "The account is not active."
+msgstr "حساب فعال نیست."
+
+#: includes/Notifications/SmsGateway.php:163
+msgid "The message was not sent."
+msgstr "پیامک ارسال نشد."
+
+#: includes/Notifications/SmsGateway.php:164
+msgid "The account documents are not complete."
+msgstr "مدارک حساب کامل نیست."
+
+#. translators: 1: error code, 2: the service's message.
+#: includes/Notifications/SmsGateway.php:179
+#, php-format
+msgid "The SMS service refused the message (code %1$d). %2$s"
+msgstr "سامانه‌ی پیامک پیام را نپذیرفت (کد %1$d). %2$s"
+
+#. translators: %s: reason.
+#: includes/Notifications/SmsNotifier.php:169
+#, php-format
+msgid "The SMS to the visitor could not be sent: %s"
+msgstr "پیامک به بازدیدکننده ارسال نشد: %s"
+
+#: includes/Notifications/SmsNotifier.php:173
+msgid "The visitor was not on the site; an SMS told them about the reply."
+msgstr "بازدیدکننده در سایت نبود؛ با پیامک از جواب باخبرش کردیم."
+
 #: includes/Notifications/Transcript.php:120
 msgid "This visitor has not given an email address."
 msgstr "این بازدیدکننده ایمیلی وارد نکرده است."
@@ -2063,21 +2433,25 @@ msgid "Former agent"
 msgstr "اپراتور سابق"
 
 #: includes/Rest/AdminPermission.php:27
-#: includes/Rest/AgentController.php:604
+#: includes/Rest/AgentController.php:621
 #: includes/Rest/CannedController.php:100
 msgid "Please log in to continue."
 msgstr "برای ادامه وارد حساب کاربری‌ات شو."
 
-#: includes/Rest/AgentController.php:365
-#: includes/Rest/AgentController.php:395
+#: includes/Rest/AgentController.php:371
+#: includes/Rest/AgentController.php:401
 msgid "This is not available right now."
 msgstr "این قابلیت الان در دسترس نیست."
 
-#: includes/Rest/AgentController.php:618
+#: includes/Rest/AgentController.php:487
+msgid "Nothing to change."
+msgstr "چیزی برای تغییر نیست."
+
+#: includes/Rest/AgentController.php:635
 msgid "Your account is not a chat agent."
 msgstr "حساب کاربری‌ات اپراتور چت نیست."
 
-#: includes/Rest/AgentController.php:626
+#: includes/Rest/AgentController.php:643
 msgid "Your agent account is inactive."
 msgstr "حساب اپراتوری‌ات غیرفعال است."
 
@@ -2095,9 +2469,19 @@ msgstr "چت‌چی سایت %s وصل شد. گفتگوهای جدید از ای
 msgid "This request was rejected."
 msgstr "این درخواست پذیرفته نشد."
 
-#: includes/Rest/SettingsController.php:288
+#: includes/Rest/SettingsController.php:316
 msgid "(no title)"
 msgstr "(بدون عنوان)"
+
+#: includes/Rest/SmsTestController.php:100
+msgid "Enter a valid mobile number, like 09121234567."
+msgstr "یک شماره موبایل معتبر وارد کن، مثل ۰۹۱۲۱۲۳۴۵۶۷."
+
+#. translators: %s: site name.
+#: includes/Rest/SmsTestController.php:113
+#, php-format
+msgid "ChatChi on %s can send SMS. This is a test."
+msgstr "چت‌چی در %s می‌تواند پیامک بفرستد. این یک پیام آزمایشی است."
 
 #: includes/Rest/WidgetController.php:432
 msgid "Start a conversation first."
@@ -2119,6 +2503,74 @@ msgstr "کمی صبر کن و بعد گفتگو را شروع کن."
 #: includes/Security/SpamGuard.php:167
 msgid "The chat form expired. Please try again."
 msgstr "فرم گفتگو منقضی شده. لطفاً دوباره امتحان کن."
+
+#: includes/Settings/ContactChannels.php:39
+msgid "The contact channels could not be read. Please try again."
+msgstr "راه‌های ارتباطی خوانده نشدند. دوباره امتحان کن."
+
+#. translators: %d: maximum number of channels.
+#: includes/Settings/ContactChannels.php:44
+#, php-format
+msgid "You can add at most %d contact channels."
+msgstr "حداکثر %d راه ارتباطی می‌توانی اضافه کنی."
+
+#. translators: %d: channel number.
+#: includes/Settings/ContactChannels.php:54
+#, php-format
+msgid "Choose the type of channel %d."
+msgstr "نوع راه ارتباطی %d را انتخاب کن."
+
+#. translators: 1: channel number, 2: maximum characters.
+#: includes/Settings/ContactChannels.php:67
+#, php-format
+msgid "The label of channel %1$d can be at most %2$d characters."
+msgstr "عنوان راه ارتباطی %1$d حداکثر می‌تواند %2$d کاراکتر باشد."
+
+#. translators: %d: channel number.
+#: includes/Settings/ContactChannels.php:192
+#, php-format
+msgid "Enter a valid username for channel %d, like @mystore."
+msgstr "برای راه ارتباطی %d یک نام کاربری معتبر وارد کن، مثل @mystore."
+
+#. translators: %d: channel number.
+#: includes/Settings/ContactChannels.php:197
+#, php-format
+msgid "Enter a valid WhatsApp number for channel %d, like 09121234567 or +989121234567."
+msgstr "برای راه ارتباطی %d یک شماره واتساپ معتبر وارد کن، مثل 09121234567 یا ‎+989121234567."
+
+#. translators: %d: channel number.
+#: includes/Settings/ContactChannels.php:201
+#, php-format
+msgid "Enter a valid phone number for channel %d."
+msgstr "برای راه ارتباطی %d یک شماره تلفن معتبر وارد کن."
+
+#: includes/Settings/FaqItems.php:36
+msgid "The questions could not be read. Please try again."
+msgstr "سؤال‌ها خوانده نشدند. دوباره امتحان کن."
+
+#. translators: %d: maximum number of questions.
+#: includes/Settings/FaqItems.php:41
+#, php-format
+msgid "You can add at most %d questions."
+msgstr "حداکثر %d سؤال می‌توانی اضافه کنی."
+
+#. translators: %d: question number.
+#: includes/Settings/FaqItems.php:51
+#, php-format
+msgid "Write both the question and the answer of item %d."
+msgstr "هم سؤال و هم جواب مورد %d را بنویس."
+
+#. translators: 1: question number, 2: maximum characters.
+#: includes/Settings/FaqItems.php:56
+#, php-format
+msgid "Question %1$d can be at most %2$d characters."
+msgstr "سؤال %1$d حداکثر می‌تواند %2$d کاراکتر باشد."
+
+#. translators: 1: question number, 2: maximum characters.
+#: includes/Settings/FaqItems.php:61
+#, php-format
+msgid "The answer of item %1$d can be at most %2$d characters."
+msgstr "جواب مورد %1$d حداکثر می‌تواند %2$d کاراکتر باشد."
 
 #: includes/Settings/ProactiveRules.php:41
 msgid "The invitations could not be read. Please try again."
@@ -2162,124 +2614,156 @@ msgstr "سلام! 👋 امروز چطور می‌تونیم کمکت کنیم؟
 msgid "We're away right now. Leave a message and we'll get back to you soon."
 msgstr "فعلاً در دسترس نیستیم. پیامت را بگذار، به‌زودی جواب می‌دیم."
 
-#: includes/Settings/SettingsValidator.php:188
+#: includes/Settings/Settings.php:124
+msgid "You have a reply from {site} support. Read it here: {link}"
+msgstr "پشتیبانی {site} به پیامت جواب داد. از اینجا بخوان: {link}"
+
+#: includes/Settings/SettingsValidator.php:215
 msgid "Enter the header your proxy puts the visitor address in."
 msgstr "نام هدری را که پراکسی آدرس بازدیدکننده را در آن می‌گذارد وارد کن."
 
-#: includes/Settings/SettingsValidator.php:197
+#: includes/Settings/SettingsValidator.php:224
 msgid "Some settings need your attention."
 msgstr "چند مورد از تنظیمات نیاز به اصلاح دارد."
 
-#: includes/Settings/SettingsValidator.php:222
+#: includes/Settings/SettingsValidator.php:249
 msgid "Enter the bot token."
 msgstr "توکن ربات را وارد کن."
 
-#: includes/Settings/SettingsValidator.php:225
+#: includes/Settings/SettingsValidator.php:252
 msgid "Enter the chat ID the bot sends to."
 msgstr "شناسه‌ی چتی که ربات به آن پیام بدهد را وارد کن."
 
-#: includes/Settings/SettingsValidator.php:389
+#: includes/Settings/SettingsValidator.php:264
+msgid "Enter the username of your Melipayamak panel."
+msgstr "نام کاربری پنل ملی‌پیامکت را وارد کن."
+
+#: includes/Settings/SettingsValidator.php:267
+msgid "Enter the password of your Melipayamak panel."
+msgstr "رمز پنل ملی‌پیامکت را وارد کن."
+
+#: includes/Settings/SettingsValidator.php:270
+msgid "Enter the sender line number of your Melipayamak panel."
+msgstr "شماره خط فرستنده‌ی پنل ملی‌پیامکت را وارد کن."
+
+#: includes/Settings/SettingsValidator.php:461
 msgid "Choose where the widget appears."
 msgstr "محل نمایش ویجت را انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:400
+#: includes/Settings/SettingsValidator.php:472
 msgid "Choose how visitors reach your site."
 msgstr "مشخص کن بازدیدکننده‌ها چطور به سایتت وصل می‌شوند."
 
-#: includes/Settings/SettingsValidator.php:413
+#: includes/Settings/SettingsValidator.php:485
 msgid "Enter a color code like #5B5BD6."
 msgstr "کد رنگ را به شکل #5B5BD6 وارد کن."
 
-#: includes/Settings/SettingsValidator.php:418
+#: includes/Settings/SettingsValidator.php:490
 msgid "Choose a corner for the widget."
 msgstr "جایگاه ویجت را انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:452
+#: includes/Settings/SettingsValidator.php:521
+msgid "Choose light, dark or automatic."
+msgstr "روشن، تیره یا خودکار را انتخاب کن."
+
+#: includes/Settings/SettingsValidator.php:539
+msgid "The API key looks wrong. Copy it again from your SMS panel."
+msgstr "کلید API درست به نظر نمی‌رسد. دوباره از پنل پیامکت کپی‌اش کن."
+
+#: includes/Settings/SettingsValidator.php:547
+msgid "Enter the password of your SMS panel."
+msgstr "رمز پنل پیامکت را وارد کن."
+
+#: includes/Settings/SettingsValidator.php:554
+msgid "Enter the sender line number, digits only."
+msgstr "شماره خط فرستنده را فقط با رقم وارد کن."
+
+#: includes/Settings/SettingsValidator.php:568
 msgid "Paste the bot token exactly as the bot maker gave it, like 123456789:AAH…."
 msgstr "توکن را دقیقاً همان‌طور که سازنده‌ی ربات داده وارد کن؛ مثل 123456789:AAH…."
 
-#: includes/Settings/SettingsValidator.php:460
+#: includes/Settings/SettingsValidator.php:576
 msgid "Enter a numeric chat ID (e.g. 123456789 or -100123…) or a channel like @mychannel."
 msgstr "شناسه‌ی عددی چت (مثل 123456789 یا ‎-100123…) یا نام کانال مثل @mychannel وارد کن."
 
-#: includes/Settings/SettingsValidator.php:467
+#: includes/Settings/SettingsValidator.php:583
 msgid "Enter an https:// address, or leave it empty for the official Telegram API."
 msgstr "یک آدرس https:// وارد کن، یا برای API رسمی تلگرام خالی بگذار."
 
-#: includes/Settings/SettingsValidator.php:472
+#: includes/Settings/SettingsValidator.php:588
 msgid "Choose when the bot sends messages."
 msgstr "انتخاب کن ربات چه زمانی پیام بفرستد."
 
-#: includes/Settings/SettingsValidator.php:479
+#: includes/Settings/SettingsValidator.php:595
 msgid "Each open day needs a start time before its end time, like 09:00 to 17:00."
 msgstr "برای هر روز باز، ساعت شروع باید قبل از ساعت پایان باشد؛ مثل ۰۹:۰۰ تا ۱۷:۰۰."
 
-#: includes/Settings/SettingsValidator.php:484
+#: includes/Settings/SettingsValidator.php:600
 msgid "Choose what offline visitors see."
 msgstr "انتخاب کن بازدیدکننده‌ی آفلاین چه ببیند."
 
-#: includes/Settings/SettingsValidator.php:494
+#: includes/Settings/SettingsValidator.php:610
 msgid "Enter a valid email address, or leave it empty for the site admin email."
 msgstr "یک ایمیل معتبر وارد کن، یا برای ایمیل مدیر سایت خالی بگذار."
 
-#: includes/Settings/SettingsValidator.php:501
+#: includes/Settings/SettingsValidator.php:617
 msgid "Choose off, optional or required."
 msgstr "یکی از خاموش، اختیاری یا اجباری را انتخاب کن."
 
 #. translators: 1: smallest allowed number, 2: largest allowed number.
-#: includes/Settings/SettingsValidator.php:512
+#: includes/Settings/SettingsValidator.php:628
 #, php-format
 msgid "Enter a whole number from %1$d to %2$d."
 msgstr "یک عدد صحیح از %1$d تا %2$d وارد کن."
 
-#: includes/Settings/SettingsValidator.php:516
+#: includes/Settings/SettingsValidator.php:632
 msgid "Unknown setting."
 msgstr "تنظیم ناشناخته."
 
-#: includes/Settings/SettingsValidator.php:525
+#: includes/Settings/SettingsValidator.php:641
 msgid "Enter the message as text."
 msgstr "پیام را به‌صورت متن وارد کن."
 
 #. translators: %d: maximum number of characters.
-#: includes/Settings/SettingsValidator.php:534
+#: includes/Settings/SettingsValidator.php:650
 #, php-format
 msgid "The welcome message can be at most %d characters."
 msgstr "پیام خوش‌آمد حداکثر می‌تواند %d نویسه باشد."
 
-#: includes/Settings/SettingsValidator.php:579
-#: includes/Settings/SettingsValidator.php:749
+#: includes/Settings/SettingsValidator.php:695
+#: includes/Settings/SettingsValidator.php:865
 msgid "Enter the text as plain text."
 msgstr "متن را به‌صورت ساده وارد کن."
 
-#: includes/Settings/SettingsValidator.php:601
+#: includes/Settings/SettingsValidator.php:717
 msgid "Choose page types from the list."
 msgstr "نوع صفحه را از فهرست انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:614
-#: includes/Settings/SettingsValidator.php:619
+#: includes/Settings/SettingsValidator.php:730
+#: includes/Settings/SettingsValidator.php:735
 msgid "Choose items from the search results."
 msgstr "موردها را از نتایج جست‌وجو انتخاب کن."
 
-#: includes/Settings/SettingsValidator.php:634
+#: includes/Settings/SettingsValidator.php:750
 msgid "Some of the chosen items no longer exist or are not published."
 msgstr "بعضی از موردهای انتخاب‌شده دیگر وجود ندارند یا منتشر نشده‌اند."
 
-#: includes/Settings/SettingsValidator.php:648
+#: includes/Settings/SettingsValidator.php:764
 msgid "Use a header name made of letters, digits and dashes, like X-Real-IP."
 msgstr "نام هدر فقط می‌تواند حرف انگلیسی، عدد و خط تیره باشد؛ مثل X-Real-IP."
 
-#: includes/Settings/SettingsValidator.php:660
+#: includes/Settings/SettingsValidator.php:776
 msgid "Enter one address or range per line."
 msgstr "در هر خط یک آدرس یا بازه وارد کن."
 
 #. translators: %s: the invalid entry.
-#: includes/Settings/SettingsValidator.php:678
+#: includes/Settings/SettingsValidator.php:794
 #, php-format
 msgid "“%s” is not an IP address or range."
 msgstr "«%s» آدرس یا بازه‌ی IP معتبر نیست."
 
 #. translators: %d: maximum number of entries.
-#: includes/Settings/SettingsValidator.php:689
+#: includes/Settings/SettingsValidator.php:805
 #, php-format
 msgid "Enter at most %d addresses or ranges."
 msgstr "حداکثر %d آدرس یا بازه وارد کن."

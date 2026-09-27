@@ -163,6 +163,9 @@
 		botTest: function ( data ) {
 			return request( 'POST', '/agent/settings/bot-test', { body: data } );
 		},
+		smsTest: function ( data ) {
+			return request( 'POST', '/agent/settings/sms-test', { body: data } );
+		},
 		customer: function ( id ) {
 			return request( 'GET', '/agent/conversations/' + id + '/customer' );
 		},
@@ -171,6 +174,9 @@
 		},
 		setStatus: function ( status ) {
 			return request( 'PATCH', '/agent/me', { body: { status: status } } );
+		},
+		setTheme: function ( theme ) {
+			return request( 'PATCH', '/agent/me', { body: { theme: theme } } );
 		},
 		inbox: function ( query ) {
 			return request( 'GET', '/agent/conversations', { query: query } );
@@ -441,6 +447,7 @@
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
+			this.buildThemeButton(),
 			this.buildAlertsButton(),
 			agent ? this.buildStatusButton( agent ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
@@ -451,6 +458,35 @@
 	 * Turns new-message alerts on or off for this browser; turning them on
 	 * also asks for permission to show desktop notifications.
 	 */
+	/**
+	 * Light, dark, or the device's choice; saved on the agent's account.
+	 */
+	var PANEL_THEMES = [ 'light', 'dark', 'auto' ];
+
+	Panel.prototype.buildThemeButton = function () {
+		var self = this;
+		var current = document.documentElement.getAttribute( 'data-theme' ) || 'light';
+		var labels = { light: S.themeLight, dark: S.themeDark, auto: S.themeAuto };
+		var icons = { light: 'sun', dark: 'moon', auto: 'monitor' };
+		var label = S.panelTheme + ': ' + labels[ current ];
+
+		return h( 'button', {
+			type: 'button',
+			className: 'cc-rail-item cc-theme-toggle',
+			title: label,
+			'aria-label': label,
+			onClick: function () {
+				var next = PANEL_THEMES[ ( PANEL_THEMES.indexOf( current ) + 1 ) % PANEL_THEMES.length ];
+				document.documentElement.setAttribute( 'data-theme', next );
+				self.renderRail();
+				self.notify( S.panelTheme + ': ' + labels[ next ] );
+				api.setTheme( next ).catch( function ( error ) {
+					self.notify( error.message, true );
+				} );
+			}
+		}, [ icon( icons[ current ] ) ] );
+	};
+
 	Panel.prototype.buildAlertsButton = function () {
 		var self = this;
 		var on = alerts.enabled();
@@ -3549,17 +3585,19 @@
 	 */
 	var SETTINGS_SECTIONS = [
 		{ id: 'general', icon: 'power', keys: [ 'widget_enabled', 'widget_sound', 'visitor_cookie_days', 'delete_data_on_uninstall' ] },
-		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
+		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_theme', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
 		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
 		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
 		{ id: 'sales', icon: 'message', keys: [ 'proactive', 'rating_enabled' ] },
+		{ id: 'contact', icon: 'help', keys: [ 'channels_enabled', 'channels', 'faq_enabled', 'faq' ] },
+		{ id: 'sms', icon: 'phone', keys: [ 'sms_enabled', 'sms_provider', 'sms_api_key', 'sms_username', 'sms_password', 'sms_sender', 'sms_message', 'sms_delay' ] },
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
 
-	var NUMBER_SETTINGS = [ 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'attachment_max_mb' ];
+	var NUMBER_SETTINGS = [ 'sms_delay', 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'attachment_max_mb' ];
 
 	function settingsSection( id ) {
 		return SETTINGS_SECTIONS.filter( function ( section ) {
@@ -3664,6 +3702,19 @@
 					message: String( rule.message ).trim(),
 					delay: /^\d+$/.test( delay ) ? parseInt( delay, 10 ) : delay
 				} );
+			} );
+		}
+		if ( id === 'contact' ) {
+			payload.channels = draft.channels.map( function ( channel ) {
+				return { type: channel.type, value: String( channel.value ).trim(), label: String( channel.label ).trim() };
+			} );
+			payload.faq = draft.faq.map( function ( item ) {
+				return { id: item.id, question: String( item.question ).trim(), answer: String( item.answer ).trim() };
+			} );
+		}
+		if ( id === 'sms' ) {
+			[ 'sms_api_key', 'sms_username', 'sms_sender', 'sms_message' ].forEach( function ( key ) {
+				payload[ key ] = String( draft[ key ] ).trim();
 			} );
 		}
 		if ( id === 'notifications' ) {
@@ -3772,6 +3823,8 @@
 			notifications: S.sectionNotifications,
 			limits: S.sectionLimits,
 			sales: S.sectionSales,
+			contact: S.sectionContact,
+			sms: S.sectionSms,
 			security: S.sectionSecurity
 		};
 
@@ -3834,6 +3887,10 @@
 			children = [ this.buildNotifications() ];
 		} else if ( this.section === 'sales' ) {
 			children = [ this.buildSales() ];
+		} else if ( this.section === 'contact' ) {
+			children = [ this.buildChannels(), this.buildFaq() ];
+		} else if ( this.section === 'sms' ) {
+			children = [ this.buildSms() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -3932,7 +3989,7 @@
 
 		el.style.setProperty( '--chatchi-primary', tokens.primary );
 		el.style.setProperty( '--chatchi-primary-hover', tokens.primaryHover );
-		el.style.setProperty( '--chatchi-primary-soft', tokens.primarySoft );
+		el.style.setProperty( '--chatchi-primary-soft-light', tokens.primarySoft );
 		el.style.setProperty( '--chatchi-primary-contrast', tokens.primaryContrast );
 	}
 
@@ -4054,6 +4111,25 @@
 			] );
 		} ) );
 
+		// Light, dark or the visitor's device.
+		var themes = h( 'div', { className: 'cc-radios cc-radios--row', role: 'radiogroup', 'aria-labelledby': 'cc-theme-label' }, [
+			[ 'light', S.themeLight, 'sun' ],
+			[ 'dark', S.themeDark, 'moon' ],
+			[ 'auto', S.themeAutoVisitor, 'monitor' ]
+		].map( function ( option ) {
+			var id = 'cc-theme-' + option[ 0 ];
+			var input = h( 'input', { id: id, type: 'radio', name: 'cc-theme', value: option[ 0 ], checked: draft.widget_theme === option[ 0 ] } );
+
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.widget_theme = option[ 0 ];
+					self.updatePreview();
+				}
+			} );
+
+			return h( 'label', { className: 'cc-radio cc-theme-option', for: id }, [ input, icon( option[ 2 ] ), h( 'span', { text: option[ 1 ] } ) ] );
+		} ) );
+
 		// Title and subtitle.
 		function textField( key, id, label ) {
 			var input = h( 'input', {
@@ -4092,7 +4168,11 @@
 			overridden,
 			h( 'span', { className: 'cc-label', id: 'cc-position-label', text: S.position } ),
 			positions,
-			this.fieldError( 'widget_position' )
+			this.fieldError( 'widget_position' ),
+			h( 'span', { className: 'cc-label', id: 'cc-theme-label', text: S.widgetTheme } ),
+			themes,
+			h( 'p', { className: 'cc-hint', text: S.widgetThemeHint } ),
+			this.fieldError( 'widget_theme' )
 		].concat(
 			textField( 'widget_title', 'cc-widget-title', S.widgetTitle ),
 			textField( 'widget_subtitle', 'cc-widget-subtitle', S.widgetSubtitle ),
@@ -4150,6 +4230,8 @@
 
 		setColorVars( preview.frame, normalizeHex( draft.primary_color ) || defaults.primary_color );
 		preview.frame.classList.toggle( 'is-right', draft.widget_position === 'right' );
+		preview.frame.classList.toggle( 'chatchi--dark', draft.widget_theme === 'dark' );
+		preview.frame.classList.toggle( 'chatchi--auto', draft.widget_theme === 'auto' );
 		preview.title.textContent = draft.widget_title.trim() || defaults.widget_title;
 		preview.subtitle.textContent = draft.widget_subtitle.trim() || defaults.widget_subtitle;
 
@@ -4807,6 +4889,339 @@
 		] );
 
 		return item;
+	};
+
+	/**
+	 * A simple list editor: rows built by buildRow, an "add" button, and
+	 * removing / moving rows. Rows are the draft's own objects.
+	 */
+	SettingsView.prototype.listEditor = function ( key, max, addLabel, emptyLabel, blank, buildRow ) {
+		var self = this;
+		var draft = this.draft;
+		var list = h( 'div', { className: 'cc-invites' } );
+		var add = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			onClick: function () {
+				draft[ key ].push( blank() );
+				self.clearError( key );
+				fill();
+				var fields = list.querySelectorAll( '.cc-invite' );
+				var last = fields[ fields.length - 1 ];
+				var focusable = last && last.querySelector( 'input, textarea, select' );
+				if ( focusable ) {
+					focusable.focus();
+				}
+				self.syncNav();
+			}
+		}, [ icon( 'plus' ), h( 'span', { text: addLabel } ) ] );
+
+		function fill() {
+			var rows = draft[ key ];
+			list.replaceChildren.apply( list, rows.length ? rows.map( function ( row, index ) {
+				var actions = [
+					index > 0 ? h( 'button', {
+						type: 'button',
+						className: 'cc-icon-button cc-move-up',
+						title: S.moveUp,
+						'aria-label': S.moveUp,
+						onClick: function () {
+							rows.splice( index - 1, 0, rows.splice( index, 1 )[ 0 ] );
+							fill();
+							self.syncNav();
+						}
+					}, [ icon( 'chevron' ) ] ) : null,
+					h( 'button', {
+						type: 'button',
+						className: 'cc-icon-button',
+						title: S.remove,
+						'aria-label': S.remove,
+						onClick: function () {
+							rows.splice( index, 1 );
+							self.clearError( key );
+							fill();
+							self.syncNav();
+						}
+					}, [ icon( 'trash' ) ] )
+				];
+				return buildRow( row, index, actions, function () {
+					self.clearError( key );
+				} );
+			} ) : [ h( 'p', { className: 'cc-invites__empty', text: emptyLabel } ) ] );
+			add.hidden = rows.length >= max;
+		}
+
+		fill();
+
+		return { list: list, add: add };
+	};
+
+	SettingsView.prototype.buildChannels = function () {
+		var self = this;
+		var draft = this.draft;
+		var limit = this.data.limits.channel_label;
+		var types = [ [ 'whatsapp', S.channelWhatsapp ], [ 'telegram', S.channelTelegram ], [ 'bale', S.channelBale ], [ 'phone', S.channelPhone ] ];
+		var placeholders = { whatsapp: '09121234567', telegram: '@mystore', bale: '@mystore', phone: '02112345678' };
+
+		var editor = this.listEditor( 'channels', this.data.limits.channels, S.channelAdd, S.channelEmpty, function () {
+			return { type: 'whatsapp', value: '', label: '' };
+		}, function ( channel, index, actions, changed ) {
+			var prefix = 'cc-channel-' + index;
+			var value = h( 'input', { id: prefix + '-value', className: 'cc-input', type: 'text', dir: 'ltr', autocomplete: 'off', placeholder: placeholders[ channel.type ] } );
+			value.value = channel.value;
+			value.addEventListener( 'input', function () {
+				channel.value = value.value;
+				changed();
+			} );
+
+			var type = h( 'select', { id: prefix + '-type', className: 'cc-input cc-select' }, types.map( function ( option ) {
+				return h( 'option', { value: option[ 0 ], text: option[ 1 ], selected: option[ 0 ] === channel.type } );
+			} ) );
+			type.addEventListener( 'change', function () {
+				channel.type = type.value;
+				value.placeholder = placeholders[ channel.type ];
+				changed();
+			} );
+
+			var label = h( 'input', { id: prefix + '-label', className: 'cc-input', type: 'text', placeholder: S.channelLabelPlaceholder } );
+			label.value = channel.label;
+			label.addEventListener( 'input', function () {
+				channel.label = label.value;
+				changed();
+			} );
+
+			return h( 'div', { className: 'cc-invite' }, [
+				h( 'div', { className: 'cc-invite__head' }, [ h( 'strong', { text: String( S.channelNumber ).replace( '%s', fmt.number( index + 1 ) ) } ) ].concat( actions ) ),
+				h( 'div', { className: 'cc-invite__grid cc-invite__grid--channel' }, [
+					h( 'div', { className: 'cc-field' }, [ h( 'label', { className: 'cc-label', for: type.id, text: S.channelType } ), type ] ),
+					h( 'div', { className: 'cc-field' }, [ h( 'label', { className: 'cc-label', for: value.id, text: S.channelValue } ), value ] ),
+					h( 'div', { className: 'cc-field' }, [ h( 'label', { className: 'cc-label', for: label.id, text: fmt.format( S.channelLabel, limit ) } ), label ] )
+				] )
+			] );
+		} );
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-channels-title' }, [
+			h( 'div', { className: 'cc-settings__head' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-channels-title', text: S.channelsTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.channelsIntro } )
+				] ),
+				this.buildSwitch( 'cc-channels-enabled', S.channelsOn, draft.channels_enabled, function ( on ) {
+					draft.channels_enabled = on;
+					self.clearError( 'channels_enabled' );
+				} )
+			] ),
+			editor.list,
+			this.fieldError( 'channels' ),
+			this.fieldError( 'channels_enabled' ),
+			h( 'div', {}, [ editor.add ] )
+		] );
+	};
+
+	SettingsView.prototype.buildFaq = function () {
+		var draft = this.draft;
+		var limits = this.data.limits;
+
+		var editor = this.listEditor( 'faq', limits.faq, S.faqAdd, S.faqEmpty, function () {
+			return { id: '', question: '', answer: '' };
+		}, function ( item, index, actions, changed ) {
+			var prefix = 'cc-faq-' + index;
+			var question = h( 'input', { id: prefix + '-question', className: 'cc-input', type: 'text', placeholder: S.faqQuestionPlaceholder } );
+			question.value = item.question;
+			question.addEventListener( 'input', function () {
+				item.question = question.value;
+				changed();
+			} );
+
+			var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+			var answer = h( 'textarea', { id: prefix + '-answer', className: 'cc-input cc-textarea', rows: '3', placeholder: S.faqAnswerPlaceholder } );
+			answer.value = item.answer;
+
+			function count() {
+				var used = Array.from( answer.value ).length;
+				counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limits.faq_answer );
+				counter.classList.toggle( 'is-over', used > limits.faq_answer );
+			}
+
+			answer.addEventListener( 'input', function () {
+				item.answer = answer.value;
+				count();
+				changed();
+			} );
+			count();
+
+			return h( 'div', { className: 'cc-invite' }, [
+				h( 'div', { className: 'cc-invite__head' }, [ h( 'strong', { text: String( S.faqNumber ).replace( '%s', fmt.number( index + 1 ) ) } ) ].concat( actions ) ),
+				h( 'div', { className: 'cc-field' }, [ h( 'label', { className: 'cc-label', for: question.id, text: S.faqQuestion } ), question ] ),
+				h( 'div', { className: 'cc-field' }, [
+					h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: answer.id, text: S.faqAnswer } ), counter ] ),
+					answer
+				] )
+			] );
+		} );
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-faq-title' }, [
+			h( 'div', { className: 'cc-settings__head' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-faq-title', text: S.faqTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.faqIntro } )
+				] ),
+				this.buildSwitch( 'cc-faq-enabled', S.faqOn, draft.faq_enabled, function ( on ) {
+					draft.faq_enabled = on;
+				} )
+			] ),
+			editor.list,
+			this.fieldError( 'faq' ),
+			h( 'div', {}, [ editor.add ] )
+		] );
+	};
+
+	/**
+	 * SMS to visitors who left the site before an agent replied.
+	 */
+	SettingsView.prototype.buildSms = function () {
+		var self = this;
+		var draft = this.draft;
+		var limit = this.data.limits.sms_message;
+
+		function input( key, label, attrs, hint ) {
+			var field = h( 'input', Object.assign( { id: 'cc-' + key.replace( /_/g, '-' ), className: 'cc-input', type: 'text', dir: 'ltr', autocomplete: 'off', spellcheck: 'false' }, attrs || {} ) );
+			field.value = draft[ key ];
+			field.addEventListener( 'input', function () {
+				draft[ key ] = field.value;
+				self.clearError( key );
+				result.hidden = true;
+			} );
+			return h( 'div', { className: 'cc-field' }, [
+				h( 'label', { className: 'cc-label', for: field.id, text: label } ),
+				field,
+				hint ? h( 'p', { className: 'cc-hint', text: hint } ) : null,
+				self.fieldError( key )
+			] );
+		}
+
+		var kavenegar = h( 'div', { className: 'cc-bot-fields' }, [
+			input( 'sms_api_key', S.smsApiKey, { type: 'password' } )
+		] );
+		var melipayamak = h( 'div', { className: 'cc-bot-fields' }, [
+			input( 'sms_username', S.smsUsername ),
+			input( 'sms_password', S.smsPassword, { type: 'password' } )
+		] );
+		var sender = input( 'sms_sender', S.smsSender, { inputmode: 'numeric' }, ' ' );
+		var senderHint = sender.querySelector( '.cc-hint' );
+
+		function showProvider() {
+			var isKavenegar = draft.sms_provider === 'kavenegar';
+			kavenegar.hidden = ! isKavenegar;
+			melipayamak.hidden = isKavenegar;
+			senderHint.textContent = isKavenegar ? S.smsSenderOptional : S.smsSenderRequired;
+			sender.querySelector( 'input' ).placeholder = isKavenegar ? '10008663' : '50004001234567';
+		}
+
+		var providers = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-sms-provider-label' }, [
+			[ 'kavenegar', S.smsKavenegar, S.smsKavenegarHint ],
+			[ 'melipayamak', S.smsMelipayamak, S.smsMelipayamakHint ]
+		].map( function ( option ) {
+			var radio = h( 'input', { id: 'cc-sms-provider-' + option[ 0 ], type: 'radio', name: 'cc-sms-provider', value: option[ 0 ], checked: draft.sms_provider === option[ 0 ] } );
+			radio.addEventListener( 'change', function () {
+				if ( radio.checked ) {
+					draft.sms_provider = option[ 0 ];
+					showProvider();
+					result.hidden = true;
+				}
+			} );
+			return h( 'label', { className: 'cc-radio cc-radio--rich', for: radio.id }, [ radio, h( 'span', {}, [ h( 'strong', { text: option[ 1 ] } ), h( 'small', { text: option[ 2 ] } ) ] ) ] );
+		} ) );
+
+		var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+		var message = h( 'textarea', { id: 'cc-sms-message', className: 'cc-input cc-textarea', rows: '3', placeholder: this.data.defaults.sms_message } );
+		message.value = draft.sms_message;
+
+		function count() {
+			var used = Array.from( message.value ).length;
+			counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limit );
+			counter.classList.toggle( 'is-over', used > limit );
+		}
+
+		message.addEventListener( 'input', function () {
+			draft.sms_message = message.value;
+			count();
+			self.clearError( 'sms_message' );
+		} );
+		count();
+
+		// Test message to a number the administrator types.
+		var result = h( 'p', { className: 'cc-bot-result', role: 'status', hidden: true } );
+		var phone = h( 'input', { id: 'cc-sms-test-phone', className: 'cc-input', type: 'tel', dir: 'ltr', inputmode: 'tel', placeholder: '09121234567', autocomplete: 'off' } );
+		var test = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			text: S.smsTest,
+			onClick: function () {
+				test.disabled = true;
+				result.hidden = true;
+				api.smsTest( {
+					provider: draft.sms_provider,
+					api_key: String( draft.sms_api_key ).trim(),
+					username: String( draft.sms_username ).trim(),
+					password: String( draft.sms_password ),
+					sender: String( draft.sms_sender ).trim(),
+					phone: phone.value.trim()
+				} ).then( function () {
+					result.textContent = S.smsTestSent;
+					result.className = 'cc-bot-result is-ok';
+				} ).catch( function ( error ) {
+					var fields = ( error.data && error.data.fields ) || {};
+					var first = Object.keys( fields )[ 0 ];
+					result.textContent = first ? fields[ first ] : error.message;
+					result.className = 'cc-bot-result is-error';
+				} ).then( function () {
+					result.hidden = false;
+					test.disabled = false;
+				} );
+			}
+		} );
+
+		showProvider();
+
+		var phoneOff = this.data.settings.form_phone === 'off';
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-sms-title', text: S.smsTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.smsIntro } )
+					] ),
+					this.buildSwitch( 'cc-sms-enabled', S.smsOn, draft.sms_enabled, function ( on ) {
+						draft.sms_enabled = on;
+						self.clearError( 'sms_enabled' );
+					} )
+				] ),
+				phoneOff ? h( 'p', { className: 'cc-banner cc-banner--warning', role: 'note' }, [ icon( 'alert' ), h( 'span', { text: S.smsPhoneOff } ) ] ) : null,
+				h( 'span', { className: 'cc-label', id: 'cc-sms-provider-label', text: S.smsProvider } ),
+				providers,
+				kavenegar,
+				melipayamak,
+				sender,
+				this.fieldError( 'sms_provider' ),
+				this.fieldError( 'sms_enabled' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-text-title' }, [
+				h( 'h2', { id: 'cc-sms-text-title', text: S.smsTextTitle } ),
+				h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: message.id, text: S.smsMessage } ), counter ] ),
+				message,
+				h( 'p', { className: 'cc-hint', text: S.smsMessageHint } ),
+				this.fieldError( 'sms_message' ),
+				this.numberField( 'sms_delay', S.smsDelay, S.minutes, S.smsDelayHint )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-test-title' }, [
+				h( 'h2', { id: 'cc-sms-test-title', text: S.smsTestTitle } ),
+				h( 'p', { className: 'cc-hint', text: S.smsTestIntro } ),
+				h( 'label', { className: 'cc-label', for: phone.id, text: S.smsTestPhone } ),
+				h( 'div', { className: 'cc-bot-test' }, [ phone, test, result ] )
+			] )
+		] );
 	};
 
 	SettingsView.prototype.fieldError = function ( key ) {

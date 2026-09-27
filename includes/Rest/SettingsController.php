@@ -11,6 +11,8 @@ use ChatChi\Frontend\ColorPalette;
 use ChatChi\Frontend\WidgetStrings;
 use ChatChi\Security\ClientIp;
 use ChatChi\Settings\ContentLookup;
+use ChatChi\Settings\ContactChannels;
+use ChatChi\Settings\FaqItems;
 use ChatChi\Settings\ProactiveRules;
 use ChatChi\Settings\Settings;
 use ChatChi\Settings\SettingsValidator;
@@ -173,6 +175,25 @@ final class SettingsController implements RouteProvider {
 				'type'     => 'array',
 				'maxItems' => 50,
 			),
+			'widget_theme'             => $enum( SettingsValidator::THEMES ),
+			'channels_enabled'         => $flag,
+			// Checked by ContactChannels::clean() and FaqItems::clean().
+			'channels'                 => array(
+				'type'     => 'array',
+				'maxItems' => 50,
+			),
+			'faq_enabled'              => $flag,
+			'faq'                      => array(
+				'type'     => 'array',
+				'maxItems' => 100,
+			),
+			'sms_enabled'              => $flag,
+			'sms_provider'             => $enum( SettingsValidator::SMS_PROVIDERS ),
+			'sms_api_key'              => $text( 500 ),
+			'sms_username'             => $text( 500 ),
+			'sms_password'             => $text( 500 ),
+			'sms_sender'               => $text( 100 ),
+			'sms_message'              => $text( 2000 ),
 		);
 
 		// Numbers arrive as JSON numbers or numeric strings; ranges are the validator's job.
@@ -242,6 +263,7 @@ final class SettingsController implements RouteProvider {
 				'form_intro'      => $this->strings->all()['formIntro'],
 				'offline_message' => $this->settings->default_offline_message(),
 				'notify_email'    => (string) get_option( 'admin_email' ),
+				'sms_message'     => $this->settings->default_sms_message(),
 			),
 			'limits'    => array(
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
@@ -252,6 +274,12 @@ final class SettingsController implements RouteProvider {
 				'offline_message' => SettingsValidator::OFFLINE_MESSAGE_MAX_LENGTH,
 				'proactive'       => ProactiveRules::MAX_RULES,
 				'proactive_text'  => ProactiveRules::MESSAGE_MAX_LENGTH,
+				'channels'        => ContactChannels::MAX_CHANNELS,
+				'channel_label'   => ContactChannels::LABEL_MAX_LENGTH,
+				'faq'             => FaqItems::MAX_ITEMS,
+				'faq_question'    => FaqItems::QUESTION_MAX_LENGTH,
+				'faq_answer'      => FaqItems::ANSWER_MAX_LENGTH,
+				'sms_message'     => SettingsValidator::SMS_MESSAGE_MAX_LENGTH,
 				// The server's own upload limit caps attachment_max_mb.
 				'upload_max_mb'   => max( 1, (int) floor( wp_max_upload_size() / MB_IN_BYTES ) ),
 			),

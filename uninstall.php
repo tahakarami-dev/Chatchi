@@ -25,6 +25,8 @@ function chatchi_uninstall_site() {
 	global $wpdb;
 
 	wp_clear_scheduled_hook( 'chatchi_purge_rate_limits' );
+	// Pending SMS checks (one per conversation, each with its own argument).
+	wp_unschedule_hook( 'chatchi_sms_check' );
 	delete_option( 'chatchi_install_lock' );
 	delete_transient( 'chatchi_install_backoff' );
 	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}chatchi_rate_limits" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.SchemaChange -- Temporary counters, recreated on install.
@@ -64,6 +66,10 @@ function chatchi_uninstall_site() {
 	}
 
 	delete_transient( 'chatchi_install_backoff' );
+
+	// Each agent's panel theme, and SMS cooldowns (chatchi_sms_{conversation}).
+	delete_metadata( 'user', 0, 'chatchi_panel_theme', '', true );
+	$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_chatchi\_sms\_%' OR option_name LIKE '\_transient\_timeout\_chatchi\_sms\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
 	chatchi_uninstall_files();
 }

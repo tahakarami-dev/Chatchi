@@ -151,7 +151,7 @@ final class PanelPage {
 		$json_flags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE;
 		?>
 <!DOCTYPE html>
-<html lang="<?php echo esc_attr( $locale ); ?>" dir="<?php echo esc_attr( $dir ); ?>">
+<html lang="<?php echo esc_attr( $locale ); ?>" dir="<?php echo esc_attr( $dir ); ?>" data-theme="<?php echo esc_attr( PanelTheme::get( get_current_user_id() ) ); ?>">
 <head>
 <meta charset="<?php echo esc_attr( get_bloginfo( 'charset' ) ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -222,7 +222,7 @@ final class PanelPage {
 		$tokens = $this->palette->tokens();
 
 		return sprintf(
-			':root{--chatchi-primary:%s;--chatchi-primary-hover:%s;--chatchi-primary-soft:%s;--chatchi-primary-contrast:%s;}',
+			':root{--chatchi-primary:%s;--chatchi-primary-hover:%s;--chatchi-primary-soft-light:%s;--chatchi-primary-contrast:%s;}',
 			$tokens['primary'],
 			$tokens['primaryHover'],
 			$tokens['primarySoft'],

@@ -48,6 +48,8 @@ use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
 use ChatChi\Rest\BotTestController;
 use ChatChi\Notifications\BotNotifier;
+use ChatChi\Notifications\SmsGateway;
+use ChatChi\Notifications\SmsNotifier;
 use ChatChi\Notifications\Transcript;
 use ChatChi\Rest\CannedController;
 use ChatChi\Rest\Presenter;
@@ -55,6 +57,7 @@ use ChatChi\Rest\RequestGuard;
 use ChatChi\Rest\ReportsController;
 use ChatChi\Rest\RestModule;
 use ChatChi\Rest\SettingsController;
+use ChatChi\Rest\SmsTestController;
 use ChatChi\Rest\WidgetController;
 use ChatChi\Security\ClientIp;
 use ChatChi\Security\RateLimiter;
@@ -537,7 +540,8 @@ final class Plugin {
 					$c->get( SettingsController::class ),
 					$c->get( CannedController::class ),
 					$c->get( BotTestController::class ),
-					$c->get( ReportsController::class )
+					$c->get( ReportsController::class ),
+					$c->get( SmsTestController::class )
 				);
 			}
 		);
@@ -640,6 +644,35 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			SmsGateway::class,
+			static function (): SmsGateway {
+				return new SmsGateway();
+			}
+		);
+
+		$this->container->singleton(
+			SmsNotifier::class,
+			static function ( Container $c ): SmsNotifier {
+				return new SmsNotifier(
+					$c->get( Settings::class ),
+					$c->get( ConversationRepository::class ),
+					$c->get( VisitorRepository::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( MessageService::class ),
+					$c->get( SmsGateway::class ),
+					$c->get( ProfileValidator::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			SmsTestController::class,
+			static function ( Container $c ): SmsTestController {
+				return new SmsTestController( $c->get( SmsGateway::class ), $c->get( SettingsValidator::class ), $c->get( ProfileValidator::class ) );
+			}
+		);
+
+		$this->container->singleton(
 			BotTestController::class,
 			static function ( Container $c ): BotTestController {
 				return new BotTestController( $c->get( BotNotifier::class ), $c->get( SettingsValidator::class ) );
@@ -710,6 +743,7 @@ final class Plugin {
 			RestModule::class,
 			OfflineNotifier::class,
 			BotNotifier::class,
+			SmsNotifier::class,
 			Transcript::class,
 			WidgetModule::class,
 			Shortcode::class,

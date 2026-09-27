@@ -1635,3 +1635,268 @@
 	width: 18px;
 	height: 18px;
 }
+
+/* Brand icons drawn as filled shapes */
+
+.cc-fill {
+	fill: currentColor;
+	stroke: none;
+}
+
+/* Contact channels menu, above the launcher */
+
+.chatchi-menu {
+	position: fixed;
+	bottom: 96px;
+	z-index: 2147483000;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	/* Laid out physically so the icons line up above the launcher. */
+	direction: ltr;
+}
+
+.chatchi-menu[hidden] {
+	display: none;
+}
+
+.chatchi--left .chatchi-menu { left: 30px; align-items: flex-start; }
+.chatchi--right .chatchi-menu { right: 30px; align-items: flex-end; }
+
+.chatchi-menu__item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: var(--chatchi-text);
+	text-decoration: none;
+	animation: chatchi-menu-in var(--chatchi-duration-slow) var(--chatchi-ease-out) both;
+}
+
+/* The icon sits above the launcher, the label on the inner side. */
+.chatchi--left .chatchi-menu__item {
+	flex-direction: row-reverse;
+}
+
+.chatchi-menu__item:nth-child(2) { animation-delay: 30ms; }
+.chatchi-menu__item:nth-child(3) { animation-delay: 60ms; }
+.chatchi-menu__item:nth-child(4) { animation-delay: 90ms; }
+.chatchi-menu__item:nth-child(5) { animation-delay: 120ms; }
+.chatchi-menu__item:nth-child(6) { animation-delay: 150ms; }
+.chatchi-menu__item:nth-child(7) { animation-delay: 180ms; }
+
+@keyframes chatchi-menu-in {
+	from { opacity: 0; transform: translateY(10px) scale(.96); }
+	to { opacity: 1; transform: none; }
+}
+
+.chatchi-menu__label {
+	padding: 7px 14px;
+	border-radius: 999px;
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-md), 0 0 0 1px var(--chatchi-border);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	unicode-bidi: plaintext;
+	transition: transform var(--chatchi-duration-fast);
+}
+
+.chatchi-menu__icon {
+	display: grid;
+	place-items: center;
+	flex-shrink: 0;
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	background: var(--chatchi-gradient);
+	color: #fff;
+	box-shadow: var(--chatchi-shadow-md);
+	transition: transform var(--chatchi-duration-fast);
+}
+
+.chatchi-menu__icon svg {
+	width: 24px;
+	height: 24px;
+}
+
+.chatchi-menu__item--whatsapp .chatchi-menu__icon { background: #25d366; }
+.chatchi-menu__item--telegram .chatchi-menu__icon { background: #229ed9; }
+.chatchi-menu__item--bale .chatchi-menu__icon { background: #1fb16e; }
+.chatchi-menu__item--phone .chatchi-menu__icon { background: #0f766e; }
+.chatchi-menu__item--chat .chatchi-menu__icon { color: var(--chatchi-primary-contrast); }
+
+.chatchi-menu__item:hover .chatchi-menu__icon,
+.chatchi-menu__item:focus-visible .chatchi-menu__icon {
+	transform: scale(1.08);
+}
+
+.chatchi-menu__item:focus-visible {
+	outline: none;
+}
+
+.chatchi-menu__item:focus-visible .chatchi-menu__label {
+	box-shadow: var(--chatchi-focus-ring), var(--chatchi-shadow-md);
+}
+
+/* The launcher shows its close icon while the menu is open. */
+.chatchi.is-menu .chatchi-launcher__icon--chat {
+	opacity: 0;
+	transform: rotate(90deg) scale(.6);
+}
+
+.chatchi.is-menu .chatchi-launcher__icon--close {
+	opacity: 1;
+	transform: none;
+}
+
+@media (max-width: 639px) {
+	.chatchi-menu {
+		bottom: 88px;
+	}
+
+	.chatchi--left .chatchi-menu { left: 22px; }
+	.chatchi--right .chatchi-menu { right: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chatchi-menu__item {
+		animation: none;
+	}
+}
+
+/* Frequently asked questions, before the first message */
+
+.chatchi-faq {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 12px 0 4px;
+	padding: 12px;
+	border-radius: 16px;
+	background: var(--chatchi-surface);
+	box-shadow: 0 0 0 1px var(--chatchi-border);
+	text-align: start;
+}
+
+.chatchi-faq__title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--chatchi-text);
+}
+
+.chatchi-faq__title svg {
+	width: 16px;
+	height: 16px;
+	color: var(--chatchi-primary);
+}
+
+.chatchi-faq__search {
+	width: 100%;
+	height: 38px;
+	padding: 0 12px;
+	border: 1.5px solid var(--chatchi-border);
+	border-radius: 10px;
+	background: var(--chatchi-bg);
+	font-size: 16px;
+}
+
+.chatchi-faq__search:focus {
+	outline: none;
+	border-color: var(--chatchi-primary);
+	box-shadow: var(--chatchi-focus-ring);
+}
+
+.chatchi-faq__list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.chatchi-faq__item {
+	border-radius: 10px;
+	background: var(--chatchi-bg);
+	transition: background-color var(--chatchi-duration-fast);
+}
+
+.chatchi-faq__item[hidden] {
+	display: none;
+}
+
+.chatchi-faq__item summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 9px 12px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.6;
+	list-style: none;
+	border-radius: 10px;
+	unicode-bidi: plaintext;
+}
+
+.chatchi-faq__item summary::-webkit-details-marker {
+	display: none;
+}
+
+.chatchi-faq__item summary:focus-visible {
+	outline: none;
+	box-shadow: var(--chatchi-focus-ring);
+}
+
+.chatchi-faq__item summary svg {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	color: var(--chatchi-text-subtle);
+	transition: transform var(--chatchi-duration-base) var(--chatchi-ease-out);
+}
+
+.chatchi-faq__item[open] {
+	background: var(--chatchi-primary-soft);
+}
+
+.chatchi-faq__item[open] summary svg {
+	transform: rotate(180deg);
+	color: var(--chatchi-primary);
+}
+
+.chatchi-faq__answer {
+	padding: 0 12px 10px;
+	font-size: 13px;
+	line-height: 1.8;
+	color: var(--chatchi-text);
+	white-space: pre-line;
+	unicode-bidi: plaintext;
+	overflow-wrap: anywhere;
+}
+
+.chatchi-faq__answer a {
+	color: var(--chatchi-primary);
+}
+
+.chatchi-faq__none,
+.chatchi-faq__hint {
+	margin: 0;
+	font-size: 12px;
+	color: var(--chatchi-text-muted);
+}
+
+.chatchi-faq__none[hidden],
+.chatchi-faq__more[hidden] {
+	display: none;
+}
+
+.chatchi-faq__more {
+	align-self: flex-start;
+	padding: 4px 2px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--chatchi-primary);
+}

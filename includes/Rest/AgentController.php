@@ -7,6 +7,7 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Admin\PanelTheme;
 use ChatChi\Attachments\AttachmentService;
 use ChatChi\Commerce\CustomerContext;
 use ChatChi\Database\Repositories\VisitorRepository;
@@ -87,9 +88,13 @@ final class AgentController extends ConversationController {
 					'permission_callback' => array( $this, 'permit_actor' ),
 					'args'                => array(
 						'status' => array(
-							'type'     => 'string',
-							'enum'     => array( Agent::STATUS_ONLINE, Agent::STATUS_AWAY ),
-							'required' => true,
+							'type' => 'string',
+							'enum' => array( Agent::STATUS_ONLINE, Agent::STATUS_AWAY ),
+						),
+						// The panel's color theme, kept per user.
+						'theme'  => array(
+							'type' => 'string',
+							'enum' => PanelTheme::THEMES,
 						),
 					),
 				),
@@ -277,6 +282,7 @@ final class AgentController extends ConversationController {
 		return $this->respond(
 			$this->presenter->agent_self( $actor->agent_model() ) + array(
 				'attachments' => $this->attachments->client_config( $actor ),
+				'theme'       => PanelTheme::get( $actor->agent_model()->user_id ),
 			)
 		);
 	}
@@ -462,7 +468,8 @@ final class AgentController extends ConversationController {
 	}
 
 	/**
-	 * POST/PATCH /agent/me: the agent sets themselves online or away.
+	 * POST/PATCH /agent/me: the agent sets themselves online or away, and/or
+	 * chooses the panel's theme.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -476,21 +483,31 @@ final class AgentController extends ConversationController {
 
 		$agent = $actor->agent_model();
 
-		try {
-			$this->agents->set_status( $agent->id, (string) $request['status'] );
-			$agent = $this->agents->find( $agent->id ) ?? $agent;
-		} catch ( \Throwable $e ) {
-			return $this->failure( $e );
+		if ( null === $request['status'] && null === $request['theme'] ) {
+			return new \WP_Error( 'rest_missing_callback_param', __( 'Nothing to change.', 'chatchi' ), array( 'status' => 400 ) );
 		}
 
-		/**
-		 * Fires after an agent changes their availability.
-		 *
-		 * @param Agent $agent Agent, with the new status.
-		 */
-		do_action( 'chatchi_agent_status_changed', $agent );
+		if ( null !== $request['theme'] ) {
+			PanelTheme::set( $agent->user_id, (string) $request['theme'] );
+		}
 
-		return $this->respond( $this->presenter->agent_self( $agent ) );
+		if ( null !== $request['status'] ) {
+			try {
+				$this->agents->set_status( $agent->id, (string) $request['status'] );
+				$agent = $this->agents->find( $agent->id ) ?? $agent;
+			} catch ( \Throwable $e ) {
+				return $this->failure( $e );
+			}
+
+			/**
+			 * Fires after an agent changes their availability.
+			 *
+			 * @param Agent $agent Agent, with the new status.
+			 */
+			do_action( 'chatchi_agent_status_changed', $agent );
+		}
+
+		return $this->respond( $this->presenter->agent_self( $agent ) + array( 'theme' => PanelTheme::get( $agent->user_id ) ) );
 	}
 
 	/**

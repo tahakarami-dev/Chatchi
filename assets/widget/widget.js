@@ -227,7 +227,7 @@
 		} );
 
 		this.root = h( 'div', {
-			className: 'chatchi chatchi--' + ( config.position === 'right' ? 'right' : 'left' ),
+			className: 'chatchi chatchi--' + ( config.position === 'right' ? 'right' : 'left' ) + ( config.theme === 'dark' || config.theme === 'auto' ? ' chatchi--' + config.theme : '' ),
 			dir: config.dir || 'rtl',
 			lang: locale.split( '-' )[ 0 ]
 		} );
@@ -235,7 +235,7 @@
 		var colors = config.colors || {};
 		this.root.style.setProperty( '--chatchi-primary', colors.primary );
 		this.root.style.setProperty( '--chatchi-primary-hover', colors.primaryHover );
-		this.root.style.setProperty( '--chatchi-primary-soft', colors.primarySoft );
+		this.root.style.setProperty( '--chatchi-primary-soft-light', colors.primarySoft );
 		this.root.style.setProperty( '--chatchi-primary-contrast', colors.primaryContrast );
 
 		this.badge = h( 'span', { className: 'chatchi-badge', hidden: true, 'aria-hidden': 'true' } );
@@ -267,7 +267,14 @@
 		shadow.appendChild( this.root );
 		document.body.appendChild( host );
 
+		this.buildMenu();
+
 		this.root.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Escape' && self.menuOpen ) {
+				event.stopPropagation();
+				self.closeMenu( true );
+				return;
+			}
 			if ( event.key !== 'Escape' || ! self.state.open ) {
 				return;
 			}
@@ -355,6 +362,11 @@
 		}
 
 		this.scheduleInvitation();
+
+		// Links from SMS (and anywhere else) ending in #chatchi open the chat.
+		if ( window.location.hash === '#chatchi' ) {
+			this.open();
+		}
 	};
 
 	/* --------------------------- invitations --------------------------- */
@@ -404,7 +416,7 @@
 	};
 
 	Widget.prototype.scheduleInvitationNow = function ( rule ) {
-		if ( this.state.open || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
+		if ( this.state.open || this.menuOpen || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
 			return;
 		}
 		this.markInvitationSeen( rule );
@@ -573,10 +585,122 @@
 			this.acceptInvite();
 			return;
 		}
+		if ( this.menuOpen ) {
+			this.closeMenu( false );
+			return;
+		}
 		if ( this.state.open ) {
 			this.close();
-		} else {
-			this.open();
+			return;
+		}
+		// With other contact channels, the launcher first offers a choice,
+		// unless the visitor has replies waiting in the chat.
+		if ( this.menu && ! this.state.unread ) {
+			this.openMenu();
+			return;
+		}
+		this.open();
+	};
+
+	/* ------------------------- contact channels ------------------------ */
+
+	var CHANNEL_ICONS = { whatsapp: 'whatsapp', telegram: 'telegram', bale: 'bale', phone: 'phone' };
+
+	/**
+	 * The menu of ways to reach the site: the chat, then WhatsApp,
+	 * Telegram, Bale or a phone call, as set in the settings.
+	 */
+	Widget.prototype.buildMenu = function () {
+		var self = this;
+		var channels = config.channels || [];
+
+		if ( ! channels.length ) {
+			return;
+		}
+
+		var defaults = { whatsapp: S.channelWhatsapp, telegram: S.channelTelegram, bale: S.channelBale, phone: S.channelPhone };
+
+		var items = [ h( 'button', {
+			type: 'button',
+			className: 'chatchi-menu__item chatchi-menu__item--chat',
+			role: 'menuitem',
+			onClick: function () {
+				self.closeMenu( false );
+				self.open();
+			}
+		}, [
+			h( 'span', { className: 'chatchi-menu__label', text: S.channelChat } ),
+			h( 'span', { className: 'chatchi-menu__icon' }, [ icon( 'chat' ) ] )
+		] ) ].concat( channels.map( function ( channel ) {
+			var external = channel.type !== 'phone';
+			return h( 'a', {
+				className: 'chatchi-menu__item chatchi-menu__item--' + channel.type,
+				role: 'menuitem',
+				href: channel.url,
+				target: external ? '_blank' : null,
+				rel: external ? 'noopener noreferrer' : null,
+				onClick: function () {
+					self.closeMenu( false );
+				}
+			}, [
+				h( 'span', { className: 'chatchi-menu__label', text: channel.label || defaults[ channel.type ] || channel.type } ),
+				h( 'span', { className: 'chatchi-menu__icon' }, [ icon( CHANNEL_ICONS[ channel.type ] || 'phone' ) ] )
+			] );
+		} ) );
+
+		this.menu = h( 'div', { id: 'chatchi-menu', className: 'chatchi-menu', role: 'menu', 'aria-label': S.channelsTitle, hidden: true }, items );
+		this.root.insertBefore( this.menu, this.launcher );
+		this.launcher.setAttribute( 'aria-haspopup', 'menu' );
+
+		// Arrow keys move between the choices.
+		this.menu.addEventListener( 'keydown', function ( event ) {
+			if ( event.key !== 'ArrowDown' && event.key !== 'ArrowUp' ) {
+				return;
+			}
+			event.preventDefault();
+			var list = Array.from( self.menu.querySelectorAll( '.chatchi-menu__item' ) );
+			var index = list.indexOf( self.root.getRootNode().activeElement );
+			var next = event.key === 'ArrowDown' ? index + 1 : index - 1;
+			list[ ( next + list.length ) % list.length ].focus();
+		} );
+
+		// A click anywhere else closes the menu.
+		document.addEventListener( 'pointerdown', function ( event ) {
+			if ( self.menuOpen && event.composedPath().indexOf( self.root ) === -1 ) {
+				self.closeMenu( false );
+			}
+		} );
+	};
+
+	Widget.prototype.openMenu = function () {
+		this.menuOpen = true;
+		this.hideTeaser();
+		this.root.classList.add( 'has-font', 'is-menu' );
+		this.menu.hidden = false;
+		this.launcher.setAttribute( 'aria-expanded', 'true' );
+		this.launcher.setAttribute( 'aria-controls', 'chatchi-menu' );
+		this.launcher.setAttribute( 'aria-label', S.closeMenu );
+		var first = this.menu.querySelector( '.chatchi-menu__item' );
+		if ( first ) {
+			first.focus();
+		}
+	};
+
+	/**
+	 * @param {boolean} refocus Move focus back to the launcher (keyboard use).
+	 */
+	Widget.prototype.closeMenu = function ( refocus ) {
+		if ( ! this.menuOpen ) {
+			return;
+		}
+		this.menuOpen = false;
+		this.root.classList.remove( 'is-menu' );
+		this.menu.hidden = true;
+		this.launcher.setAttribute( 'aria-expanded', 'false' );
+		this.launcher.setAttribute( 'aria-controls', 'chatchi-panel' );
+		this.launcher.setAttribute( 'aria-label', S.openChat );
+		if ( refocus ) {
+			this.launcher.focus();
 		}
 	};
 
@@ -1321,7 +1445,7 @@
 		var showBadge = ! state.open && waiting > 0;
 		this.badge.hidden = ! showBadge;
 		this.badge.textContent = showBadge ? formatNumber( Math.min( waiting, 99 ) ) : '';
-		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : S.openChat ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
+		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : ( this.menuOpen ? S.closeMenu : S.openChat ) ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
 
 		var agent = state.conversation && state.conversation.agent;
 		var shellKey = JSON.stringify( [
@@ -1584,6 +1708,7 @@
 			this.backAt() ? h( 'p', { className: 'chatchi-form__intro chatchi-form__back' }, [ icon( 'clock' ), this.backAt() ] ) : null
 		] : [
 			this.welcomeText() ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			this.faqElement(),
 			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
 		] );
 
@@ -1700,7 +1825,13 @@
 			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
 		}
 
+		// Before the first message, the common questions are offered.
+		var faq = ! state.conversation && ! state.pending.length ? this.faqElement() : null;
+
 		if ( ! entries.length ) {
+			if ( faq ) {
+				log.appendChild( faq );
+			}
 			log.appendChild( h( 'div', { className: 'chatchi-state' }, [ h( 'p', { text: S.empty } ) ] ) );
 			return log;
 		}
@@ -1723,6 +1854,10 @@
 			log.appendChild( self.renderMessage( entry, groupStart, groupEnd ) );
 		} );
 
+		if ( faq ) {
+			log.appendChild( faq );
+		}
+
 		if ( state.offlineSent ) {
 			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.offlineSent } ) ] ) );
 		}
@@ -1732,6 +1867,103 @@
 		}
 
 		return log;
+	};
+
+	/* ------------------------------- FAQ -------------------------------- */
+
+	var FAQ_PREVIEW = 5;
+
+	/**
+	 * The common questions, built once and moved between the start form
+	 * and the empty chat, so open answers and the search survive re-renders.
+	 * Null when there are none.
+	 */
+	Widget.prototype.faqElement = function () {
+		var items = config.faq || [];
+
+		if ( ! items.length ) {
+			return null;
+		}
+		if ( this.faq ) {
+			return this.faq;
+		}
+
+		var showAll = false;
+		var list = h( 'div', { className: 'chatchi-faq__list' } );
+		var none = h( 'p', { className: 'chatchi-faq__none', hidden: true, text: S.faqNone } );
+		var more = h( 'button', {
+			type: 'button',
+			className: 'chatchi-faq__more',
+			onClick: function () {
+				showAll = true;
+				filter();
+			}
+		} );
+		var search = items.length > FAQ_PREVIEW ? h( 'input', {
+			type: 'search',
+			className: 'chatchi-faq__search',
+			placeholder: S.faqSearch,
+			'aria-label': S.faqSearch,
+			enterkeyhint: 'search'
+		} ) : null;
+
+		var rows = items.map( function ( item ) {
+			var details = h( 'details', { className: 'chatchi-faq__item' }, [
+				h( 'summary', {}, [ h( 'span', { text: item.question } ), icon( 'chevron' ) ] ),
+				h( 'div', { className: 'chatchi-faq__answer' }, [ linkify( item.answer ) ] )
+			] );
+			// One answer open at a time keeps the list short.
+			details.addEventListener( 'toggle', function () {
+				if ( details.open ) {
+					rows.forEach( function ( row ) {
+						if ( row.el !== details ) {
+							row.el.open = false;
+						}
+					} );
+				}
+			} );
+			list.appendChild( details );
+			return { el: details, text: ( item.question + ' ' + item.answer ).toLowerCase() };
+		} );
+
+		function normalize( text ) {
+			// Persian and Arabic forms of ye and kaf match each other.
+			return String( text ).toLowerCase().replace( /ي/g, 'ی' ).replace( /ك/g, 'ک' ).trim();
+		}
+
+		function filter() {
+			var term = search ? normalize( search.value ) : '';
+			var shown = 0;
+			var matches = 0;
+
+			rows.forEach( function ( row ) {
+				var match = ! term || normalize( row.text ).indexOf( term ) !== -1;
+				matches += match ? 1 : 0;
+				var visible = match && ( term || showAll || shown < FAQ_PREVIEW );
+				row.el.hidden = ! visible;
+				shown += visible ? 1 : 0;
+			} );
+
+			none.hidden = matches > 0;
+			more.hidden = !! term || showAll || rows.length <= FAQ_PREVIEW;
+			more.textContent = format( S.faqAll, rows.length );
+		}
+
+		if ( search ) {
+			search.addEventListener( 'input', filter );
+		}
+		filter();
+
+		this.faq = h( 'section', { className: 'chatchi-faq', 'aria-labelledby': 'chatchi-faq-title' }, [
+			h( 'p', { id: 'chatchi-faq-title', className: 'chatchi-faq__title' }, [ icon( 'help' ), S.faqTitle ] ),
+			search,
+			list,
+			none,
+			more,
+			h( 'p', { className: 'chatchi-faq__hint', text: S.faqHint } )
+		] );
+
+		return this.faq;
 	};
 
 	/**
