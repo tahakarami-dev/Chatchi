@@ -2851,13 +2851,13 @@ label.cc-button {
 	flex-wrap: wrap;
 }
 
-.cc-chips {
+.cc-filter-chips {
 	display: flex;
 	gap: 4px;
 	flex-wrap: wrap;
 }
 
-.cc-chip {
+.cc-filter-chip {
 	padding: 3px 10px;
 	border-radius: 9999px;
 	box-shadow: inset 0 0 0 1px var(--chatchi-border);
@@ -2866,11 +2866,11 @@ label.cc-button {
 	transition: background-color var(--chatchi-duration-fast), color var(--chatchi-duration-fast);
 }
 
-.cc-chip:hover {
+.cc-filter-chip:hover {
 	background: var(--chatchi-bg);
 }
 
-.cc-chip[aria-checked="true"] {
+.cc-filter-chip[aria-checked="true"] {
 	background: var(--chatchi-primary-soft);
 	box-shadow: inset 0 0 0 1px var(--chatchi-primary);
 	color: var(--chatchi-primary);

@@ -565,10 +565,10 @@
 
 		// Whose conversations, and which tag.
 		var assignedOptions = [ [ '', S.everyone ], [ 'mine', S.mine ], [ 'unassigned', S.unassigned ] ];
-		this.assignedFilter = h( 'div', { className: 'cc-chips', role: 'radiogroup', 'aria-label': S.assignedFilter }, assignedOptions.map( function ( option ) {
+		this.assignedFilter = h( 'div', { className: 'cc-filter-chips', role: 'radiogroup', 'aria-label': S.assignedFilter }, assignedOptions.map( function ( option ) {
 			return h( 'button', {
 				type: 'button',
-				className: 'cc-chip',
+				className: 'cc-filter-chip',
 				role: 'radio',
 				'aria-checked': self.state.assigned === option[ 0 ] ? 'true' : 'false',
 				text: option[ 1 ],
