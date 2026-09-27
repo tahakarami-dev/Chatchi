@@ -330,6 +330,7 @@ final class PanelStrings {
 			'hoursFrom'            => __( 'from', 'chatchi' ),
 			'hoursTo'              => __( 'to', 'chatchi' ),
 			'hoursClosed'          => __( 'Closed', 'chatchi' ),
+			/* translators: %s: time zone, e.g. Asia/Tehran. */
 			'hoursTimezone'        => __( 'Times are in the site time zone (%s), set under Settings → General in WordPress.', 'chatchi' ),
 			'offlineTitle'         => __( 'When nobody is available', 'chatchi' ),
 			'offlineIntro'         => __( 'What visitors see outside business hours, and when no agent is online if you turn that on.', 'chatchi' ),
