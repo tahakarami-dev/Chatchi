@@ -103,6 +103,12 @@ final class DisplayRules {
 			return true;
 		}
 
+		// WooCommerce's shop page is not always a product archive in the main
+		// query (it can be a plain page), but WooCommerce knows it.
+		if ( function_exists( 'is_shop' ) && is_shop() ) {
+			return true;
+		}
+
 		$taxonomies = array_values( array_intersect( array( 'product_cat', 'product_tag' ), get_object_taxonomies( 'product' ) ) );
 
 		return $taxonomies && is_tax( $taxonomies );

@@ -117,6 +117,54 @@
 	height: 28px;
 }
 
+/* The launcher's solid bubble; the dots are cut out in the brand color. */
+.chatchi-launcher__icon--chat svg {
+	width: 30px;
+	height: 30px;
+	stroke: none;
+	overflow: visible;
+}
+
+.chatchi--right .chatchi-launcher__icon--chat svg {
+	transform: scaleX(-1);
+}
+
+.chatchi-launcher .cc-bubble {
+	fill: currentColor;
+}
+
+.chatchi-launcher .cc-dot {
+	fill: var(--chatchi-primary);
+	transform-box: fill-box;
+	transform-origin: center;
+}
+
+.chatchi-launcher:hover .cc-dot,
+.chatchi-launcher:focus-visible .cc-dot {
+	animation: chatchi-launcher-dots 1s var(--chatchi-ease-out) infinite;
+}
+
+.chatchi-launcher:hover .cc-dot:nth-of-type(2),
+.chatchi-launcher:focus-visible .cc-dot:nth-of-type(2) {
+	animation-delay: .12s;
+}
+
+.chatchi-launcher:hover .cc-dot:nth-of-type(3),
+.chatchi-launcher:focus-visible .cc-dot:nth-of-type(3) {
+	animation-delay: .24s;
+}
+
+@keyframes chatchi-launcher-dots {
+	0%, 60%, 100% { transform: none; }
+	30% { transform: translateY(-1.5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chatchi-launcher .cc-dot {
+		animation: none !important;
+	}
+}
+
 .chatchi-launcher__icon--close {
 	opacity: 0;
 	transform: rotate(-90deg) scale(.6);

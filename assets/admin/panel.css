@@ -2155,8 +2155,21 @@ label.cc-button {
 }
 
 .cc-preview__launcher svg {
-	width: 22px;
-	height: 22px;
+	width: 24px;
+	height: 24px;
+	stroke: none;
+}
+
+.cc-preview__launcher .cc-bubble {
+	fill: currentColor;
+}
+
+.cc-preview__launcher .cc-dot {
+	fill: var(--chatchi-primary);
+}
+
+.cc-preview__frame.is-right .cc-preview__launcher svg {
+	transform: scaleX(-1);
 }
 
 @media (max-width: 1023px) {
