@@ -33,18 +33,27 @@ final class ConversationSummary {
 	public int $unread_count;
 
 	/**
+	 * Labels agents put on the conversation.
+	 *
+	 * @var string[]
+	 */
+	public array $tags;
+
+	/**
 	 * @param Conversation $conversation Conversation.
 	 * @param Visitor|null $visitor      Its visitor.
 	 * @param Agent|null   $agent        Assigned agent.
 	 * @param Message|null $last_message Latest message.
 	 * @param int          $unread_count Unread visitor messages.
+	 * @param string[]     $tags         Tags.
 	 */
-	public function __construct( Conversation $conversation, ?Visitor $visitor, ?Agent $agent, ?Message $last_message, int $unread_count ) {
+	public function __construct( Conversation $conversation, ?Visitor $visitor, ?Agent $agent, ?Message $last_message, int $unread_count, array $tags = array() ) {
 		$this->conversation = $conversation;
 		$this->visitor      = $visitor;
 		$this->agent        = $agent;
 		$this->last_message = $last_message;
 		$this->unread_count = $unread_count;
+		$this->tags         = $tags;
 	}
 
 	/**
@@ -57,6 +66,7 @@ final class ConversationSummary {
 			'agent'        => $this->agent ? $this->agent->to_array() : null,
 			'last_message' => $this->last_message ? $this->last_message->to_array() : null,
 			'unread_count' => $this->unread_count,
+			'tags'         => $this->tags,
 		);
 	}
 }

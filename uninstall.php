@@ -41,6 +41,7 @@ function chatchi_uninstall_site() {
 		'chatchi_agents',
 		'chatchi_visitors',
 		'chatchi_attachments',
+		'chatchi_conversation_tags',
 	);
 
 	foreach ( $tables as $table ) {

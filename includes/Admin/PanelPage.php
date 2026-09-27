@@ -126,6 +126,8 @@ final class PanelPage {
 			'dir'               => is_rtl() ? 'rtl' : 'ltr',
 			'adminUrl'          => esc_url_raw( admin_url() ),
 			'userEditUrl'       => esc_url_raw( admin_url( 'user-edit.php' ) ),
+			// Shown on desktop notifications; empty when the site has no icon.
+			'iconUrl'           => esc_url_raw( (string) get_site_icon_url( 192 ) ),
 			'canManageAgents'   => current_user_can( 'manage_options' ),
 			'canManageSettings' => current_user_can( 'manage_options' ),
 			'canUpload'         => current_user_can( 'upload_files' ),

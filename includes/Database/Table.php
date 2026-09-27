@@ -23,6 +23,7 @@ final class Table {
 	public const MESSAGES      = 'chatchi_messages';
 	public const RATE_LIMITS   = 'chatchi_rate_limits';
 	public const ATTACHMENTS   = 'chatchi_attachments';
+	public const TAGS          = 'chatchi_conversation_tags';
 
 	/**
 	 * Returns every table name, unprefixed.
@@ -37,6 +38,7 @@ final class Table {
 			self::MESSAGES,
 			self::RATE_LIMITS,
 			self::ATTACHMENTS,
+			self::TAGS,
 		);
 	}
 }

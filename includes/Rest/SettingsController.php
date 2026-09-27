@@ -157,6 +157,15 @@ final class SettingsController implements RouteProvider {
 			'notify_email_enabled'     => $flag,
 			'notify_email'             => $text( 200 ),
 			'attachments_enabled'      => $flag,
+			'telegram_enabled'         => $flag,
+			'telegram_token'           => $text( 200 ),
+			'telegram_chat_id'         => $text( 100 ),
+			'telegram_api_url'         => $text( 300 ),
+			'bale_enabled'             => $flag,
+			'bale_token'               => $text( 200 ),
+			'bale_chat_id'             => $text( 100 ),
+			'bot_notify'               => $enum( SettingsValidator::BOT_NOTIFY ),
+			'transcript_enabled'       => $flag,
 		);
 
 		// Numbers arrive as JSON numbers or numeric strings; ranges are the validator's job.

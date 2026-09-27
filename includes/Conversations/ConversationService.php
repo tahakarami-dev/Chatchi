@@ -11,6 +11,7 @@ use ChatChi\Database\DatabaseException;
 use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
+use ChatChi\Database\Repositories\TagRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
 use ChatChi\Models\Agent;
 use ChatChi\Models\Conversation;
@@ -32,6 +33,10 @@ final class ConversationService {
 
 	private const SEARCH_MAX_LENGTH = 100;
 
+	public const TAG_MAX_LENGTH = 40;
+
+	public const MAX_TAGS = 10;
+
 	private ConversationRepository $conversations;
 
 	private VisitorRepository $visitors;
@@ -42,25 +47,30 @@ final class ConversationService {
 
 	private ConversationPolicy $policy;
 
+	private ?TagRepository $tags;
+
 	/**
 	 * @param ConversationRepository $conversations Conversation storage.
 	 * @param VisitorRepository      $visitors      Visitor storage.
 	 * @param AgentRepository        $agents        Agent storage.
 	 * @param MessageRepository      $messages      Message storage.
 	 * @param ConversationPolicy     $policy        Access rules.
+	 * @param TagRepository|null     $tags          Tag storage.
 	 */
 	public function __construct(
 		ConversationRepository $conversations,
 		VisitorRepository $visitors,
 		AgentRepository $agents,
 		MessageRepository $messages,
-		ConversationPolicy $policy
+		ConversationPolicy $policy,
+		?TagRepository $tags = null
 	) {
 		$this->conversations = $conversations;
 		$this->visitors      = $visitors;
 		$this->agents        = $agents;
 		$this->messages      = $messages;
 		$this->policy        = $policy;
+		$this->tags          = $tags;
 	}
 
 	/**
@@ -193,6 +203,163 @@ final class ConversationService {
 	}
 
 	/**
+	 * Replaces a conversation's tags. Agents only.
+	 *
+	 * @param Actor $actor Requesting agent.
+	 * @param int   $id    Conversation ID.
+	 * @param mixed $tags  Raw tags (strings).
+	 * @return string[]|\WP_Error The saved tags.
+	 */
+	public function set_tags( Actor $actor, int $id, $tags ) {
+		$conversation = $this->get( $actor, $id );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		if ( ! $actor->is_agent() || ! $this->tags ) {
+			return $this->forbidden();
+		}
+
+		$clean = array();
+
+		foreach ( is_array( $tags ) ? $tags : array() as $tag ) {
+			$tag = is_string( $tag ) ? $this->clean_tag( $tag ) : '';
+
+			if ( '' !== $tag && ! in_array( $tag, $clean, true ) ) {
+				$clean[] = $tag;
+			}
+		}
+
+		if ( count( $clean ) > self::MAX_TAGS ) {
+			return new \WP_Error(
+				'chatchi_too_many_tags',
+				/* translators: %d: maximum number of tags. */
+				sprintf( __( 'A conversation can have at most %d tags.', 'chatchi' ), self::MAX_TAGS ),
+				array( 'status' => 400 )
+			);
+		}
+
+		sort( $clean );
+
+		try {
+			$this->tags->replace( $conversation->id, $clean );
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * The most used tags.
+	 *
+	 * @param Actor $actor Requesting agent.
+	 * @return array<int, array{tag: string, count: int}>|\WP_Error
+	 */
+	public function popular_tags( Actor $actor ) {
+		if ( ! $this->policy->can_list_all( $actor ) || ! $this->tags ) {
+			return $this->forbidden();
+		}
+
+		try {
+			return $this->tags->popular();
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+	}
+
+	/**
+	 * A tag as stored: one line, no leading "#", at most 40 characters,
+	 * Latin letters in lower case.
+	 *
+	 * @param string $raw Raw tag.
+	 */
+	private function clean_tag( string $raw ): string {
+		$tag = trim( ltrim( trim( \ChatChi\Support\PlainText::line( $raw ) ), '#' ) );
+		$tag = preg_replace( '/[,،]+/u', ' ', $tag );
+		$tag = trim( (string) preg_replace( '/\s+/u', ' ', $tag ) );
+
+		return mb_strtolower( mb_substr( $tag, 0, self::TAG_MAX_LENGTH ) );
+	}
+
+	/**
+	 * Hands a conversation to an agent (or unassigns it with 0). Any active
+	 * agent may do this; an internal event line records who did what.
+	 *
+	 * @param Actor $actor    Requesting agent.
+	 * @param int   $id       Conversation ID.
+	 * @param int   $agent_id Target agent ID; 0 to unassign.
+	 * @return Conversation|\WP_Error The updated conversation.
+	 */
+	public function assign( Actor $actor, int $id, int $agent_id ) {
+		$conversation = $this->get( $actor, $id );
+
+		if ( $conversation instanceof \WP_Error ) {
+			return $conversation;
+		}
+
+		if ( ! $actor->is_agent() || null === $actor->agent_model() ) {
+			return $this->forbidden();
+		}
+
+		if ( $conversation->is_closed() ) {
+			return new \WP_Error( 'chatchi_conversation_closed', __( 'This conversation has been closed.', 'chatchi' ), array( 'status' => 409 ) );
+		}
+
+		if ( $conversation->agent_id === $agent_id ) {
+			return $conversation;
+		}
+
+		try {
+			$target = $agent_id > 0 ? $this->agents->find( $agent_id ) : null;
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		if ( $agent_id > 0 && ( ! $target || ! $target->is_active ) ) {
+			return new \WP_Error( 'chatchi_invalid_agent', __( 'Choose an active agent.', 'chatchi' ), array( 'status' => 400 ) );
+		}
+
+		$me = $actor->agent_model();
+
+		if ( ! $target ) {
+			/* translators: %s: agent name. */
+			$event = sprintf( __( '%s unassigned the conversation.', 'chatchi' ), $me->display_name );
+		} elseif ( $target->id === $me->id ) {
+			/* translators: %s: agent name. */
+			$event = sprintf( __( '%s took the conversation.', 'chatchi' ), $me->display_name );
+		} else {
+			/* translators: 1: agent who transferred, 2: agent who receives the conversation. */
+			$event = sprintf( __( '%1$s transferred the conversation to %2$s.', 'chatchi' ), $me->display_name, $target->display_name );
+		}
+
+		try {
+			$this->conversations->assign_agent( $conversation->id, $target ? $target->id : 0 );
+			$created = false;
+			$this->messages->create( $conversation->id, Message::SENDER_SYSTEM, 0, $event, null, $created, true );
+			$updated = $this->conversations->find( $conversation->id );
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		if ( ! $updated ) {
+			return $this->not_found();
+		}
+
+		/**
+		 * Fires after a conversation is handed to another agent.
+		 *
+		 * @param Conversation $conversation Updated conversation.
+		 * @param Agent|null   $target       New agent; null when unassigned.
+		 * @param Actor        $actor        Who did it.
+		 */
+		do_action( 'chatchi_conversation_assigned', $updated, $target, $actor );
+
+		return $updated;
+	}
+
+	/**
 	 * Records that an agent replied: a new conversation becomes active and is
 	 * assigned to the first agent who answers it.
 	 *
@@ -246,6 +413,18 @@ final class ConversationService {
 
 		$search = isset( $args['search'] ) && is_scalar( $args['search'] ) ? sanitize_text_field( (string) $args['search'] ) : '';
 
+		// "mine" or "unassigned"; anything else lists everyone's.
+		$assigned = isset( $args['assigned'] ) ? (string) $args['assigned'] : '';
+		$agent_id = null;
+
+		if ( 'mine' === $assigned && null !== $actor->agent_model() ) {
+			$agent_id = $actor->agent_model()->id;
+		} elseif ( 'unassigned' === $assigned ) {
+			$agent_id = 0;
+		}
+
+		$tag = isset( $args['tag'] ) && is_string( $args['tag'] ) ? $this->clean_tag( $args['tag'] ) : '';
+
 		try {
 			$page = $this->conversations->paginate(
 				array(
@@ -253,6 +432,8 @@ final class ConversationService {
 					'search'   => mb_substr( $search, 0, self::SEARCH_MAX_LENGTH ),
 					'page'     => isset( $args['page'] ) ? (int) $args['page'] : 1,
 					'per_page' => isset( $args['per_page'] ) ? (int) $args['per_page'] : 20,
+					'agent_id' => $agent_id,
+					'tag'      => $tag,
 				)
 			);
 
@@ -297,6 +478,7 @@ final class ConversationService {
 		$agents   = $this->agents->find_many( $agent_ids );
 		$messages = $this->messages->find_many( $last_message_ids );
 		$unread   = $this->messages->count_unread( $ids, Message::SENDER_VISITOR );
+		$tags     = $this->tags ? $this->tags->for_conversations( $ids ) : array();
 
 		$summaries = array();
 		foreach ( $conversations as $conversation ) {
@@ -305,7 +487,8 @@ final class ConversationService {
 				$visitors[ $conversation->visitor_id ] ?? null,
 				$agents[ $conversation->agent_id ] ?? null,
 				$messages[ $conversation->last_message_id ] ?? null,
-				$unread[ $conversation->id ] ?? 0
+				$unread[ $conversation->id ] ?? 0,
+				$tags[ $conversation->id ] ?? array()
 			);
 		}
 

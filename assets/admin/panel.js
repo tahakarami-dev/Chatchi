@@ -40,6 +40,89 @@
 	var GROUP_GAP_MS = 2 * 60 * 1000;
 	var SEARCH_DELAY = 300;
 
+	/**
+	 * Alerts for new visitor messages: a soft chime and, when the browser
+	 * allows it, a desktop notification. Each agent turns them on or off
+	 * for their own browser (kept in localStorage).
+	 */
+	var alerts = {
+		key: 'chatchi_panel_alerts',
+		context: null,
+		on: function () {
+			try {
+				return window.localStorage.getItem( this.key ) !== 'off';
+			} catch ( e ) {
+				return true;
+			}
+		},
+		set: function ( on ) {
+			try {
+				window.localStorage.setItem( this.key, on ? 'on' : 'off' );
+			} catch ( e ) {
+				// Private windows may refuse storage; the choice lasts for this page.
+			}
+			this.forced = on;
+		},
+		enabled: function () {
+			return this.forced !== undefined ? this.forced : this.on();
+		},
+		// Browsers only allow sound after the person interacted with the page.
+		unlock: function () {
+			var Context = window.AudioContext || window.webkitAudioContext;
+			if ( ! Context ) {
+				return;
+			}
+			try {
+				this.context = this.context || new Context();
+				if ( this.context.state === 'suspended' ) {
+					this.context.resume();
+				}
+			} catch ( e ) {
+				this.context = null;
+			}
+		},
+		chime: function () {
+			var context = this.context;
+			if ( ! context || context.state !== 'running' ) {
+				return;
+			}
+			try {
+				var now = context.currentTime;
+				[ [ 660, 0 ], [ 990, 0.12 ], [ 1320, 0.24 ] ].forEach( function ( note ) {
+					var oscillator = context.createOscillator();
+					var gain = context.createGain();
+					var at = now + note[ 1 ];
+					oscillator.type = 'sine';
+					oscillator.frequency.value = note[ 0 ];
+					gain.gain.setValueAtTime( 0.0001, at );
+					gain.gain.exponentialRampToValueAtTime( 0.14, at + 0.02 );
+					gain.gain.exponentialRampToValueAtTime( 0.0001, at + 0.35 );
+					oscillator.connect( gain );
+					gain.connect( context.destination );
+					oscillator.start( at );
+					oscillator.stop( at + 0.4 );
+				} );
+			} catch ( e ) {
+				// Sound is a nicety.
+			}
+		},
+		desktop: function ( title, body, tag, onClick ) {
+			if ( ! ( 'Notification' in window ) || window.Notification.permission !== 'granted' ) {
+				return;
+			}
+			try {
+				var notification = new window.Notification( title, { body: body, tag: tag, icon: config.iconUrl || undefined } );
+				notification.onclick = function () {
+					window.focus();
+					onClick();
+					notification.close();
+				};
+			} catch ( e ) {
+				// Some browsers only allow notifications from a service worker.
+			}
+		}
+	};
+
 	var api = {
 		me: function () {
 			return request( 'GET', '/agent/me' );
@@ -58,6 +141,27 @@
 			form.append( 'file', file, file.name );
 			form.append( 'client_id', clientId );
 			return client.upload( '/agent/conversations/' + id + '/attachments', form, onProgress );
+		},
+		note: function ( id, body, clientId ) {
+			return request( 'POST', '/agent/conversations/' + id + '/notes', { body: { body: body, client_id: clientId } } );
+		},
+		assign: function ( id, agentId ) {
+			return request( 'POST', '/agent/conversations/' + id + '/assign', { body: { agent_id: agentId } } );
+		},
+		setTags: function ( id, tags ) {
+			return request( 'PUT', '/agent/conversations/' + id + '/tags', { body: { tags: tags } } );
+		},
+		tags: function () {
+			return request( 'GET', '/agent/tags' );
+		},
+		team: function () {
+			return request( 'GET', '/agent/team' );
+		},
+		botTest: function ( data ) {
+			return request( 'POST', '/agent/settings/bot-test', { body: data } );
+		},
+		transcript: function ( id ) {
+			return request( 'POST', '/agent/conversations/' + id + '/transcript' );
 		},
 		setStatus: function ( status ) {
 			return request( 'PATCH', '/agent/me', { body: { status: status } } );
@@ -166,6 +270,8 @@
 		this.state = {
 			agent: null,
 			status: '',
+			assigned: '',
+			tag: '',
 			search: '',
 			list: { items: [], total: 0, counts: { 'new': 0, active: 0, closed: 0 }, loading: true, error: '', loadingMore: false },
 			selectedId: 0,
@@ -288,6 +394,15 @@
 		} ).catch( function () {} );
 
 		this.loadCanned();
+		this.loadTags();
+
+		var unlock = function () {
+			alerts.unlock();
+			document.removeEventListener( 'pointerdown', unlock );
+			document.removeEventListener( 'keydown', unlock );
+		};
+		document.addEventListener( 'pointerdown', unlock );
+		document.addEventListener( 'keydown', unlock );
 
 		this.loadList();
 		this.route();
@@ -318,9 +433,83 @@
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
+			this.buildAlertsButton(),
 			agent ? this.buildStatusButton( agent ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
 		);
+	};
+
+	/**
+	 * Turns new-message alerts on or off for this browser; turning them on
+	 * also asks for permission to show desktop notifications.
+	 */
+	Panel.prototype.buildAlertsButton = function () {
+		var self = this;
+		var on = alerts.enabled();
+		var label = on ? S.alertsOn : S.alertsOff;
+
+		return h( 'button', {
+			type: 'button',
+			className: 'cc-rail-item cc-alerts' + ( on ? '' : ' is-off' ),
+			title: label,
+			'aria-label': label,
+			'aria-pressed': on ? 'true' : 'false',
+			onClick: function () {
+				alerts.set( ! on );
+				alerts.unlock();
+				if ( ! on && 'Notification' in window && window.Notification.permission === 'default' ) {
+					window.Notification.requestPermission();
+				}
+				self.notify( ! on ? S.alertsEnabled : S.alertsDisabled );
+				self.renderRail();
+			}
+		}, [ icon( 'bell' ) ] );
+	};
+
+	/**
+	 * Alerts about visitor messages that arrived since the last refresh,
+	 * unless the agent is already looking at that conversation.
+	 *
+	 * @param {Array}   items  Inbox items just loaded.
+	 * @param {boolean} notify False to only remember what was seen.
+	 */
+	Panel.prototype.detectNew = function ( items, notify ) {
+		var self = this;
+		var seen = this.seenMessages || ( this.seenMessages = {} );
+		var fresh = [];
+
+		items.forEach( function ( item ) {
+			var last = item.last_message;
+			var before = seen[ item.id ];
+
+			if ( ! last ) {
+				return;
+			}
+			seen[ item.id ] = Math.max( before || 0, last.id );
+
+			// A conversation seen for the first time (e.g. after "load more")
+			// only counts when its last message is recent.
+			var isNew = before === undefined ? Date.now() - new Date( last.created_at ).getTime() < 2 * 60 * 1000 : last.id > before;
+
+			if ( notify && isNew && last.sender.type === 'visitor' && item.status !== 'closed' ) {
+				var watching = item.id === self.state.selectedId && ! document.hidden;
+				if ( ! watching ) {
+					fresh.push( item );
+				}
+			}
+		} );
+
+		if ( ! fresh.length || ! alerts.enabled() ) {
+			return;
+		}
+
+		alerts.chime();
+		fresh.slice( 0, 3 ).forEach( function ( item ) {
+			var last = item.last_message;
+			alerts.desktop( visitorName( item.visitor ), ( last.has_attachment ? '📎 ' : '' ) + last.body.slice( 0, 140 ), 'chatchi-' + item.id, function () {
+				window.location.hash = '#/conversations/' + item.id;
+			} );
+		} );
 	};
 
 	/**
@@ -373,6 +562,34 @@
 		} );
 
 		this.tabs = h( 'div', { className: 'cc-tabs', role: 'tablist', 'aria-label': S.status } );
+
+		// Whose conversations, and which tag.
+		var assignedOptions = [ [ '', S.everyone ], [ 'mine', S.mine ], [ 'unassigned', S.unassigned ] ];
+		this.assignedFilter = h( 'div', { className: 'cc-chips', role: 'radiogroup', 'aria-label': S.assignedFilter }, assignedOptions.map( function ( option ) {
+			return h( 'button', {
+				type: 'button',
+				className: 'cc-chip',
+				role: 'radio',
+				'aria-checked': self.state.assigned === option[ 0 ] ? 'true' : 'false',
+				text: option[ 1 ],
+				onClick: function ( event ) {
+					self.state.assigned = option[ 0 ];
+					Array.from( self.assignedFilter.children ).forEach( function ( chip ) {
+						chip.setAttribute( 'aria-checked', chip === event.currentTarget ? 'true' : 'false' );
+					} );
+					self.loadList();
+				}
+			} );
+		} ) );
+		this.tagFilter = h( 'select', {
+			className: 'cc-tag-filter',
+			'aria-label': S.tagFilter,
+			onChange: function () {
+				self.state.tag = self.tagFilter.value;
+				self.loadList();
+			}
+		} );
+		this.renderTagFilter();
 		this.listTitle = h( 'h1', { text: S.conversations } );
 		this.listBody = h( 'ul', { className: 'cc-list', 'aria-live': 'polite', 'aria-busy': 'true' } );
 
@@ -380,10 +597,32 @@
 			h( 'div', { className: 'cc-list-head' }, [
 				this.listTitle,
 				h( 'div', { className: 'cc-search' }, [ icon( 'search' ), this.searchInput ] ),
+				h( 'div', { className: 'cc-filters' }, [ this.assignedFilter, this.tagFilter ] ),
 				this.tabs
 			] ),
 			this.listBody
 		);
+	};
+
+	Panel.prototype.renderTagFilter = function () {
+		var select = this.tagFilter;
+		var current = this.state.tag;
+		var tags = ( this.popularTags || [] ).map( function ( item ) {
+			return item.tag;
+		} );
+
+		if ( ! select ) {
+			return;
+		}
+
+		if ( current && tags.indexOf( current ) === -1 ) {
+			tags.unshift( current );
+		}
+
+		select.replaceChildren.apply( select, [ h( 'option', { value: '', text: S.allTags } ) ].concat( tags.map( function ( tag ) {
+			return h( 'option', { value: tag, text: '# ' + tag, selected: tag === current } );
+		} ) ) );
+		select.hidden = ! tags.length;
 	};
 
 	Panel.prototype.renderTabs = function () {
@@ -429,11 +668,14 @@
 			this.renderList();
 		}
 
-		return api.inbox( { status: this.state.status, search: this.state.search, page: 1, per_page: perPage } ).then( function ( page ) {
+		return api.inbox( { status: this.state.status, search: this.state.search, assigned: this.state.assigned, tag: this.state.tag, page: 1, per_page: perPage } ).then( function ( page ) {
 			if ( ticket !== self.listRequest ) {
 				return;
 			}
 			list.items = page.items;
+			// Only refreshes alert; a new filter or search just shows other items.
+			self.detectNew( page.items, !! refresh && self.alertsReady );
+			self.alertsReady = true;
 			list.total = page.total;
 			list.counts = page.counts;
 			list.loading = false;
@@ -466,7 +708,7 @@
 		list.loadingMore = true;
 		this.renderList();
 
-		api.inbox( { status: this.state.status, search: this.state.search, page: page, per_page: PER_PAGE } ).then( function ( result ) {
+		api.inbox( { status: this.state.status, search: this.state.search, assigned: this.state.assigned, tag: this.state.tag, page: page, per_page: PER_PAGE } ).then( function ( result ) {
 			var known = {};
 			list.items.forEach( function ( item ) {
 				known[ item.id ] = true;
@@ -593,7 +835,10 @@
 					h( 'span', { className: 'cc-status-dot cc-status-dot--' + item.status, title: STATUS_LABELS[ item.status ] } ),
 					h( 'span', { className: 'cc-item__preview', text: preview } ),
 					item.unread_count > 0 ? h( 'span', { className: 'cc-count', 'aria-label': fmt.format( S.unread, item.unread_count ), text: fmt.number( item.unread_count ) } ) : null
-				] )
+				] ),
+				item.tags && item.tags.length ? h( 'span', { className: 'cc-item__tags' }, item.tags.slice( 0, 3 ).map( function ( tag ) {
+					return h( 'span', { className: 'cc-item__tag', text: '#' + tag } );
+				} ) ) : null
 			] )
 		] );
 	};
@@ -683,6 +928,8 @@
 		state.hasMore = false;
 		state.convError = '';
 		state.confirmingClose = false;
+		this.noteMode = false;
+		this.assignMenu = false;
 		state.convLoading = !! id;
 		state.visitorTyping = false;
 		this.lastReadMarked = 0;
@@ -838,10 +1085,10 @@
 	};
 
 	Panel.prototype.applyDetail = function ( detail ) {
-		var before = JSON.stringify( [ this.state.conv.status, this.state.conv.visitor, this.state.conv.agent ] );
+		var before = JSON.stringify( [ this.state.conv.status, this.state.conv.visitor, this.state.conv.agent, this.state.conv.tags ] );
 		this.state.conv = detail;
 
-		if ( JSON.stringify( [ detail.status, detail.visitor, detail.agent ] ) !== before ) {
+		if ( JSON.stringify( [ detail.status, detail.visitor, detail.agent, detail.tags ] ) !== before ) {
 			this.renderConversation();
 			this.renderInfo();
 			this.syncSelected();
@@ -906,7 +1153,7 @@
 	};
 
 	Panel.prototype.send = function ( text ) {
-		var pending = { clientId: Core.uuid(), body: text, failed: false, convId: this.state.selectedId };
+		var pending = { clientId: Core.uuid(), body: text, failed: false, convId: this.state.selectedId, note: !! this.noteMode };
 
 		// Sending ends the typing signal on the server as well.
 		this.typingSentAt = 0;
@@ -939,7 +1186,7 @@
 			if ( bar ) {
 				bar.style.width = Math.round( progress * 100 ) + '%';
 			}
-		} ) : api.send( pending.convId, pending.body, pending.clientId );
+		} ) : ( pending.note ? api.note( pending.convId, pending.body, pending.clientId ) : api.send( pending.convId, pending.body, pending.clientId ) );
 
 		sending.then( function ( message ) {
 			if ( pending.preview ) {
@@ -1167,6 +1414,7 @@
 					subtitle ? h( 'p', { dir: 'auto', text: subtitle } ) : null
 				] ),
 				statusBadge( conv.status ),
+				conv.status !== 'closed' ? this.buildAssign() : null,
 				conv.status !== 'closed' ? h( 'button', {
 					type: 'button',
 					className: 'cc-button cc-button--secondary',
@@ -1218,6 +1466,107 @@
 		return nodes;
 	};
 
+	/**
+	 * "Transfer" button with a menu of active agents (a dot shows who is
+	 * online), plus "unassign".
+	 */
+	Panel.prototype.buildAssign = function () {
+		var self = this;
+		var conv = this.state.conv;
+		var current = conv.agent ? conv.agent.id : 0;
+		var menu = h( 'div', { className: 'cc-menu', role: 'menu', hidden: ! this.assignMenu, 'aria-label': S.transfer } );
+		var button = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary cc-assign',
+			'aria-haspopup': 'menu',
+			'aria-expanded': this.assignMenu ? 'true' : 'false',
+			title: S.transfer,
+			onClick: function () {
+				self.assignMenu = ! self.assignMenu;
+				menu.hidden = ! self.assignMenu;
+				button.setAttribute( 'aria-expanded', self.assignMenu ? 'true' : 'false' );
+				if ( self.assignMenu ) {
+					fill();
+				}
+			}
+		}, [ icon( 'transfer' ), h( 'span', { text: conv.agent ? conv.agent.name : S.unassigned } ) ] );
+
+		function choose( agentId ) {
+			self.assignMenu = false;
+			menu.hidden = true;
+			api.assign( conv.id, agentId ).then( function ( detail ) {
+				if ( self.state.selectedId !== conv.id ) {
+					return;
+				}
+				self.applyDetail( detail );
+				self.renderConversation( true );
+				self.pollMessages( conv.id );
+				self.loadList( true );
+				self.notify( detail.agent ? S.transferred.replace( '%s', detail.agent.name ) : S.unassignedDone );
+			} ).catch( function ( error ) {
+				self.notify( error.message, true );
+			} );
+		}
+
+		function fill() {
+			menu.replaceChildren( h( 'p', { className: 'cc-menu__hint', text: S.loading } ) );
+			api.team().then( function ( team ) {
+				menu.replaceChildren.apply( menu, team.map( function ( agent ) {
+					return h( 'button', {
+						type: 'button',
+						className: 'cc-menu__item' + ( agent.id === current ? ' is-current' : '' ),
+						role: 'menuitemradio',
+						'aria-checked': agent.id === current ? 'true' : 'false',
+						onClick: function () {
+							if ( agent.id !== current ) {
+								choose( agent.id );
+							}
+						}
+					}, [
+						h( 'span', { className: 'cc-menu__dot' + ( agent.online ? ' is-online' : '' ), 'aria-label': agent.online ? S.statusOnline : S.statusAway } ),
+						h( 'span', { text: agent.is_me ? agent.name + ' (' + S.me + ')' : agent.name } ),
+						agent.id === current ? icon( 'check' ) : null
+					] );
+				} ).concat( current ? [ h( 'button', {
+					type: 'button',
+					className: 'cc-menu__item cc-menu__item--muted',
+					role: 'menuitem',
+					text: S.unassign,
+					onClick: function () {
+						choose( 0 );
+					}
+				} ) ] : [] ) );
+			} ).catch( function ( error ) {
+				menu.replaceChildren( h( 'p', { className: 'cc-menu__hint', text: error.message } ) );
+			} );
+		}
+
+		if ( this.assignMenu ) {
+			fill();
+		}
+
+		var wrap = h( 'div', { className: 'cc-menu-wrap' }, [ button, menu ] );
+
+		wrap.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Escape' && self.assignMenu ) {
+				event.stopPropagation();
+				self.assignMenu = false;
+				menu.hidden = true;
+				button.setAttribute( 'aria-expanded', 'false' );
+				button.focus();
+			}
+		} );
+		wrap.addEventListener( 'focusout', function ( event ) {
+			if ( self.assignMenu && ( ! event.relatedTarget || ! wrap.contains( event.relatedTarget ) ) ) {
+				self.assignMenu = false;
+				menu.hidden = true;
+				button.setAttribute( 'aria-expanded', 'false' );
+			}
+		} );
+
+		return wrap;
+	};
+
 	Panel.prototype.renderLog = function () {
 		var log = this.convPane.querySelector( '.cc-log' );
 
@@ -1252,9 +1601,9 @@
 		}
 
 		var entries = state.messages.map( function ( m ) {
-			return { key: m.id, mine: m.is_mine, type: m.sender.type, sender: m.sender, body: m.body, attachment: m.attachment, date: new Date( m.created_at ), read: !! m.read_at, isNew: !! self.newIds[ m.id ] };
+			return { key: m.id, mine: m.is_mine, type: m.sender.type, sender: m.sender, body: m.body, internal: !! m.internal, attachment: m.attachment, date: new Date( m.created_at ), read: !! m.read_at, isNew: !! self.newIds[ m.id ] };
 		} ).concat( state.pending.map( function ( p ) {
-			return { key: p.clientId, mine: true, type: 'agent', sender: null, body: p.body, upload: p.file ? p : null, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: ! p.shown };
+			return { key: p.clientId, mine: true, type: 'agent', sender: self.state.agent, body: p.body, internal: !! p.note, upload: p.file ? p : null, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: ! p.shown };
 		} ) );
 
 		if ( ! entries.length ) {
@@ -1285,18 +1634,52 @@
 	};
 
 	Panel.prototype.sameGroup = function ( a, b ) {
-		return a.mine === b.mine &&
+		return ! a.internal && ! b.internal &&
+			a.mine === b.mine &&
 			a.type === b.type &&
 			( a.sender && b.sender ? a.sender.name === b.sender.name : true ) &&
 			fmt.dayKey( a.date ) === fmt.dayKey( b.date ) &&
 			Math.abs( b.date - a.date ) < GROUP_GAP_MS;
 	};
 
+	/**
+	 * An internal note: a card only agents see.
+	 */
+	Panel.prototype.buildNote = function ( entry ) {
+		var self = this;
+		var author = ( entry.sender && entry.sender.name ) || S.appName;
+		var body = h( 'div', { className: 'cc-note__body' } );
+
+		body.appendChild( Core.linkify( entry.body ) );
+
+		return h( 'div', { className: 'cc-note' + ( entry.pending ? ' is-pending' : '' ) + ( entry.failed ? ' is-failed' : '' ) + ( entry.isNew ? ' is-new' : '' ), 'data-key': String( entry.key ) }, [
+			h( 'div', { className: 'cc-note__head' }, [
+				icon( 'lock' ),
+				h( 'strong', { text: S.internalNote } ),
+				h( 'span', { text: author } ),
+				h( 'time', { text: fmt.time( entry.date ) } )
+			] ),
+			body,
+			entry.failed ? h( 'button', {
+				type: 'button',
+				className: 'cc-retry',
+				text: S.sendFailed,
+				onClick: function () {
+					self.deliver( entry.ref );
+				}
+			} ) : null
+		] );
+	};
+
 	Panel.prototype.buildMessage = function ( entry, groupStart, groupEnd, visitor ) {
 		var self = this;
 
 		if ( entry.type === 'system' ) {
-			return h( 'div', { className: 'cc-day', text: entry.body } );
+			return entry.internal ? h( 'div', { className: 'cc-event' }, [ icon( 'users' ), h( 'span', { text: entry.body } ), h( 'time', { text: fmt.time( entry.date ) } ) ] ) : h( 'div', { className: 'cc-day', text: entry.body } );
+		}
+
+		if ( entry.internal ) {
+			return this.buildNote( entry );
 		}
 
 		var classes = [ 'cc-row', entry.mine ? 'cc-row--mine' : 'cc-row--theirs' ];
@@ -1637,7 +2020,44 @@
 
 		window.requestAnimationFrame( refresh );
 
+		// Reply to the visitor, or write an internal note only agents see.
+		function setMode( note, keepFocus ) {
+			self.noteMode = note;
+			inner.classList.toggle( 'is-note', note );
+			replyTab.setAttribute( 'aria-selected', note ? 'false' : 'true' );
+			noteTab.setAttribute( 'aria-selected', note ? 'true' : 'false' );
+			textarea.placeholder = note ? S.notePlaceholder : S.placeholder;
+			textarea.setAttribute( 'aria-label', textarea.placeholder );
+			attachButton.hidden = note;
+			send.title = note ? S.addNote : S.send;
+			send.setAttribute( 'aria-label', send.title );
+			if ( ! keepFocus ) {
+				textarea.focus();
+			}
+		}
+
+		var replyTab = h( 'button', {
+			type: 'button',
+			className: 'cc-compose-mode__tab',
+			role: 'tab',
+			'aria-selected': 'true',
+			text: S.reply,
+			onClick: function () {
+				setMode( false );
+			}
+		} );
+		var noteTab = h( 'button', {
+			type: 'button',
+			className: 'cc-compose-mode__tab cc-compose-mode__tab--note',
+			role: 'tab',
+			'aria-selected': 'false',
+			onClick: function () {
+				setMode( true );
+			}
+		}, [ icon( 'lock' ), S.internalNote ] );
+
 		var inner = h( 'div', { className: 'cc-composer__inner' }, [
+			h( 'div', { className: 'cc-compose-mode', role: 'tablist', 'aria-label': S.composeMode }, [ replyTab, noteTab ] ),
 			list,
 			h( 'form', {
 				onSubmit: function ( event ) {
@@ -1646,6 +2066,12 @@
 				}
 			}, [ cannedButton, attachButton, fileInput, textarea, send ] )
 		] );
+
+		if ( this.noteMode ) {
+			window.requestAnimationFrame( function () {
+				setMode( true, true );
+			} );
+		}
 
 		// Leaving the composer closes the picker.
 		inner.addEventListener( 'focusout', function ( event ) {
@@ -1719,8 +2145,120 @@
 				h( 'h2', { text: name } ),
 				statusBadge( conv.status )
 			] ),
-			h( 'ul', { className: 'cc-info-list' }, rows )
+			h( 'ul', { className: 'cc-info-list' }, rows ),
+			visitor.email ? h( 'div', { className: 'cc-info-actions' }, [
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary cc-button--sm',
+					onClick: function ( event ) {
+						var button = event.currentTarget;
+						button.disabled = true;
+						api.transcript( conv.id ).then( function ( result ) {
+							self.notify( S.transcriptSent.replace( '%s', result.sent_to ) );
+						} ).catch( function ( error ) {
+							self.notify( error.message, true );
+						} ).then( function () {
+							button.disabled = false;
+						} );
+					}
+				}, [ icon( 'mail' ), S.sendTranscript ] )
+			] ) : null,
+			this.buildTagEditor( conv )
 		);
+	};
+
+	/**
+	 * Tags of the open conversation: chips with a remove button, and a box
+	 * to add more (Enter or comma), suggesting tags already in use.
+	 */
+	Panel.prototype.buildTagEditor = function ( conv ) {
+		var self = this;
+		var tags = ( conv.tags || [] ).slice();
+		var chips = h( 'div', { className: 'cc-tags' } );
+		var listId = 'cc-tag-suggestions';
+		var input = h( 'input', { type: 'text', className: 'cc-input cc-tags__input', placeholder: S.addTag, 'aria-label': S.addTag, list: listId, maxlength: '40' } );
+		var suggestions = h( 'datalist', { id: listId }, ( this.popularTags || [] ).map( function ( item ) {
+			return h( 'option', { value: item.tag } );
+		} ) );
+
+		function save( next ) {
+			api.setTags( conv.id, next ).then( function ( result ) {
+				if ( self.state.conv && self.state.conv.id === conv.id ) {
+					self.state.conv.tags = result.tags;
+					tags = result.tags.slice();
+					renderChips();
+				}
+				self.loadTags();
+				self.loadList( true );
+			} ).catch( function ( error ) {
+				self.notify( error.message, true );
+			} );
+		}
+
+		function renderChips() {
+			chips.replaceChildren.apply( chips, tags.length ? tags.map( function ( tag ) {
+				return h( 'span', { className: 'cc-tag cc-tag--removable' }, [
+					h( 'span', { text: tag } ),
+					h( 'button', {
+						type: 'button',
+						'aria-label': S.removeTag.replace( '%s', tag ),
+						title: S.removeTag.replace( '%s', tag ),
+						onClick: function () {
+							save( tags.filter( function ( t ) {
+								return t !== tag;
+							} ) );
+						}
+					}, [ icon( 'close' ) ] )
+				] );
+			} ) : [ h( 'span', { className: 'cc-muted', text: S.noTags } ) ] );
+		}
+
+		function add() {
+			var value = input.value.replace( /[,،]+$/, '' ).trim();
+			if ( ! value ) {
+				return;
+			}
+			input.value = '';
+			if ( tags.indexOf( value.toLowerCase() ) === -1 ) {
+				save( tags.concat( [ value ] ) );
+			}
+		}
+
+		input.addEventListener( 'keydown', function ( event ) {
+			if ( ( event.key === 'Enter' || event.key === ',' || event.key === '،' ) && ! event.isComposing ) {
+				event.preventDefault();
+				add();
+			}
+		} );
+		input.addEventListener( 'change', function () {
+			// Picking a suggestion from the list.
+			if ( self.popularTags && self.popularTags.some( function ( item ) {
+				return item.tag === input.value;
+			} ) ) {
+				add();
+			}
+		} );
+
+		renderChips();
+
+		return h( 'section', { className: 'cc-info-tags', 'aria-label': S.tags }, [
+			h( 'h3', {}, [ icon( 'tag' ), S.tags ] ),
+			chips,
+			input,
+			suggestions
+		] );
+	};
+
+	/**
+	 * Loads the most used tags, for suggestions and the inbox filter.
+	 */
+	Panel.prototype.loadTags = function () {
+		var self = this;
+
+		return api.tags().then( function ( tags ) {
+			self.popularTags = tags;
+			self.renderTagFilter();
+		} ).catch( function () {} );
 	};
 
 	/**
@@ -2457,7 +2995,8 @@
 		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
-		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message', 'notify_email_enabled', 'notify_email' ] },
+		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
+		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
@@ -2559,8 +3098,10 @@
 		if ( id === 'appearance' ) {
 			payload.primary_color = draft.primary_color.trim();
 		}
-		if ( id === 'hours' ) {
-			payload.notify_email = draft.notify_email.trim();
+		if ( id === 'notifications' ) {
+			[ 'notify_email', 'bale_token', 'bale_chat_id', 'telegram_token', 'telegram_chat_id', 'telegram_api_url' ].forEach( function ( key ) {
+				payload[ key ] = String( draft[ key ] ).trim();
+			} );
 		}
 
 		// Whole numbers go out as numbers; anything else is sent as typed so
@@ -2660,6 +3201,7 @@
 			form: S.sectionForm,
 			display: S.sectionDisplay,
 			hours: S.sectionHours,
+			notifications: S.sectionNotifications,
 			limits: S.sectionLimits,
 			security: S.sectionSecurity
 		};
@@ -2719,6 +3261,8 @@
 			children = [ this.buildProxy() ];
 		} else if ( this.section === 'hours' ) {
 			children = [ this.buildHours() ];
+		} else if ( this.section === 'notifications' ) {
+			children = [ this.buildNotifications() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -3342,13 +3886,6 @@
 		} );
 		count();
 
-		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email, disabled: ! draft.notify_email_enabled } );
-		email.value = draft.notify_email;
-		email.addEventListener( 'input', function () {
-			draft.notify_email = email.value;
-			self.clearError( 'notify_email' );
-		} );
-
 		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-hours-title' }, [
 				h( 'div', { className: 'cc-settings__head' }, [
@@ -3383,7 +3920,35 @@
 				] ),
 				this.fieldError( 'offline_mode' ),
 				this.fieldError( 'offline_message' )
-			] ),
+			] )
+		] );
+	};
+
+	/* -------------------------- notifications -------------------------- */
+
+	SettingsView.prototype.buildNotifications = function () {
+		var self = this;
+		var draft = this.draft;
+
+		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email, disabled: ! draft.notify_email_enabled } );
+		email.value = draft.notify_email;
+		email.addEventListener( 'input', function () {
+			draft.notify_email = email.value;
+			self.clearError( 'notify_email' );
+		} );
+
+		var whens = [ [ 'new', S.botNotifyNew, S.botNotifyNewHint ], [ 'offline', S.botNotifyOffline, S.botNotifyOfflineHint ] ];
+		var when = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-bot-when-title' }, whens.map( function ( option ) {
+			var input = h( 'input', { id: 'cc-bot-notify-' + option[ 0 ], type: 'radio', name: 'cc-bot-notify', value: option[ 0 ], checked: draft.bot_notify === option[ 0 ] } );
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.bot_notify = option[ 0 ];
+				}
+			} );
+			return h( 'label', { className: 'cc-radio cc-radio--rich', for: input.id }, [ input, h( 'span', {}, [ h( 'strong', { text: option[ 1 ] } ), h( 'small', { text: option[ 2 ] } ) ] ) ] );
+		} ) );
+
+		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-notify-title' }, [
 				h( 'div', { className: 'cc-settings__head' }, [
 					h( 'div', {}, [
@@ -3399,7 +3964,108 @@
 				email,
 				h( 'p', { className: 'cc-hint', text: S.notifyEmailHint } ),
 				this.fieldError( 'notify_email' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-bot-when-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-bot-when-title', text: S.botWhenTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.botWhenIntro } )
+				] ),
+				when,
+				this.fieldError( 'bot_notify' )
+			] ),
+			this.buildBot( 'bale', S.baleTitle, S.baleHelp ),
+			this.buildBot( 'telegram', S.telegramTitle, S.telegramHelp ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-transcript-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-transcript-title', text: S.transcriptTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.transcriptIntro } )
+					] ),
+					this.buildSwitch( 'cc-transcript-enabled', S.transcriptOn, draft.transcript_enabled, function ( on ) {
+						draft.transcript_enabled = on;
+					} )
+				] ),
+				this.fieldError( 'transcript_enabled' )
 			] )
+		] );
+	};
+
+	/**
+	 * One messenger bot: switch, token, chat ID and "send a test".
+	 *
+	 * @param {string} service "bale" or "telegram".
+	 */
+	SettingsView.prototype.buildBot = function ( service, title, help ) {
+		var self = this;
+		var draft = this.draft;
+		var prefix = 'cc-' + service;
+		var result = h( 'p', { className: 'cc-bot-result', role: 'status', hidden: true } );
+
+		function input( key, label, attrs ) {
+			var field = h( 'input', Object.assign( { id: prefix + '-' + key.replace( /_/g, '-' ), className: 'cc-input', type: 'text', dir: 'ltr', autocomplete: 'off', spellcheck: 'false' }, attrs || {} ) );
+			field.value = draft[ service + '_' + key ];
+			field.addEventListener( 'input', function () {
+				draft[ service + '_' + key ] = field.value;
+				self.clearError( service + '_' + key );
+				result.hidden = true;
+			} );
+			return h( 'div', { className: 'cc-field' }, [
+				h( 'label', { className: 'cc-label', for: field.id, text: label } ),
+				field,
+				self.fieldError( service + '_' + key )
+			] );
+		}
+
+		var test = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--secondary',
+			text: S.botTest,
+			onClick: function () {
+				test.disabled = true;
+				result.hidden = true;
+				api.botTest( {
+					service: service,
+					token: String( draft[ service + '_token' ] ).trim(),
+					chat_id: String( draft[ service + '_chat_id' ] ).trim(),
+					api_url: service === 'telegram' ? String( draft.telegram_api_url ).trim() : ''
+				} ).then( function () {
+					result.textContent = S.botTestSent;
+					result.className = 'cc-bot-result is-ok';
+				} ).catch( function ( error ) {
+					var fields = ( error.data && error.data.fields ) || {};
+					var first = Object.keys( fields )[ 0 ];
+					result.textContent = first ? fields[ first ] : error.message;
+					result.className = 'cc-bot-result is-error';
+				} ).then( function () {
+					result.hidden = false;
+					test.disabled = false;
+				} );
+			}
+		} );
+
+		var fields = [
+			input( 'token', S.botToken, { type: 'password', placeholder: '123456789:AAH…' } ),
+			input( 'chat_id', S.botChatId, { placeholder: '123456789 / @channel' } )
+		];
+
+		if ( service === 'telegram' ) {
+			fields.push( input( 'api_url', S.telegramApiUrl, { type: 'url', placeholder: 'https://api.telegram.org' } ) );
+			fields.push( h( 'p', { className: 'cc-hint', text: S.telegramApiUrlHint } ) );
+		}
+
+		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': prefix + '-title' }, [
+			h( 'div', { className: 'cc-settings__head' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: prefix + '-title', text: title } ),
+					h( 'p', { className: 'cc-hint cc-hint--pre', text: help } )
+				] ),
+				this.buildSwitch( prefix + '-enabled', S.botOn, draft[ service + '_enabled' ], function ( on ) {
+					draft[ service + '_enabled' ] = on;
+				} )
+			] ),
+			h( 'div', { className: 'cc-bot-fields' }, fields ),
+			h( 'div', { className: 'cc-bot-test' }, [ test, result ] ),
+			this.fieldError( service + '_enabled' )
 		] );
 	};
 

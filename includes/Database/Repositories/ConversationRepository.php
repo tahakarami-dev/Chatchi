@@ -320,6 +320,18 @@ final class ConversationRepository extends Repository {
 		$where  = array( '1 = 1' );
 		$params = array();
 
+		// Assigned agent: an ID, or 0 for unassigned; absent for everyone's.
+		if ( isset( $args['agent_id'] ) && null !== $args['agent_id'] ) {
+			$where[]  = 'c.agent_id = %d';
+			$params[] = max( 0, (int) $args['agent_id'] );
+		}
+
+		if ( isset( $args['tag'] ) && '' !== (string) $args['tag'] ) {
+			$tags     = $this->db->prefix . Table::TAGS;
+			$where[]  = "c.id IN (SELECT conversation_id FROM {$tags} WHERE tag = %s)";
+			$params[] = (string) $args['tag'];
+		}
+
 		if ( '' !== $status ) {
 			if ( ! in_array( $status, Conversation::statuses(), true ) ) {
 				return array(

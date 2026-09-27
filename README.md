@@ -107,6 +107,11 @@ docs/                    Design and architecture documents
 | `chatchi_offline_email` | filter | The email about an unanswered message (`to`, `subject`, `message`, `headers`); return false to send nothing |
 | `chatchi_attachment_types` | filter | Allowed file types, extension pattern => MIME type. Scriptable types (SVG, HTML, XML, JS, PHP…) are always removed |
 | `chatchi_agent_status_changed` | action | An agent switched between online and away |
+| `chatchi_note_added` | action | An agent added an internal note |
+| `chatchi_conversation_assigned` | action | A conversation was taken, transferred or unassigned |
+| `chatchi_bot_message` | filter | Text of the Telegram / Bale message about a new chat; empty sends nothing |
+| `chatchi_bot_api_url` | filter | Bot API address per service (e.g. a relay) |
+| `chatchi_transcript_email` | filter | The transcript email (`to`, `subject`, HTML `message`, `headers`); falsy cancels |
 | `chatchi_canned_responses_updated` | action | The saved replies changed |
 
 ## Database
@@ -116,8 +121,9 @@ docs/                    Design and architecture documents
 | `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token) and contact info | `UNIQUE token_hash`, `user_id` |
 | `{prefix}chatchi_agents` | Agents, one per WordPress user, with their chosen status (online / away) and when their panel last talked to the server | `UNIQUE user_id`, `is_active` |
 | `{prefix}chatchi_conversations` | Conversation state, latest activity, and when each side last reported typing | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
-| `{prefix}chatchi_messages` | Messages and read state; `attachment_id` links a sent file | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
+| `{prefix}chatchi_messages` | Messages and read state; `attachment_id` links a sent file; `internal` marks agent-only notes and events, never sent to visitors | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
 | `{prefix}chatchi_attachments` | Files sent in conversations: original name, type, size, picture size, and the path of the stored file | `conversation_id`, `message_id` |
+| `{prefix}chatchi_conversation_tags` | Tags agents put on conversations | `(conversation_id,tag)` primary, `tag` |
 | `{prefix}chatchi_rate_limits` | Rate-limit counters; buckets are salted hashes, no IPs stored. Purged hourly | `bucket` (primary), `expires_at` |
 
 All datetimes are stored in UTC. Relations are enforced in the application layer.
@@ -150,12 +156,18 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 |---|---|---|
 | GET | `/agent/me` | Current agent, with `status` and the `attachments` limits |
 | POST/PATCH | `/agent/me` | `status`: `online` or `away` |
-| GET | `/agent/conversations` | Inbox: `status`, `search`, `page`, `per_page` (≤100); `X-WP-Total` headers |
+| GET | `/agent/conversations` | Inbox: `status`, `search`, `assigned` (`mine` / `unassigned`), `tag`, `page`, `per_page` (≤100); `X-WP-Total` headers. Items carry `tags` |
 | GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
 | POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
 | POST | `/agent/conversations/{id}/typing` | Same as widget: the agent is typing |
 | POST, GET | `/agent/conversations/{id}/attachments[/{attachment_id}]` | Same as widget; agents may send files even when visitors may not |
+| POST | `/agent/conversations/{id}/notes` | Internal note (`body`, optional `client_id`): agents only; never in the visitor's messages, unread count or the inbox preview |
+| POST | `/agent/conversations/{id}/assign` | `agent_id` (0 unassigns): hand the conversation to an active agent; an internal event line records it |
+| PUT/PATCH/POST | `/agent/conversations/{id}/tags` | `tags`: replaces the tags (≤ 10; cleaned: one line, no `#`, ≤ 40 characters, Latin in lower case) |
+| POST | `/agent/conversations/{id}/transcript` | Email the visitor a copy of the conversation (notes excluded) |
+| GET | `/agent/tags` | The 50 most used tags with counts |
+| GET | `/agent/team` | Active agents (`id`, `name`, `avatar_url`, `online`, `is_me`), for transfers |
 | GET | `/agent/canned` | Saved replies (`id`, `title`, `shortcut`, `body`); any active agent |
 | POST | `/agent/canned` | Add a saved reply (administrators): `title` (≤ 100), `shortcut` (optional, `a-z 0-9 - _`, unique), `body` (≤ 2000) |
 | POST/PATCH, DELETE | `/agent/canned/{id}` | Change or delete a saved reply (administrators) |
@@ -182,6 +194,7 @@ Administrators only (`manage_options`).
 | GET | `/agent/settings` | Settings, the default welcome message, limits, available page types, and the chosen items with titles |
 | POST/PATCH | `/agent/settings` | Save any of `primary_color` (`#RRGGBB`, `#RGB`; empty = default), `widget_position` (`left` / `right`), `widget_title` (≤ 60 characters), `widget_subtitle` (≤ 100; empty = translated default), `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
 | GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
+| POST | `/agent/settings/bot-test` | `service` (`telegram` / `bale`), `token`, `chat_id`, `api_url`: sends a test message with these values (saved or not) and reports the service's answer |
 
 ## Agent panel
 
@@ -191,7 +204,8 @@ Administrators also get an **Agents** screen (`#/agents`) to add agents from exi
 
 Administrators also get a **Settings** screen with six sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
 
-- **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, the offline text, and the email address that hears about messages nobody was there to answer (the site admin email by default).
+- **Notifications** (`#/settings/notifications`): the email about unanswered messages, Telegram and Bale bots (token, chat ID, an optional relay address for Telegram, "send a test message"), whether bots write for every new chat or only when nobody is online, and automatic transcripts for visitors when a conversation ends.
+- **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, and the offline text.
 - **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), the notification sound for new replies, how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
 - **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
 - **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, the longest allowed message (100–10000 characters), and files: whether visitors may send them and the largest size (1–50 MB, capped by the server's upload limit).
@@ -210,6 +224,15 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 - **Offline email**: the first visitor message of a conversation sent while nobody is available is emailed, with the visitor's details, the page, a link to the conversation and `Reply-To` set to the visitor. Filter `chatchi_offline_email` to change or cancel it.
 - **Saved replies** (`#/canned`, administrators): in the composer, type `/` (e.g. `/ship`) or press ⚡ to pick one; arrows move, Enter or Tab inserts. `{name}` and `{agent}` are filled in.
 - **Files**: the 📎 button, pasting a screenshot, or dropping files on the chat send them (up to 5 at a time) with a progress bar; pictures show as thumbnails. Files are stored in `uploads/chatchi-files` under random names without an extension (the folder also refuses direct access on Apache) and are only served by the REST API to the conversation's visitor and to agents. Deleting the plugin with "delete all data" on removes them.
+
+## Team tools
+
+- **Internal notes**: switch the composer from *Reply* to *Internal note* (🔒). Notes show as yellow cards to agents only; the visitor's API never returns them.
+- **Transfer**: the button in the conversation header lists active agents (green dot = online). Taking, transferring or unassigning adds an internal event line ("Sara transferred the conversation to Reza.").
+- **Inbox filters**: *All / Mine / Unassigned*, and a tag filter; tags show under each conversation and are edited in the details pane (Enter or comma adds, suggestions come from tags in use).
+- **Alerts**: the 🔔 button in the rail turns new-message alerts on or off for the agent's browser: a chime and, with the browser's permission, a desktop notification that opens the conversation. Alerts skip the conversation the agent is looking at.
+- **Telegram / Bale**: one message per new conversation (its first visitor message), sent without delaying the visitor; filters `chatchi_bot_message` and `chatchi_bot_api_url`. Bale's bot API is Telegram-compatible (`tapi.bale.ai`). Many servers in Iran cannot reach `api.telegram.org`; use Bale or a relay address.
+- **Transcripts**: plain, escaped RTL HTML email of the visitor-facing messages; sent on close (setting) or from the details pane. Filter `chatchi_transcript_email`.
 
 ## Chat widget
 

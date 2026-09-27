@@ -43,6 +43,10 @@ final class SettingsValidator {
 
 	public const OFFLINE_MESSAGE_MAX_LENGTH = 300;
 
+	public const BOT_NOTIFY = array( 'new', 'offline' );
+
+	public const BOT_SERVICES = array( 'telegram', 'bale' );
+
 	/**
 	 * Whole-number settings: name => array( min, max, default ).
 	 */
@@ -120,6 +124,18 @@ final class SettingsValidator {
 			// Empty means "the site admin email".
 			'notify_email'             => '',
 			'attachments_enabled'      => true,
+			// Telegram and Bale bots (see Notifications\BotNotifier).
+			'telegram_enabled'         => false,
+			'telegram_token'           => '',
+			'telegram_chat_id'         => '',
+			// Empty means the official API; a relay for servers that cannot reach it.
+			'telegram_api_url'         => '',
+			'bale_enabled'             => false,
+			'bale_token'               => '',
+			'bale_chat_id'             => '',
+			'bot_notify'               => 'new',
+			// Email visitors a copy of the chat when it ends.
+			'transcript_enabled'       => false,
 		);
 
 		foreach ( self::NUMBERS as $key => $range ) {
@@ -191,6 +207,24 @@ final class SettingsValidator {
 	public function validate_combined( array $settings ): ?\WP_Error {
 		if ( 'custom' === $settings['proxy_mode'] && '' === $settings['proxy_header'] ) {
 			return $this->invalid( array( 'proxy_header' => $this->missing_header_message() ) );
+		}
+
+		// A bot that is switched on needs its token and chat.
+		$errors = array();
+
+		foreach ( self::BOT_SERVICES as $service ) {
+			if ( ! empty( $settings[ $service . '_enabled' ] ) ) {
+				if ( '' === $settings[ $service . '_token' ] ) {
+					$errors[ $service . '_token' ] = __( 'Enter the bot token.', 'chatchi' );
+				}
+				if ( '' === $settings[ $service . '_chat_id' ] ) {
+					$errors[ $service . '_chat_id' ] = __( 'Enter the chat ID the bot sends to.', 'chatchi' );
+				}
+			}
+		}
+
+		if ( $errors ) {
+			return $this->invalid( $errors );
 		}
 
 		return null;
@@ -270,7 +304,28 @@ final class SettingsValidator {
 				case 'offline_no_agents':
 				case 'notify_email_enabled':
 				case 'attachments_enabled':
+				case 'telegram_enabled':
+				case 'bale_enabled':
+				case 'transcript_enabled':
 					$settings[ $key ] = is_bool( $value ) ? $value : (bool) $default;
+					break;
+
+				case 'telegram_token':
+				case 'bale_token':
+					$settings[ $key ] = is_string( $value ) && ( '' === $value || $this->is_bot_token( $value ) ) ? $value : $default;
+					break;
+
+				case 'telegram_chat_id':
+				case 'bale_chat_id':
+					$settings[ $key ] = is_string( $value ) && ( '' === $value || $this->is_chat_id( $value ) ) ? $value : $default;
+					break;
+
+				case 'telegram_api_url':
+					$settings[ $key ] = is_string( $value ) && ( '' === $value || $this->is_api_url( $value ) ) ? $value : $default;
+					break;
+
+				case 'bot_notify':
+					$settings[ $key ] = in_array( $value, self::BOT_NOTIFY, true ) ? $value : $default;
 					break;
 
 				case 'hours':
@@ -370,7 +425,38 @@ final class SettingsValidator {
 			case 'offline_no_agents':
 			case 'notify_email_enabled':
 			case 'attachments_enabled':
+			case 'telegram_enabled':
+			case 'bale_enabled':
+			case 'transcript_enabled':
 				return rest_sanitize_boolean( $value );
+
+			case 'telegram_token':
+			case 'bale_token':
+				$value = is_string( $value ) ? trim( $value ) : null;
+
+				return null !== $value && ( '' === $value || $this->is_bot_token( $value ) )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Paste the bot token exactly as the bot maker gave it, like 123456789:AAH….', 'chatchi' ) );
+
+			case 'telegram_chat_id':
+			case 'bale_chat_id':
+				$value = is_string( $value ) ? trim( $value ) : null;
+
+				return null !== $value && ( '' === $value || $this->is_chat_id( $value ) )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Enter a numeric chat ID (e.g. 123456789 or -100123…) or a channel like @mychannel.', 'chatchi' ) );
+
+			case 'telegram_api_url':
+				$value = is_string( $value ) ? untrailingslashit( trim( $value ) ) : null;
+
+				return null !== $value && ( '' === $value || $this->is_api_url( $value ) )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Enter an https:// address, or leave it empty for the official Telegram API.', 'chatchi' ) );
+
+			case 'bot_notify':
+				return in_array( $value, self::BOT_NOTIFY, true )
+					? $value
+					: new \WP_Error( 'invalid', __( 'Choose when the bot sends messages.', 'chatchi' ) );
 
 			case 'hours':
 				$week = Schedule::clean( $value );
@@ -437,6 +523,35 @@ final class SettingsValidator {
 		}
 
 		return $text;
+	}
+
+	/**
+	 * A bot token: "<bot id>:<secret>".
+	 *
+	 * @param string $value Value.
+	 */
+	private function is_bot_token( string $value ): bool {
+		return (bool) preg_match( '/^\d{3,20}:[A-Za-z0-9_-]{20,100}$/', $value );
+	}
+
+	/**
+	 * A chat ID (negative for groups and channels) or a public @channel.
+	 *
+	 * @param string $value Value.
+	 */
+	private function is_chat_id( string $value ): bool {
+		return (bool) preg_match( '/^(-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{3,31})$/', $value );
+	}
+
+	/**
+	 * An https:// address without credentials, query or fragment.
+	 *
+	 * @param string $value Value.
+	 */
+	private function is_api_url( string $value ): bool {
+		$parts = wp_parse_url( $value );
+
+		return is_array( $parts ) && 'https' === ( $parts['scheme'] ?? '' ) && ! empty( $parts['host'] ) && ! isset( $parts['user'] ) && ! isset( $parts['pass'] ) && ! isset( $parts['query'] ) && ! isset( $parts['fragment'] ) && strlen( $value ) <= 200;
 	}
 
 	/**
