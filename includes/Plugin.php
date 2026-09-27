@@ -10,6 +10,11 @@ namespace ChatChi;
 use ChatChi\Admin\AdminModule;
 use ChatChi\Agents\AgentService;
 use ChatChi\Agents\AvatarUploader;
+use ChatChi\Attachments\AttachmentService;
+use ChatChi\Attachments\FileStore;
+use ChatChi\Availability\Availability;
+use ChatChi\Availability\OfflineNotifier;
+use ChatChi\Canned\CannedResponses;
 use ChatChi\Admin\PanelAccess;
 use ChatChi\Admin\PanelPage;
 use ChatChi\Admin\PanelStrings;
@@ -21,6 +26,7 @@ use ChatChi\Core\I18n;
 use ChatChi\Core\InstallNotice;
 use ChatChi\Core\Installer;
 use ChatChi\Database\Repositories\AgentRepository;
+use ChatChi\Database\Repositories\AttachmentRepository;
 use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\RateLimitRepository;
@@ -36,6 +42,7 @@ use ChatChi\Messages\MessageBody;
 use ChatChi\Messages\MessageService;
 use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
+use ChatChi\Rest\CannedController;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
 use ChatChi\Rest\RestModule;
@@ -169,6 +176,7 @@ final class Plugin {
 			ConversationRepository::class,
 			MessageRepository::class,
 			RateLimitRepository::class,
+			AttachmentRepository::class,
 		);
 
 		foreach ( $repositories as $repository ) {
@@ -187,6 +195,7 @@ final class Plugin {
 		$this->register_message_services();
 		$this->register_rest_services();
 		$this->register_frontend_services();
+		$this->register_availability_services();
 		$this->register_admin_services();
 
 		$this->container->singleton(
@@ -388,7 +397,9 @@ final class Plugin {
 					$c->get( MessageBody::class ),
 					$c->get( RequestGuard::class ),
 					$c->get( RateLimiter::class ),
-					$c->get( SpamGuard::class )
+					$c->get( SpamGuard::class ),
+					$c->get( Availability::class ),
+					$c->get( AttachmentService::class )
 				);
 			}
 		);
@@ -400,7 +411,8 @@ final class Plugin {
 					$c->get( ConversationService::class ),
 					$c->get( MessageService::class ),
 					$c->get( Presenter::class ),
-					$c->get( AgentRepository::class )
+					$c->get( AgentRepository::class ),
+					$c->get( AttachmentService::class )
 				);
 			}
 		);
@@ -416,6 +428,41 @@ final class Plugin {
 			AgentService::class,
 			static function ( Container $c ): AgentService {
 				return new AgentService( $c->get( AgentRepository::class ), $c->get( AvatarUploader::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			FileStore::class,
+			static function (): FileStore {
+				return new FileStore();
+			}
+		);
+
+		$this->container->singleton(
+			AttachmentService::class,
+			static function ( Container $c ): AttachmentService {
+				return new AttachmentService(
+					$c->get( ConversationService::class ),
+					$c->get( MessageService::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( AttachmentRepository::class ),
+					$c->get( FileStore::class ),
+					$c->get( Settings::class )
+				);
+			}
+		);
+
+		$this->container->singleton(
+			CannedResponses::class,
+			static function (): CannedResponses {
+				return new CannedResponses();
+			}
+		);
+
+		$this->container->singleton(
+			CannedController::class,
+			static function ( Container $c ): CannedController {
+				return new CannedController( $c->get( CannedResponses::class ), $c->get( AgentRepository::class ) );
 			}
 		);
 
@@ -446,7 +493,8 @@ final class Plugin {
 					$c->get( WidgetController::class ),
 					$c->get( AgentController::class ),
 					$c->get( AgentManagementController::class ),
-					$c->get( SettingsController::class )
+					$c->get( SettingsController::class ),
+					$c->get( CannedController::class )
 				);
 			}
 		);
@@ -506,6 +554,30 @@ final class Plugin {
 	}
 
 	/**
+	 * Registers business hours, agent presence and offline notifications.
+	 */
+	private function register_availability_services(): void {
+		$this->container->singleton(
+			Availability::class,
+			static function ( Container $c ): Availability {
+				return new Availability( $c->get( Settings::class ), $c->get( AgentRepository::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			OfflineNotifier::class,
+			static function ( Container $c ): OfflineNotifier {
+				return new OfflineNotifier(
+					$c->get( Availability::class ),
+					$c->get( Settings::class ),
+					$c->get( MessageRepository::class ),
+					$c->get( VisitorRepository::class )
+				);
+			}
+		);
+	}
+
+	/**
 	 * Registers the standalone agent panel.
 	 */
 	private function register_admin_services(): void {
@@ -554,6 +626,7 @@ final class Plugin {
 			InstallNotice::class,
 			SecurityModule::class,
 			RestModule::class,
+			OfflineNotifier::class,
 			WidgetModule::class,
 			Shortcode::class,
 			AdminModule::class,

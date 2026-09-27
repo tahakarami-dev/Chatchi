@@ -61,11 +61,12 @@ final class VisitorService {
 	 * A returning visitor who submits the form again gets their details
 	 * updated with the newly submitted, non-empty fields.
 	 *
-	 * @param array<string, mixed> $input Raw start-form input.
+	 * @param array<string, mixed> $input   Raw start-form input.
+	 * @param bool                 $offline Validate against the leave-a-message form.
 	 * @return Visitor|\WP_Error
 	 */
-	public function start( array $input ) {
-		$profile = $this->validator->validate( $input, $this->fields->all() );
+	public function start( array $input, bool $offline = false ) {
+		$profile = $this->validator->validate( $input, $offline ? $this->fields->offline() : $this->fields->all() );
 
 		if ( $profile instanceof \WP_Error ) {
 			return $profile;
@@ -93,12 +94,13 @@ final class VisitorService {
 	/**
 	 * Returns the start-form configuration for the widget.
 	 *
-	 * @return array{enabled: bool, fields: array<string, array{enabled: bool, required: bool}>}
+	 * @return array{enabled: bool, fields: array<string, array{enabled: bool, required: bool}>, offline_fields: array<string, array{enabled: bool, required: bool}>}
 	 */
 	public function form_config(): array {
 		return array(
-			'enabled' => $this->fields->form_enabled(),
-			'fields'  => $this->fields->all(),
+			'enabled'        => $this->fields->form_enabled(),
+			'fields'         => $this->fields->all(),
+			'offline_fields' => $this->fields->offline(),
 		);
 	}
 

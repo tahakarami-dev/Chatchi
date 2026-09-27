@@ -7,10 +7,12 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Attachments\AttachmentService;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Messages\MessageService;
+use ChatChi\Models\Agent;
 use ChatChi\Models\Conversation;
 
 defined( 'ABSPATH' ) || exit;
@@ -27,13 +29,19 @@ final class AgentController extends ConversationController {
 	private AgentRepository $agents;
 
 	/**
+	 * Agent whose presence was already recorded in this request.
+	 */
+	private int $touched = 0;
+
+	/**
 	 * @param ConversationService $conversations Conversation use cases.
 	 * @param MessageService      $messages      Message use cases.
 	 * @param Presenter           $presenter     Response shapes.
 	 * @param AgentRepository     $agents        Agent storage.
+	 * @param AttachmentService   $attachments   Files in conversations.
 	 */
-	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents ) {
-		parent::__construct( $conversations, $messages, $presenter );
+	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments ) {
+		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
 		$this->agents = $agents;
 	}
@@ -53,9 +61,23 @@ final class AgentController extends ConversationController {
 			self::NAMESPACE,
 			'/agent/me',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'me' ),
-				'permission_callback' => array( $this, 'permit_actor' ),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'me' ),
+					'permission_callback' => array( $this, 'permit_actor' ),
+				),
+				array(
+					'methods'             => \WP_REST_Server::EDITABLE,
+					'callback'            => array( $this, 'update_me' ),
+					'permission_callback' => array( $this, 'permit_actor' ),
+					'args'                => array(
+						'status' => array(
+							'type'     => 'string',
+							'enum'     => array( Agent::STATUS_ONLINE, Agent::STATUS_AWAY ),
+							'required' => true,
+						),
+					),
+				),
 			)
 		);
 
@@ -117,7 +139,66 @@ final class AgentController extends ConversationController {
 			return $actor;
 		}
 
-		return $this->respond( $this->presenter->agent_self( $actor->agent_model() ) );
+		return $this->respond(
+			$this->presenter->agent_self( $actor->agent_model() ) + array(
+				'attachments' => $this->attachments->client_config( $actor ),
+			)
+		);
+	}
+
+	/**
+	 * POST/PATCH /agent/me: the agent sets themselves online or away.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function update_me( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$agent = $actor->agent_model();
+
+		try {
+			$this->agents->set_status( $agent->id, (string) $request['status'] );
+			$agent = $this->agents->find( $agent->id ) ?? $agent;
+		} catch ( \Throwable $e ) {
+			return $this->failure( $e );
+		}
+
+		/**
+		 * Fires after an agent changes their availability.
+		 *
+		 * @param Agent $agent Agent, with the new status.
+		 */
+		do_action( 'chatchi_agent_status_changed', $agent );
+
+		return $this->respond( $this->presenter->agent_self( $agent ) );
+	}
+
+	/**
+	 * Records the agent's presence: any request from the panel means it is
+	 * open. Runs once per request, from the permission check.
+	 *
+	 * {@inheritDoc}
+	 */
+	protected function throttle( \WP_REST_Request $request, Actor $actor ): ?\WP_Error {
+		$agent = $actor->agent_model();
+
+		if ( $agent && $this->touched !== $agent->id ) {
+			$this->touched = $agent->id;
+
+			try {
+				$this->agents->touch( $agent->id );
+			} catch ( \Throwable $e ) {
+				// Presence is best effort; never refuse the request for it.
+				$this->failure( $e );
+			}
+		}
+
+		return null;
 	}
 
 	/**

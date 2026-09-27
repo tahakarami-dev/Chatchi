@@ -70,6 +70,11 @@ final class RateLimiter {
 				'visitor' => array( 40, MINUTE_IN_SECONDS ),
 				'ip'      => array( 240, MINUTE_IN_SECONDS ),
 			),
+			// Files: each one is also stored on disk.
+			'upload'  => array(
+				'visitor' => array( 10, 10 * MINUTE_IN_SECONDS ),
+				'ip'      => array( 40, 10 * MINUTE_IN_SECONDS ),
+			),
 			// Marking messages read and closing.
 			'write'   => array(
 				'visitor' => array( 60, MINUTE_IN_SECONDS ),
@@ -80,7 +85,7 @@ final class RateLimiter {
 		/**
 		 * Filters the rate limits.
 		 *
-		 * Shape: action ("start", "message", "typing", "write") => scope ("visitor",
+		 * Shape: action ("start", "message", "typing", "upload", "write") => scope ("visitor",
 		 * "ip") => array( max hits, window in seconds ). Remove a scope or
 		 * set its max to 0 to turn it off.
 		 *
@@ -107,7 +112,7 @@ final class RateLimiter {
 	/**
 	 * Counts an attempt and says whether it is allowed.
 	 *
-	 * @param string   $action     "start", "message", "typing" or "write".
+	 * @param string   $action     "start", "message", "typing", "upload" or "write".
 	 * @param int|null $visitor_id Visitor, when known.
 	 * @return \WP_Error|null A 429 error with data.retry_after, or null.
 	 */

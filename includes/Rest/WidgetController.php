@@ -7,6 +7,8 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Attachments\AttachmentService;
+use ChatChi\Availability\Availability;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Database\Repositories\AgentRepository;
@@ -42,6 +44,8 @@ final class WidgetController extends ConversationController {
 
 	private SpamGuard $spam;
 
+	private Availability $availability;
+
 	/**
 	 * Rate-limit decisions per request object.
 	 *
@@ -63,6 +67,8 @@ final class WidgetController extends ConversationController {
 	 * @param RequestGuard        $guard         Cross-site protection.
 	 * @param RateLimiter         $limiter       Rate limits.
 	 * @param SpamGuard           $spam          Bot checks for the start form.
+	 * @param Availability        $availability  Business hours and agent presence.
+	 * @param AttachmentService   $attachments   Files in conversations.
 	 */
 	public function __construct(
 		ConversationService $conversations,
@@ -73,17 +79,20 @@ final class WidgetController extends ConversationController {
 		MessageBody $body,
 		RequestGuard $guard,
 		RateLimiter $limiter,
-		SpamGuard $spam
+		SpamGuard $spam,
+		Availability $availability,
+		AttachmentService $attachments
 	) {
-		parent::__construct( $conversations, $messages, $presenter );
+		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
-		$this->visitors  = $visitors;
-		$this->agents    = $agents;
-		$this->body      = $body;
-		$this->guard     = $guard;
-		$this->limiter   = $limiter;
-		$this->spam      = $spam;
-		$this->decisions = new \SplObjectStorage();
+		$this->visitors     = $visitors;
+		$this->agents       = $agents;
+		$this->body         = $body;
+		$this->guard        = $guard;
+		$this->limiter      = $limiter;
+		$this->spam         = $spam;
+		$this->availability = $availability;
+		$this->decisions    = new \SplObjectStorage();
 	}
 
 	/**
@@ -142,6 +151,11 @@ final class WidgetController extends ConversationController {
 						'type'      => 'string',
 						'maxLength' => 2048,
 						'default'   => '',
+					),
+					// Sent from the leave-a-message form: email is required then.
+					'offline'    => array(
+						'type'    => 'boolean',
+						'default' => false,
 					),
 				),
 			)
@@ -252,6 +266,8 @@ final class WidgetController extends ConversationController {
 				'form'               => $this->visitors->form_config(),
 				'max_message_length' => $this->body->max_length(),
 				'form_token'         => $this->spam->token(),
+				'availability'       => $this->availability->state(),
+				'attachments'        => $this->attachments->client_config(),
 			)
 		);
 	}
@@ -275,7 +291,8 @@ final class WidgetController extends ConversationController {
 				'name'  => $request['name'],
 				'email' => $request['email'],
 				'phone' => $request['phone'],
-			)
+			),
+			(bool) $request['offline']
 		);
 
 		if ( $visitor instanceof \WP_Error ) {
@@ -347,6 +364,8 @@ final class WidgetController extends ConversationController {
 			$action = 'message';
 		} elseif ( '/typing' === substr( $route, -7 ) ) {
 			$action = 'typing';
+		} elseif ( '/attachments' === substr( $route, -12 ) ) {
+			$action = 'upload';
 		}
 
 		return $this->once(

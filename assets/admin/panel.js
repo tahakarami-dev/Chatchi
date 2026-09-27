@@ -44,6 +44,24 @@
 		me: function () {
 			return request( 'GET', '/agent/me' );
 		},
+		canned: function () {
+			return request( 'GET', '/agent/canned' );
+		},
+		saveCanned: function ( id, data ) {
+			return id ? request( 'PATCH', '/agent/canned/' + id, { body: data } ) : request( 'POST', '/agent/canned', { body: data } );
+		},
+		deleteCanned: function ( id ) {
+			return request( 'DELETE', '/agent/canned/' + id );
+		},
+		upload: function ( id, file, clientId, onProgress ) {
+			var form = new FormData();
+			form.append( 'file', file, file.name );
+			form.append( 'client_id', clientId );
+			return client.upload( '/agent/conversations/' + id + '/attachments', form, onProgress );
+		},
+		setStatus: function ( status ) {
+			return request( 'PATCH', '/agent/me', { body: { status: status } } );
+		},
 		inbox: function ( query ) {
 			return request( 'GET', '/agent/conversations', { query: query } );
 		},
@@ -184,6 +202,43 @@
 		this.rail = h( 'nav', { className: 'cc-rail', 'aria-label': S.appName } );
 		this.listPane = h( 'section', { className: 'cc-list-pane', 'aria-label': S.conversations } );
 		this.convPane = h( 'main', { className: 'cc-conv-pane' } );
+
+		// Files dropped on an open conversation are sent.
+		var dragDepth = 0;
+		var canDrop = function ( event ) {
+			var types = event.dataTransfer ? Array.from( event.dataTransfer.types || [] ) : [];
+			return !! self.state.conv && self.state.conv.status !== 'closed' && types.indexOf( 'Files' ) !== -1;
+		};
+
+		this.convPane.setAttribute( 'data-drop-label', S.dropFiles );
+		this.convPane.addEventListener( 'dragenter', function ( event ) {
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+				dragDepth++;
+				self.convPane.classList.add( 'is-dropping' );
+			}
+		} );
+		this.convPane.addEventListener( 'dragover', function ( event ) {
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+			}
+		} );
+		this.convPane.addEventListener( 'dragleave', function () {
+			dragDepth = Math.max( 0, dragDepth - 1 );
+			if ( ! dragDepth ) {
+				self.convPane.classList.remove( 'is-dropping' );
+			}
+		} );
+		this.convPane.addEventListener( 'drop', function ( event ) {
+			dragDepth = 0;
+			self.convPane.classList.remove( 'is-dropping' );
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+				Array.from( event.dataTransfer.files || [] ).slice( 0, 5 ).forEach( function ( file ) {
+					self.sendFile( file );
+				} );
+			}
+		} );
 		this.infoPane = h( 'aside', { className: 'cc-info-pane', 'aria-label': S.visitorInfo } );
 		this.page = h( 'main', { className: 'cc-page' } );
 		this.shell = h( 'div', { className: 'cc-shell' }, [ this.rail, this.listPane, this.convPane, this.infoPane, this.page ] );
@@ -191,6 +246,8 @@
 		this.view = 'inbox';
 		this.agentsView = config.canManageAgents ? new AgentsView( this ) : null;
 		this.settingsView = config.canManageSettings ? new SettingsView( this ) : null;
+		this.cannedView = config.canManageSettings ? new CannedView( this ) : null;
+		this.canned = [];
 		this.toast = h( 'div', { className: 'cc-toast', role: 'status', 'aria-live': 'polite', hidden: true } );
 		root.appendChild( this.toast );
 
@@ -230,6 +287,8 @@
 			self.renderRail();
 		} ).catch( function () {} );
 
+		this.loadCanned();
+
 		this.loadList();
 		this.route();
 	};
@@ -256,11 +315,43 @@
 				hasUnread ? h( 'span', { className: 'cc-rail-dot' } ) : null
 			] ),
 			this.agentsView ? railLink( 'agents', '#/agents', S.agents, 'users' ) : null,
+			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
-			agent ? h( 'span', { title: agent.name }, [ avatar( agent.name, 'rail', agent.avatar_url ) ] ) : null,
+			agent ? this.buildStatusButton( agent ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
 		);
+	};
+
+	/**
+	 * The agent's own avatar, with a dot for their availability; clicking
+	 * switches between online and away. Away agents do not count as
+	 * available for visitors (see Availability on the server).
+	 */
+	Panel.prototype.buildStatusButton = function ( agent ) {
+		var self = this;
+		var online = agent.status !== 'away';
+		var label = agent.name + ' — ' + ( online ? S.statusOnline : S.statusAway ) + '. ' + ( online ? S.goAway : S.goOnline );
+
+		return h( 'button', {
+			type: 'button',
+			className: 'cc-status' + ( online ? ' is-online' : ' is-away' ),
+			title: label,
+			'aria-label': label,
+			'aria-pressed': online ? 'true' : 'false',
+			onClick: function ( event ) {
+				var button = event.currentTarget;
+				button.disabled = true;
+				api.setStatus( online ? 'away' : 'online' ).then( function ( updated ) {
+					self.state.agent = updated;
+					self.renderRail();
+					self.notify( updated.status === 'away' ? S.nowAway : S.nowOnline );
+				} ).catch( function ( error ) {
+					button.disabled = false;
+					self.notify( error.message, true );
+				} );
+			}
+		}, [ avatar( agent.name, 'rail', agent.avatar_url ), h( 'span', { className: 'cc-status__dot', 'aria-hidden': 'true' } ) ] );
 	};
 
 	/* ------------------------------- list ------------------------------ */
@@ -484,7 +575,7 @@
 	Panel.prototype.renderItem = function ( item ) {
 		var name = visitorName( item.visitor );
 		var last = item.last_message;
-		var preview = last ? ( last.is_mine ? S.you + ': ' : '' ) + last.body.replace( /\s+/g, ' ' ) : S.noMessages;
+		var preview = last ? ( last.is_mine ? S.you + ': ' : '' ) + ( last.has_attachment ? '📎 ' : '' ) + last.body.replace( /\s+/g, ' ' ) : S.noMessages;
 		var classes = 'cc-item' + ( item.id === this.state.selectedId ? ' is-selected' : '' ) + ( item.unread_count > 0 ? ' is-unread' : '' );
 
 		return h( 'a', {
@@ -532,6 +623,8 @@
 
 		if ( this.agentsView && hash === '#/agents' ) {
 			page = 'agents';
+		} else if ( this.cannedView && hash === '#/canned' ) {
+			page = 'canned';
 		} else if ( settings ) {
 			page = 'settings';
 		}
@@ -542,6 +635,10 @@
 
 		if ( page === 'agents' ) {
 			this.agentsView.show();
+			return;
+		}
+		if ( page === 'canned' ) {
+			this.cannedView.show();
 			return;
 		}
 		if ( page === 'settings' ) {
@@ -824,10 +921,30 @@
 	Panel.prototype.deliver = function ( pending ) {
 		var self = this;
 
+		// A file that can never be sent: clicking the error removes it.
+		if ( pending.fatal ) {
+			this.state.pending = this.state.pending.filter( function ( p ) {
+				return p !== pending;
+			} );
+			this.renderLog();
+			return;
+		}
+
 		pending.failed = false;
 		this.renderLog();
 
-		api.send( pending.convId, pending.body, pending.clientId ).then( function ( message ) {
+		var sending = pending.file ? api.upload( pending.convId, pending.file, pending.clientId, function ( progress ) {
+			var bar = self.convPane.querySelector( '[data-key="' + pending.clientId + '"] .cc-progress span' );
+			pending.progress = progress;
+			if ( bar ) {
+				bar.style.width = Math.round( progress * 100 ) + '%';
+			}
+		} ) : api.send( pending.convId, pending.body, pending.clientId );
+
+		sending.then( function ( message ) {
+			if ( pending.preview ) {
+				URL.revokeObjectURL( pending.preview );
+			}
 			if ( self.state.selectedId !== pending.convId ) {
 				return;
 			}
@@ -860,8 +977,72 @@
 				return;
 			}
 			pending.failed = true;
+			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large' ].indexOf( error.code ) !== -1;
+			pending.reason = pending.file && error.status >= 400 && error.status < 500 ? error.message : '';
 			self.renderLog();
 		} );
+	};
+
+	/**
+	 * Sends a file the agent picked, pasted or dropped.
+	 */
+	Panel.prototype.sendFile = function ( file ) {
+		var settings = ( this.state.agent && this.state.agent.attachments ) || { max_bytes: 0 };
+		var pending = { clientId: Core.uuid(), body: file.name, file: file, progress: 0, failed: false, convId: this.state.selectedId };
+
+		if ( /^image\/(jpeg|png|gif|webp)$/.test( file.type ) && window.URL && URL.createObjectURL ) {
+			pending.preview = URL.createObjectURL( file );
+		}
+
+		this.state.pending.push( pending );
+
+		if ( settings.max_bytes && file.size > settings.max_bytes ) {
+			pending.failed = true;
+			pending.fatal = true;
+			pending.reason = S.fileTooLarge.replace( '%s', Core.fileSize( settings.max_bytes, config.locale ) );
+			this.renderLog();
+			this.scrollToBottom();
+			return;
+		}
+
+		this.scrollToBottom();
+		this.deliver( pending );
+	};
+
+	Panel.prototype.buildAttachment = function ( attachment ) {
+		if ( attachment.is_image ) {
+			return h( 'a', { className: 'cc-bubble cc-bubble--image', href: client.fileUrl( attachment.url ), target: '_blank', rel: 'noopener', title: attachment.name }, [
+				h( 'img', { src: client.fileUrl( attachment.url ), alt: attachment.name, loading: 'lazy', width: attachment.width ? String( attachment.width ) : null, height: attachment.height ? String( attachment.height ) : null } )
+			] );
+		}
+
+		return h( 'a', { className: 'cc-bubble cc-file', href: client.fileUrl( attachment.url, true ), download: attachment.name, title: S.download + ': ' + attachment.name }, [
+			h( 'span', { className: 'cc-file__icon' }, [ icon( 'file' ) ] ),
+			h( 'span', { className: 'cc-file__text' }, [
+				h( 'span', { className: 'cc-file__name', text: attachment.name } ),
+				h( 'small', { text: Core.fileSize( attachment.size, config.locale ) } )
+			] ),
+			icon( 'download' )
+		] );
+	};
+
+	Panel.prototype.buildUpload = function ( pending ) {
+		var bar = pending.failed ? null : h( 'span', { className: 'cc-progress', role: 'progressbar', 'aria-label': S.uploading }, [
+			h( 'span', { style: 'width:' + Math.round( ( pending.progress || 0 ) * 100 ) + '%' } )
+		] );
+
+		if ( pending.preview ) {
+			return h( 'div', { className: 'cc-bubble cc-bubble--image is-uploading' }, [ h( 'img', { src: pending.preview, alt: pending.body } ), bar ] );
+		}
+
+		return h( 'div', { className: 'cc-bubble cc-file is-uploading' }, [
+			h( 'span', { className: 'cc-file__icon' }, [ icon( 'file' ) ] ),
+			h( 'span', { className: 'cc-file__text' }, [
+				h( 'span', { className: 'cc-file__name', text: pending.body } ),
+				h( 'small', { text: Core.fileSize( pending.file.size, config.locale ) } ),
+				bar
+			] )
+		] );
 	};
 
 	Panel.prototype.closeConversation = function () {
@@ -1071,9 +1252,9 @@
 		}
 
 		var entries = state.messages.map( function ( m ) {
-			return { key: m.id, mine: m.is_mine, type: m.sender.type, sender: m.sender, body: m.body, date: new Date( m.created_at ), read: !! m.read_at, isNew: !! self.newIds[ m.id ] };
+			return { key: m.id, mine: m.is_mine, type: m.sender.type, sender: m.sender, body: m.body, attachment: m.attachment, date: new Date( m.created_at ), read: !! m.read_at, isNew: !! self.newIds[ m.id ] };
 		} ).concat( state.pending.map( function ( p ) {
-			return { key: p.clientId, mine: true, type: 'agent', sender: null, body: p.body, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: true };
+			return { key: p.clientId, mine: true, type: 'agent', sender: null, body: p.body, upload: p.file ? p : null, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: ! p.shown };
 		} ) );
 
 		if ( ! entries.length ) {
@@ -1142,15 +1323,24 @@
 			stack.appendChild( h( 'span', { className: 'cc-sender', text: senderName } ) );
 		}
 
-		var bubble = h( 'div', { className: 'cc-bubble' } );
-		bubble.appendChild( Core.linkify( entry.body ) );
+		var bubble;
+
+		if ( entry.attachment ) {
+			bubble = this.buildAttachment( entry.attachment );
+		} else if ( entry.upload ) {
+			bubble = this.buildUpload( entry.upload );
+			entry.upload.shown = true;
+		} else {
+			bubble = h( 'div', { className: 'cc-bubble' } );
+			bubble.appendChild( Core.linkify( entry.body ) );
+		}
 		stack.appendChild( bubble );
 
 		if ( entry.failed ) {
 			stack.appendChild( h( 'button', {
 				type: 'button',
 				className: 'cc-retry',
-				text: S.sendFailed,
+				text: entry.ref.reason || S.sendFailed,
 				onClick: function () {
 					self.deliver( entry.ref );
 				}
@@ -1171,7 +1361,7 @@
 			stack.appendChild( h( 'div', { className: metaClass }, meta ) );
 		}
 
-		var row = h( 'div', { className: classes.join( ' ' ) } );
+		var row = h( 'div', { className: classes.join( ' ' ), 'data-key': String( entry.key ) } );
 
 		if ( ! entry.mine ) {
 			var face = avatar( senderName, 'sm', entry.sender && entry.sender.avatar_url );
@@ -1229,7 +1419,162 @@
 		var self = this;
 		var id = this.state.selectedId;
 		var send = h( 'button', { type: 'submit', className: 'cc-send', 'aria-label': S.send, title: S.send, disabled: ! ( this.drafts[ id ] || '' ).trim() }, [ icon( 'send', 'cc-flip' ) ] );
-		var textarea = h( 'textarea', { rows: '1', placeholder: S.placeholder, 'aria-label': S.placeholder, value: this.drafts[ id ] || '' } );
+		var textarea = h( 'textarea', {
+			rows: '1',
+			placeholder: S.placeholder,
+			'aria-label': S.placeholder,
+			'aria-autocomplete': 'list',
+			'aria-controls': 'cc-canned-picker',
+			value: this.drafts[ id ] || ''
+		} );
+
+		// Saved replies: opened with the ⚡ button, or by typing "/" at the
+		// start of an empty message ("/ship" filters as you type).
+		var picker = { open: false, slash: false, index: 0, matches: [] };
+		var list = h( 'div', { id: 'cc-canned-picker', className: 'cc-canned-picker', role: 'listbox', 'aria-label': S.cannedInsert, hidden: true } );
+		var cannedButton = h( 'button', {
+			type: 'button',
+			className: 'cc-tool',
+			title: S.cannedInsert,
+			'aria-label': S.cannedInsert,
+			'aria-expanded': 'false',
+			'aria-controls': 'cc-canned-picker',
+			onClick: function () {
+				if ( picker.open ) {
+					closePicker();
+				} else {
+					openPicker( '', false );
+				}
+			}
+		}, [ icon( 'zap' ) ] );
+
+		function fill( body ) {
+			var conv = self.state.conv;
+			var name = ( conv && conv.visitor && conv.visitor.name ) || '';
+			var agent = self.state.agent ? self.state.agent.name : '';
+
+			return body.replace( /\{name\}/g, name ).replace( /\{agent\}/g, agent );
+		}
+
+		function matchesFor( query ) {
+			query = query.toLowerCase();
+
+			return self.canned.filter( function ( item ) {
+				return ! query || item.shortcut.indexOf( query ) === 0 || item.title.toLowerCase().indexOf( query ) !== -1 || item.body.toLowerCase().indexOf( query ) !== -1;
+			} ).slice( 0, 50 );
+		}
+
+		function renderPicker() {
+			list.replaceChildren();
+
+			if ( ! picker.matches.length ) {
+				textarea.removeAttribute( 'aria-activedescendant' );
+				list.appendChild( h( 'p', { className: 'cc-canned-picker__empty' }, [
+					S.cannedNone,
+					config.canManageSettings ? h( 'a', { href: '#/canned', text: S.cannedManage } ) : null
+				] ) );
+				return;
+			}
+
+			picker.matches.forEach( function ( item, i ) {
+				list.appendChild( h( 'div', {
+					id: 'cc-canned-option-' + item.id,
+					className: 'cc-canned-option' + ( i === picker.index ? ' is-active' : '' ),
+					role: 'option',
+					'aria-selected': i === picker.index ? 'true' : 'false',
+					// mousedown, so the text box keeps focus.
+					onMousedown: function ( event ) {
+						event.preventDefault();
+						choose( item );
+					}
+				}, [
+					h( 'span', { className: 'cc-canned-option__head' }, [
+						h( 'strong', { text: item.title } ),
+						item.shortcut ? h( 'code', { dir: 'ltr', text: '/' + item.shortcut } ) : null
+					] ),
+					h( 'span', { className: 'cc-canned-option__body', text: fill( item.body ) } )
+				] ) );
+			} );
+
+			textarea.setAttribute( 'aria-activedescendant', 'cc-canned-option-' + picker.matches[ picker.index ].id );
+
+			var active = list.querySelector( '.is-active' );
+			if ( active && active.scrollIntoView ) {
+				active.scrollIntoView( { block: 'nearest' } );
+			}
+		}
+
+		function openPicker( query, slash ) {
+			picker.open = true;
+			picker.slash = slash;
+			picker.index = 0;
+			picker.matches = matchesFor( query );
+			list.hidden = false;
+			cannedButton.setAttribute( 'aria-expanded', 'true' );
+			renderPicker();
+			if ( ! slash ) {
+				textarea.focus();
+			}
+		}
+
+		function closePicker() {
+			if ( ! picker.open ) {
+				return;
+			}
+			picker.open = false;
+			list.hidden = true;
+			cannedButton.setAttribute( 'aria-expanded', 'false' );
+			textarea.removeAttribute( 'aria-activedescendant' );
+		}
+
+		function choose( item ) {
+			var text = fill( item.body );
+
+			if ( picker.slash ) {
+				textarea.value = text;
+			} else if ( textarea.setRangeText ) {
+				textarea.setRangeText( text, textarea.selectionStart, textarea.selectionEnd, 'end' );
+			} else {
+				textarea.value += text;
+			}
+
+			closePicker();
+			textarea.dispatchEvent( new Event( 'input' ) );
+			textarea.focus();
+		}
+
+		var fileInput = h( 'input', { type: 'file', className: 'cc-sr', tabindex: '-1', 'aria-hidden': 'true', multiple: true } );
+		var attachButton = h( 'button', {
+			type: 'button',
+			className: 'cc-tool',
+			title: S.attach,
+			'aria-label': S.attach,
+			onClick: function () {
+				fileInput.click();
+			}
+		}, [ icon( 'paperclip' ) ] );
+
+		if ( this.state.agent && this.state.agent.attachments ) {
+			fileInput.accept = this.state.agent.attachments.accept;
+		}
+
+		fileInput.addEventListener( 'change', function () {
+			Array.from( fileInput.files || [] ).slice( 0, 5 ).forEach( function ( file ) {
+				self.sendFile( file );
+			} );
+			fileInput.value = '';
+		} );
+
+		// Pasting a screenshot sends it.
+		textarea.addEventListener( 'paste', function ( event ) {
+			var files = event.clipboardData ? Array.from( event.clipboardData.files || [] ) : [];
+			if ( files.length ) {
+				event.preventDefault();
+				files.slice( 0, 5 ).forEach( function ( file ) {
+					self.sendFile( file );
+				} );
+			}
+		} );
 
 		function refresh() {
 			send.disabled = ! textarea.value.trim();
@@ -1243,6 +1588,7 @@
 				return;
 			}
 			textarea.value = '';
+			closePicker();
 			refresh();
 			self.send( text );
 		}
@@ -1251,9 +1597,38 @@
 			self.drafts[ id ] = textarea.value;
 			refresh();
 			self.signalTyping( id, !! textarea.value.trim() );
+
+			var slash = /^\/(\S*)$/.exec( textarea.value );
+			if ( slash ) {
+				openPicker( slash[ 1 ], true );
+			} else if ( picker.slash ) {
+				closePicker();
+			}
 		} );
 
 		textarea.addEventListener( 'keydown', function ( event ) {
+			if ( picker.open && ! event.isComposing ) {
+				var count = picker.matches.length;
+
+				if ( ( event.key === 'ArrowDown' || event.key === 'ArrowUp' ) && count ) {
+					event.preventDefault();
+					picker.index = ( picker.index + ( event.key === 'ArrowDown' ? 1 : count - 1 ) ) % count;
+					renderPicker();
+					return;
+				}
+				if ( ( event.key === 'Enter' || event.key === 'Tab' ) && ! event.shiftKey && count ) {
+					event.preventDefault();
+					choose( picker.matches[ picker.index ] );
+					return;
+				}
+				if ( event.key === 'Escape' ) {
+					event.preventDefault();
+					event.stopPropagation();
+					closePicker();
+					return;
+				}
+			}
+
 			if ( event.key === 'Enter' && ! event.shiftKey && ! event.isComposing ) {
 				event.preventDefault();
 				submit();
@@ -1262,17 +1637,29 @@
 
 		window.requestAnimationFrame( refresh );
 
-		return h( 'div', { className: 'cc-composer' }, [
-			h( 'div', { className: 'cc-typing', role: 'status', hidden: ! this.state.visitorTyping }, [
-				h( 'span', { className: 'cc-typing__dots', 'aria-hidden': 'true' }, [ h( 'span' ), h( 'span' ), h( 'span' ) ] ),
-				h( 'span', { text: S.visitorTyping } )
-			] ),
+		var inner = h( 'div', { className: 'cc-composer__inner' }, [
+			list,
 			h( 'form', {
 				onSubmit: function ( event ) {
 					event.preventDefault();
 					submit();
 				}
-			}, [ textarea, send ] )
+			}, [ cannedButton, attachButton, fileInput, textarea, send ] )
+		] );
+
+		// Leaving the composer closes the picker.
+		inner.addEventListener( 'focusout', function ( event ) {
+			if ( ! event.relatedTarget || ! inner.contains( event.relatedTarget ) ) {
+				closePicker();
+			}
+		} );
+
+		return h( 'div', { className: 'cc-composer' }, [
+			h( 'div', { className: 'cc-typing', role: 'status', hidden: ! this.state.visitorTyping }, [
+				h( 'span', { className: 'cc-typing__dots', 'aria-hidden': 'true' }, [ h( 'span' ), h( 'span' ), h( 'span' ) ] ),
+				h( 'span', { text: S.visitorTyping } )
+			] ),
+			inner
 		] );
 	};
 
@@ -1358,6 +1745,257 @@
 	 * Inputs are built once per open form and only result lists are
 	 * re-rendered, so typing (including Persian IME input) is not disturbed.
 	 */
+	/* -------------------------- saved replies -------------------------- */
+
+	/**
+	 * Loads the saved replies used by the composer picker.
+	 */
+	Panel.prototype.loadCanned = function () {
+		var self = this;
+
+		return api.canned().then( function ( items ) {
+			self.canned = items;
+		} ).catch( function () {
+			// The picker then shows as empty; chatting still works.
+		} );
+	};
+
+	/**
+	 * Administrators' screen for the saved replies (#/canned).
+	 */
+	function CannedView( panel ) {
+		this.panel = panel;
+		this.el = panel.page;
+		this.state = { loading: true, error: '', editing: null, busy: false, errors: {}, confirmId: 0 };
+		this.loaded = false;
+	}
+
+	CannedView.prototype.show = function () {
+		var self = this;
+
+		if ( ! this.loaded ) {
+			this.loaded = true;
+			this.state.loading = true;
+			this.panel.loadCanned().then( function () {
+				self.state.loading = false;
+				self.render();
+			} );
+		}
+		this.render();
+	};
+
+	CannedView.prototype.render = function () {
+		var self = this;
+		var state = this.state;
+		var items = this.panel.canned;
+
+		if ( this.panel.view !== 'canned' ) {
+			return;
+		}
+
+		var header = h( 'header', { className: 'cc-page-head' }, [
+			h( 'div', {}, [
+				h( 'h1', { text: S.canned } ),
+				h( 'p', { text: S.cannedIntro } )
+			] ),
+			state.editing ? null : h( 'button', {
+				type: 'button',
+				className: 'cc-button',
+				onClick: function () {
+					self.edit( { id: 0, title: '', shortcut: '', body: '' } );
+				}
+			}, [ icon( 'plus' ), S.cannedAdd ] )
+		] );
+
+		var body;
+
+		if ( state.loading ) {
+			body = h( 'div', { className: 'cc-canned-list', 'aria-busy': 'true' }, [ 1, 2, 3 ].map( function () {
+				return h( 'div', { className: 'cc-canned-item' }, [ h( 'span', { className: 'cc-skeleton', style: 'width:40%;height:14px' } ) ] );
+			} ) );
+		} else if ( ! items.length && ! state.editing ) {
+			body = h( 'div', { className: 'cc-state' }, [
+				icon( 'zap' ),
+				h( 'h2', { text: S.cannedEmpty } ),
+				h( 'p', { text: S.cannedEmptyHint } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button',
+					onClick: function () {
+						self.edit( { id: 0, title: '', shortcut: '', body: '' } );
+					}
+				}, [ icon( 'plus' ), S.cannedAdd ] )
+			] );
+		} else {
+			body = h( 'div', { className: 'cc-canned-list' }, items.map( function ( item ) {
+				return state.editing && state.editing.id === item.id ? self.buildEditor() : self.buildItem( item );
+			} ) );
+		}
+
+		this.el.replaceChildren( h( 'div', { className: 'cc-page-inner' }, [
+			header,
+			h( 'p', { className: 'cc-hint cc-canned-tip', text: S.cannedTip } ),
+			state.editing && ! state.editing.id ? this.buildEditor() : null,
+			body
+		] ) );
+
+		var first = this.el.querySelector( '.cc-canned-editor input' );
+		if ( first && this.focusEditor ) {
+			this.focusEditor = false;
+			first.focus();
+		}
+	};
+
+	CannedView.prototype.edit = function ( item ) {
+		this.state.editing = { id: item.id, title: item.title, shortcut: item.shortcut, body: item.body };
+		this.state.errors = {};
+		this.state.confirmId = 0;
+		this.focusEditor = true;
+		this.render();
+	};
+
+	CannedView.prototype.buildItem = function ( item ) {
+		var self = this;
+		var confirming = this.state.confirmId === item.id;
+
+		return h( 'article', { className: 'cc-canned-item' }, [
+			h( 'div', { className: 'cc-canned-item__text' }, [
+				h( 'h2', {}, [
+					item.title,
+					item.shortcut ? h( 'code', { className: 'cc-canned-shortcut', dir: 'ltr', text: '/' + item.shortcut } ) : null
+				] ),
+				h( 'p', { text: item.body } )
+			] ),
+			h( 'div', { className: 'cc-canned-item__actions' }, confirming ? [
+				h( 'span', { className: 'cc-hint', text: S.cannedDeleteConfirm } ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary cc-button--sm',
+					text: S.cancel,
+					onClick: function () {
+						self.state.confirmId = 0;
+						self.render();
+					}
+				} ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--danger cc-button--sm',
+					text: S.delete,
+					onClick: function () {
+						self.remove( item );
+					}
+				} )
+			] : [
+				h( 'button', {
+					type: 'button',
+					className: 'cc-icon-button',
+					title: S.edit,
+					'aria-label': S.edit + ' — ' + item.title,
+					onClick: function () {
+						self.edit( item );
+					}
+				}, [ icon( 'edit' ) ] ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-icon-button',
+					title: S.delete,
+					'aria-label': S.delete + ' — ' + item.title,
+					onClick: function () {
+						self.state.confirmId = item.id;
+						self.render();
+					}
+				}, [ icon( 'trash' ) ] )
+			] )
+		] );
+	};
+
+	CannedView.prototype.buildEditor = function () {
+		var self = this;
+		var editing = this.state.editing;
+		var errors = this.state.errors;
+
+		function field( key, label, control, hint ) {
+			control.addEventListener( 'input', function () {
+				editing[ key ] = control.value;
+			} );
+			return h( 'div', { className: 'cc-field' }, [
+				h( 'label', { className: 'cc-label', for: control.id, text: label } ),
+				control,
+				hint ? h( 'p', { className: 'cc-hint', text: hint } ) : null,
+				errors[ key ] ? h( 'p', { className: 'cc-field-error', role: 'alert', text: errors[ key ] } ) : null
+			] );
+		}
+
+		var title = h( 'input', { id: 'cc-canned-title', className: 'cc-input', type: 'text', value: editing.title, 'aria-invalid': errors.title ? 'true' : null } );
+		var shortcut = h( 'input', { id: 'cc-canned-shortcut', className: 'cc-input', type: 'text', dir: 'ltr', placeholder: 'shipping', value: editing.shortcut, 'aria-invalid': errors.shortcut ? 'true' : null } );
+		var text = h( 'textarea', { id: 'cc-canned-body', className: 'cc-input cc-textarea', rows: '5', value: editing.body, 'aria-invalid': errors.body ? 'true' : null } );
+
+		return h( 'form', {
+			className: 'cc-card cc-canned-editor',
+			noValidate: true,
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				self.save();
+			}
+		}, [
+			h( 'div', { className: 'cc-canned-editor__row' }, [
+				field( 'title', S.cannedTitle, title ),
+				field( 'shortcut', S.cannedShortcut, shortcut, S.cannedShortcutHint )
+			] ),
+			field( 'body', S.cannedBody, text, S.cannedBodyHint ),
+			h( 'div', { className: 'cc-canned-editor__actions' }, [
+				h( 'button', {
+					type: 'button',
+					className: 'cc-button cc-button--secondary',
+					text: S.cancel,
+					onClick: function () {
+						self.state.editing = null;
+						self.render();
+					}
+				} ),
+				h( 'button', { type: 'submit', className: 'cc-button', disabled: this.state.busy, text: this.state.busy ? S.saving : S.save } )
+			] )
+		] );
+	};
+
+	CannedView.prototype.save = function () {
+		var self = this;
+		var editing = this.state.editing;
+
+		this.state.busy = true;
+		this.render();
+
+		api.saveCanned( editing.id, { title: editing.title, shortcut: editing.shortcut, body: editing.body } ).then( function () {
+			self.state.busy = false;
+			self.state.editing = null;
+			self.panel.notify( S.saved );
+			return self.panel.loadCanned();
+		} ).then( function () {
+			self.render();
+		} ).catch( function ( error ) {
+			self.state.busy = false;
+			self.state.errors = ( error.data && error.data.fields ) || {};
+			if ( ! Object.keys( self.state.errors ).length ) {
+				self.panel.notify( error.message, true );
+			}
+			self.render();
+		} );
+	};
+
+	CannedView.prototype.remove = function ( item ) {
+		var self = this;
+
+		api.deleteCanned( item.id ).then( function () {
+			self.state.confirmId = 0;
+			self.panel.notify( S.cannedDeleted );
+			return self.panel.loadCanned();
+		} ).then( function () {
+			self.render();
+		} ).catch( function ( error ) {
+			self.panel.notify( error.message, true );
+		} );
+	};
+
 	function AgentsView( panel ) {
 		this.panel = panel;
 		this.el = panel.page;
@@ -1819,11 +2457,12 @@
 		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
-		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length' ] },
+		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message', 'notify_email_enabled', 'notify_email' ] },
+		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
 
-	var NUMBER_SETTINGS = [ 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip' ];
+	var NUMBER_SETTINGS = [ 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'attachment_max_mb' ];
 
 	function settingsSection( id ) {
 		return SETTINGS_SECTIONS.filter( function ( section ) {
@@ -1882,7 +2521,8 @@
 				return;
 			}
 			var value = saved[ key ];
-			draft[ key ] = Array.isArray( value ) ? value.slice() : value;
+			// Copies, so edits never touch the saved values (the week is nested).
+			draft[ key ] = value && typeof value === 'object' ? JSON.parse( JSON.stringify( value ) ) : value;
 		} );
 
 		if ( id === 'display' ) {
@@ -1918,6 +2558,9 @@
 		}
 		if ( id === 'appearance' ) {
 			payload.primary_color = draft.primary_color.trim();
+		}
+		if ( id === 'hours' ) {
+			payload.notify_email = draft.notify_email.trim();
 		}
 
 		// Whole numbers go out as numbers; anything else is sent as typed so
@@ -2016,6 +2659,7 @@
 			appearance: S.sectionAppearance,
 			form: S.sectionForm,
 			display: S.sectionDisplay,
+			hours: S.sectionHours,
 			limits: S.sectionLimits,
 			security: S.sectionSecurity
 		};
@@ -2073,6 +2717,8 @@
 			children = [ this.buildLimits() ];
 		} else if ( this.section === 'security' ) {
 			children = [ this.buildProxy() ];
+		} else if ( this.section === 'hours' ) {
+			children = [ this.buildHours() ];
 		} else {
 			children = [ this.buildWelcome(), this.buildDisplay(), this.buildShortcode() ];
 		}
@@ -2593,6 +3239,166 @@
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-length-title' }, [
 				h( 'h2', { id: 'cc-length-title', text: S.messagesTitle } ),
 				this.numberField( 'message_max_length', S.messageMaxLength, S.characters )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-files-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-files-title', text: S.filesTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.filesIntro } )
+					] ),
+					this.buildSwitch( 'cc-attachments-enabled', S.filesOn, draft.attachments_enabled, function ( on ) {
+						draft.attachments_enabled = on;
+					} )
+				] ),
+				this.numberField( 'attachment_max_mb', S.filesMaxSize, S.megabytes, S.filesServerLimit.replace( '%s', fmt.number( this.data.limits.upload_max_mb ) ) ),
+				this.fieldError( 'attachments_enabled' )
+			] )
+		] );
+	};
+
+	/* -------------------------- business hours ------------------------- */
+
+	/**
+	 * Days in the order the site's week starts: Saturday first for Persian
+	 * sites, as in the Iranian calendar; otherwise Monday first.
+	 */
+	function weekOrder() {
+		return /^fa/.test( config.locale || '' ) ? [ '6', '0', '1', '2', '3', '4', '5' ] : [ '1', '2', '3', '4', '5', '6', '0' ];
+	}
+
+	function dayName( day ) {
+		// 7 January 2024 was a Sunday (day "0").
+		var date = new Date( 2024, 0, 7 + parseInt( day, 10 ), 12 );
+		return new Intl.DateTimeFormat( config.locale || 'fa-IR', { weekday: 'long' } ).format( date );
+	}
+
+	SettingsView.prototype.buildHours = function () {
+		var self = this;
+		var draft = this.draft;
+		var limit = this.data.limits.offline_message;
+
+		var rows = weekOrder().map( function ( day ) {
+			var entry = draft.hours[ day ];
+			var id = 'cc-hours-' + day;
+			var on = h( 'input', { id: id, type: 'checkbox', checked: entry.on } );
+			var from = h( 'input', { type: 'time', className: 'cc-input cc-input--time', value: entry.from, step: '300', 'aria-label': dayName( day ) + ' — ' + S.hoursFrom, disabled: ! entry.on } );
+			var to = h( 'input', { type: 'time', className: 'cc-input cc-input--time', value: entry.to === '24:00' ? '23:59' : entry.to, step: '300', 'aria-label': dayName( day ) + ' — ' + S.hoursTo, disabled: ! entry.on } );
+			var row = h( 'div', { className: 'cc-hours__row' + ( entry.on ? '' : ' is-closed' ) } );
+
+			on.addEventListener( 'change', function () {
+				entry.on = on.checked;
+				from.disabled = to.disabled = ! on.checked;
+				row.classList.toggle( 'is-closed', ! on.checked );
+				self.clearError( 'hours' );
+			} );
+			from.addEventListener( 'input', function () {
+				entry.from = from.value;
+				self.clearError( 'hours' );
+			} );
+			to.addEventListener( 'input', function () {
+				entry.to = to.value;
+				self.clearError( 'hours' );
+			} );
+
+			row.append(
+				h( 'label', { className: 'cc-hours__day', for: id }, [ on, h( 'span', { text: dayName( day ) } ) ] ),
+				h( 'span', { className: 'cc-hours__closed', text: S.hoursClosed } ),
+				h( 'span', { className: 'cc-hours__times' }, [ from, h( 'span', { text: S.hoursTo } ), to ] )
+			);
+
+			return row;
+		} );
+
+		var week = h( 'div', { className: 'cc-hours' + ( draft.hours_enabled ? '' : ' is-off' ) }, rows );
+
+		var modes = [ [ 'message', S.offlineModeMessage, S.offlineModeMessageHint ], [ 'chat', S.offlineModeChat, S.offlineModeChatHint ] ];
+		var modeGroup = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-offline-mode-label' }, modes.map( function ( mode ) {
+			var input = h( 'input', { id: 'cc-offline-mode-' + mode[ 0 ], type: 'radio', name: 'cc-offline-mode', value: mode[ 0 ], checked: draft.offline_mode === mode[ 0 ] } );
+			input.addEventListener( 'change', function () {
+				if ( input.checked ) {
+					draft.offline_mode = mode[ 0 ];
+				}
+			} );
+			return h( 'label', { className: 'cc-radio cc-radio--rich', for: 'cc-offline-mode-' + mode[ 0 ] }, [
+				input,
+				h( 'span', {}, [ h( 'strong', { text: mode[ 1 ] } ), h( 'small', { text: mode[ 2 ] } ) ] )
+			] );
+		} ) );
+
+		var counter = h( 'span', { className: 'cc-counter', 'aria-live': 'polite' } );
+		var message = h( 'textarea', { id: 'cc-offline-message', className: 'cc-input cc-textarea', rows: '3', placeholder: this.data.defaults.offline_message } );
+		message.value = draft.offline_message;
+
+		function count() {
+			var used = Array.from( message.value ).length;
+			counter.textContent = fmt.number( used ) + ' / ' + fmt.number( limit );
+			counter.classList.toggle( 'is-over', used > limit );
+		}
+
+		message.addEventListener( 'input', function () {
+			draft.offline_message = message.value;
+			count();
+			self.clearError( 'offline_message' );
+		} );
+		count();
+
+		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email, disabled: ! draft.notify_email_enabled } );
+		email.value = draft.notify_email;
+		email.addEventListener( 'input', function () {
+			draft.notify_email = email.value;
+			self.clearError( 'notify_email' );
+		} );
+
+		return h( 'div', { className: 'cc-settings' }, [
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-hours-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-hours-title', text: S.hoursTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.hoursIntro } )
+					] ),
+					this.buildSwitch( 'cc-hours-enabled', S.hoursOn, draft.hours_enabled, function ( on ) {
+						draft.hours_enabled = on;
+						week.classList.toggle( 'is-off', ! on );
+					} )
+				] ),
+				week,
+				h( 'p', { className: 'cc-hint', text: S.hoursTimezone.replace( '%s', this.data.timezone ) } ),
+				this.fieldError( 'hours' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-offline-title' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-offline-title', text: S.offlineTitle } ),
+					h( 'p', { className: 'cc-hint', text: S.offlineIntro } )
+				] ),
+				h( 'span', { id: 'cc-offline-mode-label', className: 'cc-label', text: S.offlineModeLabel } ),
+				modeGroup,
+				this.buildSwitch( 'cc-offline-no-agents', S.offlineNoAgents, draft.offline_no_agents, function ( on ) {
+					draft.offline_no_agents = on;
+				} ),
+				h( 'label', { className: 'cc-label', for: 'cc-offline-message', text: S.offlineMessage } ),
+				message,
+				h( 'div', { className: 'cc-settings__row' }, [
+					h( 'p', { className: 'cc-hint', text: S.offlineMessageHint } ),
+					counter
+				] ),
+				this.fieldError( 'offline_mode' ),
+				this.fieldError( 'offline_message' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-notify-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-notify-title', text: S.notifyTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.notifyIntro } )
+					] ),
+					this.buildSwitch( 'cc-notify-enabled', S.notifyOn, draft.notify_email_enabled, function ( on ) {
+						draft.notify_email_enabled = on;
+						email.disabled = ! on;
+					} )
+				] ),
+				h( 'label', { className: 'cc-label', for: 'cc-notify-email', text: S.notifyEmail } ),
+				email,
+				h( 'p', { className: 'cc-hint', text: S.notifyEmailHint } ),
+				this.fieldError( 'notify_email' )
 			] )
 		] );
 	};

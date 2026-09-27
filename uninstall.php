@@ -40,6 +40,7 @@ function chatchi_uninstall_site() {
 		'chatchi_conversations',
 		'chatchi_agents',
 		'chatchi_visitors',
+		'chatchi_attachments',
 	);
 
 	foreach ( $tables as $table ) {
@@ -54,6 +55,7 @@ function chatchi_uninstall_site() {
 		'chatchi_install_error',
 		'chatchi_db_version',
 		'chatchi_settings',
+		'chatchi_canned_responses',
 	);
 
 	foreach ( $options as $option ) {
@@ -61,6 +63,43 @@ function chatchi_uninstall_site() {
 	}
 
 	delete_transient( 'chatchi_install_backoff' );
+
+	chatchi_uninstall_files();
+}
+
+/**
+ * Deletes files sent in conversations (uploads/chatchi-files) on the
+ * current site.
+ *
+ * @return void
+ */
+function chatchi_uninstall_files() {
+	$uploads = wp_upload_dir( null, false );
+
+	if ( empty( $uploads['basedir'] ) ) {
+		return;
+	}
+
+	$base = trailingslashit( $uploads['basedir'] ) . 'chatchi-files';
+
+	if ( ! is_dir( $base ) ) {
+		return;
+	}
+
+	$items = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator( $base, FilesystemIterator::SKIP_DOTS ),
+		RecursiveIteratorIterator::CHILD_FIRST
+	);
+
+	foreach ( $items as $item ) {
+		if ( $item->isDir() && ! $item->isLink() ) {
+			rmdir( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- The plugin's own upload folder.
+		} else {
+			wp_delete_file( $item->getPathname() );
+		}
+	}
+
+	rmdir( $base ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- The plugin's own upload folder.
 }
 
 if ( is_multisite() ) {

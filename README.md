@@ -92,7 +92,7 @@ docs/                    Design and architecture documents
 | `chatchi_widget_config` | filter | Full widget configuration |
 | `chatchi_settings` | filter | Settings as the plugin uses them (not saved) |
 | `chatchi_settings_updated` | action | Settings were saved, with the validated changes |
-| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `typing`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]`; receives the Settings values |
+| `chatchi_rate_limits` | filter | Limits per action (`start`, `message`, `typing`, `upload`, `write`) and scope (`visitor`, `ip`): `[max hits, window seconds]`; receives the Settings values |
 | `chatchi_rate_limited` | action | A request was refused by a rate limit |
 | `chatchi_rate_limit_error` | action | The counter table failed; the request was allowed |
 | `chatchi_client_ip` | filter | The visitor IP used for rate limiting |
@@ -102,15 +102,22 @@ docs/                    Design and architecture documents
 | `chatchi_stray_output` | action | Output printed by other code (PHP notices, stray whitespace) was removed from a ChatChi REST response |
 | `chatchi_panel_csp` | filter | Content-Security-Policy of the agent panel (empty string: none) |
 | `chatchi_avatar_max_bytes` | filter | Largest agent picture upload in bytes (default 2 MB, capped by the server upload limit) |
+| `chatchi_availability` | filter | The availability sent to the widget (`mode`, `agents_online`, `in_hours`, `opens_at`, `offline_form`, `offline_message`) |
+| `chatchi_offline_fields` | filter | Fields of the leave-a-message form (email is required by default) |
+| `chatchi_offline_email` | filter | The email about an unanswered message (`to`, `subject`, `message`, `headers`); return false to send nothing |
+| `chatchi_attachment_types` | filter | Allowed file types, extension pattern => MIME type. Scriptable types (SVG, HTML, XML, JS, PHP…) are always removed |
+| `chatchi_agent_status_changed` | action | An agent switched between online and away |
+| `chatchi_canned_responses_updated` | action | The saved replies changed |
 
 ## Database
 
 | Table | Purpose | Key indexes |
 |---|---|---|
 | `{prefix}chatchi_visitors` | Visitor identity (hashed cookie token) and contact info | `UNIQUE token_hash`, `user_id` |
-| `{prefix}chatchi_agents` | Agents, one per WordPress user | `UNIQUE user_id`, `is_active` |
+| `{prefix}chatchi_agents` | Agents, one per WordPress user, with their chosen status (online / away) and when their panel last talked to the server | `UNIQUE user_id`, `is_active` |
 | `{prefix}chatchi_conversations` | Conversation state, latest activity, and when each side last reported typing | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id` |
-| `{prefix}chatchi_messages` | Messages and read state | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
+| `{prefix}chatchi_messages` | Messages and read state; `attachment_id` links a sent file | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
+| `{prefix}chatchi_attachments` | Files sent in conversations: original name, type, size, picture size, and the path of the stored file | `conversation_id`, `message_id` |
 | `{prefix}chatchi_rate_limits` | Rate-limit counters; buckets are salted hashes, no IPs stored. Purged hourly | `bucket` (primary), `expires_at` |
 
 All datetimes are stored in UTC. Relations are enforced in the application layer.
@@ -125,12 +132,14 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/widget/session` | Visitor, open conversation, unread count, start-form config, `form_token`. Never sets a cookie |
-| POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url`, `form_token`, `website` (honeypot, must be empty) → visitor + open conversation |
+| GET | `/widget/session` | Visitor, open conversation, unread count, start-form config (and the leave-a-message fields), `form_token`, `availability` (`mode`: online / away / offline, `opens_at`, `offline_form`, `offline_message`) and `attachments` (`enabled`, `max_bytes`, `accept`). Never sets a cookie |
+| POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url`, `form_token`, `website` (honeypot, must be empty), `offline` (leave-a-message form: email required) → visitor + open conversation |
 | GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50. Also returns `typing`: whether the other side is typing |
 | POST | `/widget/conversations/{id}/messages` | `body`, optional `client_id` (UUID, makes retries idempotent) |
 | POST | `/widget/conversations/{id}/read` | Mark agent messages read, optional `up_to_id` |
 | POST | `/widget/conversations/{id}/typing` | `typing` (default `true`): the visitor is typing, or stopped. Lasts 6 seconds unless repeated; sending a message clears it. Ignored for closed conversations |
+| POST | `/widget/conversations/{id}/attachments` | Send a file: multipart field `file`, optional `client_id`. Pictures (JPG, PNG, GIF, WebP), PDF, Word, Excel, text, CSV and ZIP, checked by content; SVG, HTML and scripts are always refused. Returns the new message with `attachment` |
+| GET | `/widget/conversations/{id}/attachments/{attachment_id}` | The file, after an access check. Pictures inline, everything else as a download (`download=1` forces it); sandboxing CSP and `nosniff` always |
 | POST | `/widget/conversations/{id}/close` | Close own conversation |
 
 ### Agent panel
@@ -139,12 +148,17 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/agent/me` | Current agent |
+| GET | `/agent/me` | Current agent, with `status` and the `attachments` limits |
+| POST/PATCH | `/agent/me` | `status`: `online` or `away` |
 | GET | `/agent/conversations` | Inbox: `status`, `search`, `page`, `per_page` (≤100); `X-WP-Total` headers |
 | GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
 | POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
 | POST | `/agent/conversations/{id}/typing` | Same as widget: the agent is typing |
+| POST, GET | `/agent/conversations/{id}/attachments[/{attachment_id}]` | Same as widget; agents may send files even when visitors may not |
+| GET | `/agent/canned` | Saved replies (`id`, `title`, `shortcut`, `body`); any active agent |
+| POST | `/agent/canned` | Add a saved reply (administrators): `title` (≤ 100), `shortcut` (optional, `a-z 0-9 - _`, unique), `body` (≤ 2000) |
+| POST/PATCH, DELETE | `/agent/canned/{id}` | Change or delete a saved reply (administrators) |
 | POST | `/agent/conversations/{id}/close` | Close |
 
 ### Agent management
@@ -177,9 +191,10 @@ Administrators also get an **Agents** screen (`#/agents`) to add agents from exi
 
 Administrators also get a **Settings** screen with six sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
 
+- **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, the offline text, and the email address that hears about messages nobody was there to answer (the site admin email by default).
 - **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), the notification sound for new replies, how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
 - **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
-- **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, and the longest allowed message (100–10000 characters).
+- **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, the longest allowed message (100–10000 characters), and files: whether visitors may send them and the largest size (1–50 MB, capped by the server's upload limit).
 
 - **Appearance** (`#/settings/appearance`): brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
 - **Welcome & display** (`#/settings/display`) and **IP & security** (`#/settings/security`), described below.
@@ -187,6 +202,14 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 - **Welcome message**: shown in the widget as the first bubble from support, above the start form and at the top of every conversation. It is not stored as a message, so agents never see it in the inbox. On by default with a translated default text.
 - **Where the widget appears**: on every page, only on chosen page types and items, or everywhere except them. Page types are the home page, all pages, all blog posts, and WooCommerce products (single products, the shop, product categories and tags).
 - **Shortcode**: `[chatchi]` (alias `[hamyarchat]`) shows the floating widget on that page even where the rules hide it. It prints nothing itself and also works in widget areas and page builders (the widget then loads in the footer).
+
+## Availability, saved replies and files
+
+- **Agent status**: every request from an open panel counts as presence (written at most every 30 seconds). An agent is *available* when active, set to **online** (the dot on their avatar in the panel's rail; one click switches to away) and seen in the last 90 seconds.
+- **What visitors see**: a green dot and the usual subtitle when someone is available; amber and "we'll reply as soon as we can" when not; gray, "back Saturday 09:00" and the leave-a-message form (or a notice, per settings) outside business hours.
+- **Offline email**: the first visitor message of a conversation sent while nobody is available is emailed, with the visitor's details, the page, a link to the conversation and `Reply-To` set to the visitor. Filter `chatchi_offline_email` to change or cancel it.
+- **Saved replies** (`#/canned`, administrators): in the composer, type `/` (e.g. `/ship`) or press ⚡ to pick one; arrows move, Enter or Tab inserts. `{name}` and `{agent}` are filled in.
+- **Files**: the 📎 button, pasting a screenshot, or dropping files on the chat send them (up to 5 at a time) with a progress bar; pictures show as thumbnails. Files are stored in `uploads/chatchi-files` under random names without an extension (the folder also refuses direct access on Apache) and are only served by the REST API to the conversation's visitor and to agents. Deleting the plugin with "delete all data" on removes them.
 
 ## Chat widget
 
@@ -203,7 +226,7 @@ Administrators also get a **Settings** screen with six sections, each saved on i
 
 ## Security
 
-- **Rate limits** (sliding window, per visitor and per IP; IPv6 per /64): starting conversations 5/hour per visitor and 10/10 min per IP; messages 20/min per visitor and 60/min per IP; typing signals 40/min and 240/min; other writes 60/min and 180/min. Reads (polling) and agents are not limited. Refused requests get `429 chatchi_rate_limited` with `data.retry_after` and a `Retry-After` header; the widget shows "try again in N seconds/minutes". Counting is atomic, so parallel requests cannot get past a limit. If the counter table fails, requests are allowed.
+- **Rate limits** (sliding window, per visitor and per IP; IPv6 per /64): starting conversations 5/hour per visitor and 10/10 min per IP; messages 20/min per visitor and 60/min per IP; typing signals 40/min and 240/min; files 10 and 40 per 10 minutes; other writes 60/min and 180/min. Reads (polling) and agents are not limited. Refused requests get `429 chatchi_rate_limited` with `data.retry_after` and a `Retry-After` header; the widget shows "try again in N seconds/minutes". Counting is atomic, so parallel requests cannot get past a limit. If the counter table fails, requests are allowed.
 - **Visitor IP**: the connection address by default. Behind Cloudflare, `CF-Connecting-IP` is used only on connections from Cloudflare's published ranges; behind another CDN or proxy (e.g. ArvanCloud), the configured header is used only from the listed proxy addresses (`X-Forwarded-For` is read right to left, skipping trusted proxies).
 - **Bot checks on the start form**: a honeypot field, and a signed timestamp from `/widget/session` that must be at least 2 seconds and at most 1 day old. The widget retries too-early and expired starts by itself, so people never see these errors.
 - **Agent panel**: Content-Security-Policy with a per-view nonce (no injected scripts, `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: same-origin`, not cacheable.

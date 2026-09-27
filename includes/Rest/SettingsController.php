@@ -148,6 +148,15 @@ final class SettingsController implements RouteProvider {
 				'items'    => $text( 64 ),
 				'maxItems' => SettingsValidator::MAX_TRUSTED_PROXIES * 2,
 			),
+			'hours_enabled'            => $flag,
+			// Days are checked by the validator (Schedule::clean()).
+			'hours'                    => array( 'type' => 'object' ),
+			'offline_mode'             => $enum( SettingsValidator::OFFLINE_MODES ),
+			'offline_no_agents'        => $flag,
+			'offline_message'          => $text( 3000 ),
+			'notify_email_enabled'     => $flag,
+			'notify_email'             => $text( 200 ),
+			'attachments_enabled'      => $flag,
 		);
 
 		// Numbers arrive as JSON numbers or numeric strings; ranges are the validator's job.
@@ -215,6 +224,8 @@ final class SettingsController implements RouteProvider {
 				'widget_title'    => $this->strings->all()['title'],
 				'widget_subtitle' => $this->strings->all()['subtitle'],
 				'form_intro'      => $this->strings->all()['formIntro'],
+				'offline_message' => $this->settings->default_offline_message(),
+				'notify_email'    => (string) get_option( 'admin_email' ),
 			),
 			'limits'    => array(
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
@@ -222,7 +233,12 @@ final class SettingsController implements RouteProvider {
 				'widget_title'    => SettingsValidator::TITLE_MAX_LENGTH,
 				'widget_subtitle' => SettingsValidator::SUBTITLE_MAX_LENGTH,
 				'form_intro'      => SettingsValidator::FORM_INTRO_MAX_LENGTH,
+				'offline_message' => SettingsValidator::OFFLINE_MESSAGE_MAX_LENGTH,
+				// The server's own upload limit caps attachment_max_mb.
+				'upload_max_mb'   => max( 1, (int) floor( wp_max_upload_size() / MB_IN_BYTES ) ),
 			),
+			// Business hours are in the site's time zone (Settings > General).
+			'timezone'  => wp_timezone_string(),
 			// Allowed ranges of the number settings: key => [min, max].
 			'ranges'    => array_map(
 				static function ( array $range ): array {

@@ -7,6 +7,7 @@
 
 namespace ChatChi\Rest;
 
+use ChatChi\Attachments\AttachmentService;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Messages\MessageService;
@@ -30,15 +31,19 @@ abstract class ConversationController implements RouteProvider {
 
 	protected Presenter $presenter;
 
+	protected AttachmentService $attachments;
+
 	/**
 	 * @param ConversationService $conversations Conversation use cases.
 	 * @param MessageService      $messages      Message use cases.
 	 * @param Presenter           $presenter     Response shapes.
+	 * @param AttachmentService   $attachments   Files in conversations.
 	 */
-	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter ) {
+	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AttachmentService $attachments ) {
 		$this->conversations = $conversations;
 		$this->messages      = $messages;
 		$this->presenter     = $presenter;
+		$this->attachments   = $attachments;
 	}
 
 	/**
@@ -139,6 +144,49 @@ abstract class ConversationController implements RouteProvider {
 
 		register_rest_route(
 			self::NAMESPACE,
+			$route . '/attachments',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'upload' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'client_id' => array(
+							'type'    => 'string',
+							'pattern' => '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+						),
+					)
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			$route . '/attachments/(?P<attachment_id>\d+)',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'download' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
+				'args'                => array_merge(
+					$this->id_arg(),
+					array(
+						'attachment_id' => array(
+							'type'     => 'integer',
+							'minimum'  => 1,
+							'required' => true,
+						),
+						'download'      => array(
+							'type'    => 'boolean',
+							'default' => false,
+						),
+					)
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			$route . '/typing',
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
@@ -214,7 +262,7 @@ abstract class ConversationController implements RouteProvider {
 			return $page;
 		}
 
-		return $this->respond( $this->presenter->message_page( $page, $actor ) );
+		return $this->respond( $this->presenter->message_page( $page, $actor, $this->attachments->for_messages( $page->messages ) ) );
 	}
 
 	/**
@@ -268,6 +316,83 @@ abstract class ConversationController implements RouteProvider {
 		}
 
 		return $this->respond( array( 'marked' => $marked ) );
+	}
+
+	/**
+	 * POST …/attachments: sends a file (multipart field "file").
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function upload( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$files     = $request->get_file_params();
+		$client_id = $request['client_id'];
+		$message   = $this->attachments->upload(
+			$actor,
+			(int) $request['id'],
+			isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null,
+			is_string( $client_id ) && '' !== $client_id ? $client_id : null
+		);
+
+		if ( $message instanceof \WP_Error ) {
+			return $message;
+		}
+
+		$agent  = $actor->agent_model();
+		$agents = $agent ? array( $agent->id => $agent ) : array();
+
+		return $this->respond( $this->presenter->message( $message, $actor, $agents, $this->attachments->for_messages( array( $message ) ) ), 201 );
+	}
+
+	/**
+	 * GET …/attachments/{attachment_id}: the file itself.
+	 *
+	 * Sent with headers that stop browsers from running anything in it:
+	 * only pictures are shown inline, everything else is downloaded, and
+	 * a sandboxing Content-Security-Policy applies either way.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_Error|void Error, or the file is sent and the request ends.
+	 */
+	public function download( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		$result = $this->attachments->download( $actor, (int) $request['id'], (int) $request['attachment_id'] );
+
+		if ( $result instanceof \WP_Error ) {
+			return $result;
+		}
+
+		list( $attachment, $path ) = $result;
+
+		$inline = $attachment->is_image() && ! $request['download'];
+
+		// Nothing printed before (notices, other plugins) may corrupt the file.
+		while ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
+
+		nocache_headers();
+		header( 'Content-Type: ' . $attachment->mime );
+		header( 'Content-Length: ' . (string) filesize( $path ) );
+		header( 'Content-Disposition: ' . ( $inline ? 'inline' : 'attachment' ) . "; filename*=UTF-8''" . rawurlencode( $attachment->file_name ) );
+		header( 'X-Content-Type-Options: nosniff' );
+		header( "Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox" );
+		header( 'Cross-Origin-Resource-Policy: same-origin' );
+		header( 'Cache-Control: private, max-age=86400' );
+
+		readfile( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- Streaming a stored attachment.
+		exit;
 	}
 
 	/**
