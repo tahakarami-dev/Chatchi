@@ -86,6 +86,13 @@ final class WidgetStrings {
 			'rating4'        => __( 'Good', 'chatchi' ),
 			'rating5'        => __( 'Excellent', 'chatchi' ),
 			'today'          => __( 'Today', 'chatchi' ),
+			'channelsTitle'  => __( 'Contact us', 'chatchi' ),
+			'channelChat'    => __( 'Chat with us', 'chatchi' ),
+			'channelWhatsapp' => __( 'WhatsApp', 'chatchi' ),
+			'channelTelegram' => __( 'Telegram', 'chatchi' ),
+			'channelBale'    => __( 'Bale', 'chatchi' ),
+			'channelPhone'   => __( 'Call us', 'chatchi' ),
+			'closeMenu'      => __( 'Close menu', 'chatchi' ),
 			'yesterday'      => __( 'Yesterday', 'chatchi' ),
 			/* translators: %d: number of unread messages. */
 			'unread'         => __( '%d unread messages', 'chatchi' ),

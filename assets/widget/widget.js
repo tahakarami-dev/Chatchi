@@ -267,7 +267,14 @@
 		shadow.appendChild( this.root );
 		document.body.appendChild( host );
 
+		this.buildMenu();
+
 		this.root.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Escape' && self.menuOpen ) {
+				event.stopPropagation();
+				self.closeMenu( true );
+				return;
+			}
 			if ( event.key !== 'Escape' || ! self.state.open ) {
 				return;
 			}
@@ -404,7 +411,7 @@
 	};
 
 	Widget.prototype.scheduleInvitationNow = function ( rule ) {
-		if ( this.state.open || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
+		if ( this.state.open || this.menuOpen || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
 			return;
 		}
 		this.markInvitationSeen( rule );
@@ -573,10 +580,122 @@
 			this.acceptInvite();
 			return;
 		}
+		if ( this.menuOpen ) {
+			this.closeMenu( false );
+			return;
+		}
 		if ( this.state.open ) {
 			this.close();
-		} else {
-			this.open();
+			return;
+		}
+		// With other contact channels, the launcher first offers a choice,
+		// unless the visitor has replies waiting in the chat.
+		if ( this.menu && ! this.state.unread ) {
+			this.openMenu();
+			return;
+		}
+		this.open();
+	};
+
+	/* ------------------------- contact channels ------------------------ */
+
+	var CHANNEL_ICONS = { whatsapp: 'whatsapp', telegram: 'telegram', bale: 'bale', phone: 'phone' };
+
+	/**
+	 * The menu of ways to reach the site: the chat, then WhatsApp,
+	 * Telegram, Bale or a phone call, as set in the settings.
+	 */
+	Widget.prototype.buildMenu = function () {
+		var self = this;
+		var channels = config.channels || [];
+
+		if ( ! channels.length ) {
+			return;
+		}
+
+		var defaults = { whatsapp: S.channelWhatsapp, telegram: S.channelTelegram, bale: S.channelBale, phone: S.channelPhone };
+
+		var items = [ h( 'button', {
+			type: 'button',
+			className: 'chatchi-menu__item chatchi-menu__item--chat',
+			role: 'menuitem',
+			onClick: function () {
+				self.closeMenu( false );
+				self.open();
+			}
+		}, [
+			h( 'span', { className: 'chatchi-menu__label', text: S.channelChat } ),
+			h( 'span', { className: 'chatchi-menu__icon' }, [ icon( 'chat' ) ] )
+		] ) ].concat( channels.map( function ( channel ) {
+			var external = channel.type !== 'phone';
+			return h( 'a', {
+				className: 'chatchi-menu__item chatchi-menu__item--' + channel.type,
+				role: 'menuitem',
+				href: channel.url,
+				target: external ? '_blank' : null,
+				rel: external ? 'noopener noreferrer' : null,
+				onClick: function () {
+					self.closeMenu( false );
+				}
+			}, [
+				h( 'span', { className: 'chatchi-menu__label', text: channel.label || defaults[ channel.type ] || channel.type } ),
+				h( 'span', { className: 'chatchi-menu__icon' }, [ icon( CHANNEL_ICONS[ channel.type ] || 'phone' ) ] )
+			] );
+		} ) );
+
+		this.menu = h( 'div', { id: 'chatchi-menu', className: 'chatchi-menu', role: 'menu', 'aria-label': S.channelsTitle, hidden: true }, items );
+		this.root.insertBefore( this.menu, this.launcher );
+		this.launcher.setAttribute( 'aria-haspopup', 'menu' );
+
+		// Arrow keys move between the choices.
+		this.menu.addEventListener( 'keydown', function ( event ) {
+			if ( event.key !== 'ArrowDown' && event.key !== 'ArrowUp' ) {
+				return;
+			}
+			event.preventDefault();
+			var list = Array.from( self.menu.querySelectorAll( '.chatchi-menu__item' ) );
+			var index = list.indexOf( self.root.getRootNode().activeElement );
+			var next = event.key === 'ArrowDown' ? index + 1 : index - 1;
+			list[ ( next + list.length ) % list.length ].focus();
+		} );
+
+		// A click anywhere else closes the menu.
+		document.addEventListener( 'pointerdown', function ( event ) {
+			if ( self.menuOpen && event.composedPath().indexOf( self.root ) === -1 ) {
+				self.closeMenu( false );
+			}
+		} );
+	};
+
+	Widget.prototype.openMenu = function () {
+		this.menuOpen = true;
+		this.hideTeaser();
+		this.root.classList.add( 'has-font', 'is-menu' );
+		this.menu.hidden = false;
+		this.launcher.setAttribute( 'aria-expanded', 'true' );
+		this.launcher.setAttribute( 'aria-controls', 'chatchi-menu' );
+		this.launcher.setAttribute( 'aria-label', S.closeMenu );
+		var first = this.menu.querySelector( '.chatchi-menu__item' );
+		if ( first ) {
+			first.focus();
+		}
+	};
+
+	/**
+	 * @param {boolean} refocus Move focus back to the launcher (keyboard use).
+	 */
+	Widget.prototype.closeMenu = function ( refocus ) {
+		if ( ! this.menuOpen ) {
+			return;
+		}
+		this.menuOpen = false;
+		this.root.classList.remove( 'is-menu' );
+		this.menu.hidden = true;
+		this.launcher.setAttribute( 'aria-expanded', 'false' );
+		this.launcher.setAttribute( 'aria-controls', 'chatchi-panel' );
+		this.launcher.setAttribute( 'aria-label', S.openChat );
+		if ( refocus ) {
+			this.launcher.focus();
 		}
 	};
 
@@ -1321,7 +1440,7 @@
 		var showBadge = ! state.open && waiting > 0;
 		this.badge.hidden = ! showBadge;
 		this.badge.textContent = showBadge ? formatNumber( Math.min( waiting, 99 ) ) : '';
-		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : S.openChat ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
+		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : ( this.menuOpen ? S.closeMenu : S.openChat ) ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
 
 		var agent = state.conversation && state.conversation.agent;
 		var shellKey = JSON.stringify( [

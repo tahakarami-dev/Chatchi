@@ -3924,3 +3924,52 @@ a.cc-order-head:hover strong {
 	height: 18px;
 	color: var(--chatchi-text-muted);
 }
+
+/* Channels, FAQ and SMS settings */
+
+.cc-invite__grid--channel {
+	grid-template-columns: 1fr 1.4fr 1.2fr;
+}
+
+.cc-move-up svg {
+	transform: rotate(180deg);
+}
+
+.cc-invite__head .cc-icon-button {
+	flex-shrink: 0;
+}
+
+.cc-banner {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: var(--chatchi-radius-sm);
+	font-size: 13px;
+}
+
+.cc-banner svg {
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+}
+
+.cc-banner--warning {
+	background: var(--chatchi-warning-soft);
+	color: var(--chatchi-warning-text);
+}
+
+.cc-bot-fields[hidden] {
+	display: none;
+}
+
+@media (max-width: 767px) {
+	.cc-invite__grid--channel {
+		grid-template-columns: 1fr;
+	}
+}
+
+.cc-bot-test .cc-input {
+	max-width: 220px;
+}

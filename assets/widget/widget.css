@@ -1642,3 +1642,124 @@
 	fill: currentColor;
 	stroke: none;
 }
+
+/* Contact channels menu, above the launcher */
+
+.chatchi-menu {
+	position: fixed;
+	bottom: 96px;
+	z-index: 2147483000;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	/* Laid out physically so the icons line up above the launcher. */
+	direction: ltr;
+}
+
+.chatchi-menu[hidden] {
+	display: none;
+}
+
+.chatchi--left .chatchi-menu { left: 30px; align-items: flex-start; }
+.chatchi--right .chatchi-menu { right: 30px; align-items: flex-end; }
+
+.chatchi-menu__item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: var(--chatchi-text);
+	text-decoration: none;
+	animation: chatchi-menu-in var(--chatchi-duration-slow) var(--chatchi-ease-out) both;
+}
+
+/* The icon sits above the launcher, the label on the inner side. */
+.chatchi--left .chatchi-menu__item {
+	flex-direction: row-reverse;
+}
+
+.chatchi-menu__item:nth-child(2) { animation-delay: 30ms; }
+.chatchi-menu__item:nth-child(3) { animation-delay: 60ms; }
+.chatchi-menu__item:nth-child(4) { animation-delay: 90ms; }
+.chatchi-menu__item:nth-child(5) { animation-delay: 120ms; }
+.chatchi-menu__item:nth-child(6) { animation-delay: 150ms; }
+.chatchi-menu__item:nth-child(7) { animation-delay: 180ms; }
+
+@keyframes chatchi-menu-in {
+	from { opacity: 0; transform: translateY(10px) scale(.96); }
+	to { opacity: 1; transform: none; }
+}
+
+.chatchi-menu__label {
+	padding: 7px 14px;
+	border-radius: 999px;
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-md), 0 0 0 1px var(--chatchi-border);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	unicode-bidi: plaintext;
+	transition: transform var(--chatchi-duration-fast);
+}
+
+.chatchi-menu__icon {
+	display: grid;
+	place-items: center;
+	flex-shrink: 0;
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	background: var(--chatchi-gradient);
+	color: #fff;
+	box-shadow: var(--chatchi-shadow-md);
+	transition: transform var(--chatchi-duration-fast);
+}
+
+.chatchi-menu__icon svg {
+	width: 24px;
+	height: 24px;
+}
+
+.chatchi-menu__item--whatsapp .chatchi-menu__icon { background: #25d366; }
+.chatchi-menu__item--telegram .chatchi-menu__icon { background: #229ed9; }
+.chatchi-menu__item--bale .chatchi-menu__icon { background: #1fb16e; }
+.chatchi-menu__item--phone .chatchi-menu__icon { background: #0f766e; }
+.chatchi-menu__item--chat .chatchi-menu__icon { color: var(--chatchi-primary-contrast); }
+
+.chatchi-menu__item:hover .chatchi-menu__icon,
+.chatchi-menu__item:focus-visible .chatchi-menu__icon {
+	transform: scale(1.08);
+}
+
+.chatchi-menu__item:focus-visible {
+	outline: none;
+}
+
+.chatchi-menu__item:focus-visible .chatchi-menu__label {
+	box-shadow: var(--chatchi-focus-ring), var(--chatchi-shadow-md);
+}
+
+/* The launcher shows its close icon while the menu is open. */
+.chatchi.is-menu .chatchi-launcher__icon--chat {
+	opacity: 0;
+	transform: rotate(90deg) scale(.6);
+}
+
+.chatchi.is-menu .chatchi-launcher__icon--close {
+	opacity: 1;
+	transform: none;
+}
+
+@media (max-width: 639px) {
+	.chatchi-menu {
+		bottom: 88px;
+	}
+
+	.chatchi--left .chatchi-menu { left: 22px; }
+	.chatchi--right .chatchi-menu { right: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.chatchi-menu__item {
+		animation: none;
+	}
+}
