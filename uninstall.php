@@ -67,6 +67,10 @@ function chatchi_uninstall_site() {
 
 	delete_transient( 'chatchi_install_backoff' );
 
+	// Each agent's panel theme, and SMS cooldowns (chatchi_sms_{conversation}).
+	delete_metadata( 'user', 0, 'chatchi_panel_theme', '', true );
+	$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_chatchi\_sms\_%' OR option_name LIKE '\_transient\_timeout\_chatchi\_sms\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
 	chatchi_uninstall_files();
 }
 

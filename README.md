@@ -42,7 +42,7 @@ includes/                PSR-4 root for the ChatChi\ namespace
 ├── Reports/             Report figures for administrators
 ├── Rest/                chatchi/v1 controllers (widget, agent, agent management, settings), presenter, CSRF guard
 ├── Frontend/            Widget loader, display rules, [chatchi] shortcode, color tokens, font face, interface strings
-├── Admin/               Standalone agent panel page, access capability, menu entry
+├── Admin/               Standalone agent panel page, access capability, menu entry, per-agent theme
 ├── Core/
 │   ├── Container.php    Lazy service container
 │   ├── Contracts/       Interfaces (Module)
@@ -58,7 +58,8 @@ includes/                PSR-4 root for the ChatChi\ namespace
 │   └── Repositories/    Prepared-statement-only data access per table
 ├── Models/              Visitor, Agent, Conversation, Message
 ├── Security/            Rate limiter, visitor IP detection, bot checks for the start form
-├── Settings/            Settings store (one autoloaded option), validation, content lookup for display rules
+├── Notifications/       Offline email, Telegram / Bale bots, transcripts, SMS (Kavenegar, Melipayamak)
+├── Settings/            Settings store (one autoloaded option), validation, content lookup for display rules, invitations, contact channels, FAQ
 ├── Support/             Small shared helpers (plain-text cleaning)
 └── Visitors/            Identity (cookie token), start-form fields and validation
 assets/shared/           Core JS (DOM, API client, dates) and design tokens shared by widget and panel
@@ -117,6 +118,10 @@ docs/                    Design and architecture documents
 | `chatchi_canned_responses_updated` | action | The saved replies changed |
 | `chatchi_agent_can_see_orders` | filter | Whether the current agent sees the visitor's WooCommerce orders (default: `manage_options` or `edit_shop_orders`) |
 | `chatchi_conversation_rated` | action | A visitor rated (or re-rated) an ended conversation |
+| `chatchi_widget_theme` | filter | `light`, `dark` or `auto` (follows the visitor's device); receives the Settings choice (default `light`) |
+| `chatchi_sms_message` | filter | Text of the SMS to a visitor; empty sends nothing |
+| `chatchi_sms_api_url` | filter | SMS service address per provider (e.g. a relay); Kavenegar's contains `%s` for the API key |
+| `chatchi_sms_sent` | action | An SMS told a visitor about a reply |
 
 ## Database
 
@@ -160,7 +165,7 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/agent/me` | Current agent, with `status` and the `attachments` limits |
-| POST/PATCH | `/agent/me` | `status`: `online` or `away` |
+| POST/PATCH | `/agent/me` | `status`: `online` or `away`, and/or `theme`: `light`, `dark` or `auto` (the panel's theme, saved per user) |
 | GET | `/agent/conversations` | Inbox: `status`, `search`, `assigned` (`mine` / `unassigned`), `tag`, `page`, `per_page` (≤100); `X-WP-Total` headers. Items carry `tags` |
 | GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
@@ -201,6 +206,7 @@ Administrators only (`manage_options`).
 | POST/PATCH | `/agent/settings` | Save any of `primary_color` (`#RRGGBB`, `#RGB`; empty = default), `widget_position` (`left` / `right`), `widget_title` (≤ 60 characters), `widget_subtitle` (≤ 100; empty = translated default), `proxy_mode` (`direct` / `cloudflare` / `custom`), `proxy_header`, `trusted_proxies` (IPs or CIDR ranges, ≤ 100), `welcome_enabled`, `welcome_message` (≤ 500 characters; empty = default), `display_mode` (`all` / `include` / `exclude`), `display_targets` (`home`, `pages`, `posts`, `products`), `display_ids` (published pages, posts or products, ≤ 100). Invalid fields → `400 chatchi_invalid_settings` with `data.fields` |
 | GET | `/agent/content` | Published pages, posts and products by title: `search`, up to 20 |
 | GET | `/agent/reports` | `range` 7, 30 or 90 days (site time zone): KPIs with the previous period (`conversations`, `answered` %, median `first_response` in seconds, `satisfaction`), `daily`, `ratings`, `agents`, `heatmap` (weekday × hour, 0 = Sunday), `tags`, `comments` |
+| POST | `/agent/settings/sms-test` | `provider` (`kavenegar` / `melipayamak`), `api_key` or `username` + `password`, `sender`, `phone`: sends a test SMS with these values and reports the service's answer |
 | POST | `/agent/settings/bot-test` | `service` (`telegram` / `bale`), `token`, `chat_id`, `api_url`: sends a test message with these values (saved or not) and reports the service's answer |
 
 ## Agent panel
@@ -209,8 +215,10 @@ Administrators only (`manage_options`).
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
 
-Administrators also get a **Settings** screen with nine sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
+Administrators also get a **Settings** screen with eleven sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
 
+- **Channels & FAQ** (`#/settings/contact`): WhatsApp, Telegram, Bale and phone numbers (up to 6, reorderable, each with an optional label) shown in a menu the chat button opens, and up to 30 frequently asked questions visitors see before their first message. Numbers are stored normalized (WhatsApp `0912…` becomes `98912…`) and links are built only from them (`wa.me`, `t.me`, `ble.ir`, `tel:`).
+- **SMS** (`#/settings/sms`): Kavenegar (API key, optional sender line) or Melipayamak (username, password, sender line), the text (`{site}`, `{link}`), how long to wait for the visitor to read the reply (1–60 minutes), and "send a test SMS".
 - **Sales** (`#/settings/sales`): chat invitations (up to 10) and the post-chat rating. Each invitation has a message (≤ 300 characters), where it shows (all pages, home, product pages, shop and categories, cart, checkout, or pages whose address contains a text), a delay (0–600 seconds) and how often (once per visit, once a day, every page view). The first matching invitation appears as a bubble by the launcher; clicking it opens the chat with the invitation as support's first message. Invitations never show to a visitor who is already chatting.
 - **Notifications** (`#/settings/notifications`): the email about unanswered messages, Telegram and Bale bots (token, chat ID, an optional relay address for Telegram, "send a test message"), whether bots write for every new chat or only when nobody is online, and automatic transcripts for visitors when a conversation ends.
 - **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, and the offline text.
@@ -218,7 +226,7 @@ Administrators also get a **Settings** screen with nine sections, each saved on 
 - **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
 - **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, the longest allowed message (100–10000 characters), and files: whether visitors may send them and the largest size (1–50 MB, capped by the server's upload limit).
 
-- **Appearance** (`#/settings/appearance`): brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
+- **Appearance** (`#/settings/appearance`): light, dark or automatic (the visitor's device decides) widget theme, brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
 - **Welcome & display** (`#/settings/display`) and **IP & security** (`#/settings/security`), described below.
 
 - **Welcome message**: shown in the widget as the first bubble from support, above the start form and at the top of every conversation. It is not stored as a message, so agents never see it in the inbox. On by default with a translated default text.
@@ -248,6 +256,13 @@ Administrators also get a **Settings** screen with nine sections, each saved on 
 - **Chat invitations**: see Settings → Sales above.
 - **Ratings**: when a conversation ends, the widget asks "How was your chat?" with five stars and an optional comment. Agents see the rating as an internal event line, in the inbox (★) and in the details pane.
 - **Reports** (`#/reports`, administrators): conversations, answer rate, median first response time and satisfaction, each compared with the previous period; conversations per day, rating distribution, each agent's conversations, replies, response time and rating, the busiest hours, the most used tags and the latest comments.
+
+## Contact channels, FAQ, dark mode and SMS
+
+- **Dark mode**: the widget follows the Appearance setting; each agent picks light, dark or their device's setting for the panel with the button in the rail (saved on their account, applied before the page draws). All colors come from design tokens, and the brand's soft tint is recomputed for dark surfaces.
+- **Contact menu**: with channels set, the chat button opens a menu (chat first, then the channels); arrow keys move, Escape or a click elsewhere closes it. Visitors with unread replies go straight to the chat. External links open in a new tab with `noopener`.
+- **FAQ**: shown above the start form and in the empty chat until the first message. Answers are plain text with clickable links; one is open at a time; with more than five questions there is a search box (Persian and Arabic ی/ک match).
+- **SMS**: when an agent replies, a check runs after the set delay (WP-Cron). If the reply is still unread, the visitor has not been on the site for a minute, and they gave a mobile number, one SMS is sent with a link to the page they chatted on (`#chatchi` opens the chat), at most once per conversation every 6 hours. Agents see an event line saying it was sent or why it failed. The service's credentials never appear in logs or errors.
 
 ## Chat widget
 
