@@ -14,6 +14,7 @@ use ChatChi\Attachments\AttachmentService;
 use ChatChi\Attachments\FileStore;
 use ChatChi\Availability\Availability;
 use ChatChi\Availability\OfflineNotifier;
+use ChatChi\Commerce\CustomerContext;
 use ChatChi\Canned\CannedResponses;
 use ChatChi\Admin\PanelAccess;
 use ChatChi\Admin\PanelPage;
@@ -405,7 +406,8 @@ final class Plugin {
 					$c->get( RateLimiter::class ),
 					$c->get( SpamGuard::class ),
 					$c->get( Availability::class ),
-					$c->get( AttachmentService::class )
+					$c->get( AttachmentService::class ),
+					$c->get( CustomerContext::class )
 				);
 			}
 		);
@@ -419,7 +421,9 @@ final class Plugin {
 					$c->get( Presenter::class ),
 					$c->get( AgentRepository::class ),
 					$c->get( AttachmentService::class ),
-					$c->get( Transcript::class )
+					$c->get( Transcript::class ),
+					$c->get( CustomerContext::class ),
+					$c->get( VisitorRepository::class )
 				);
 			}
 		);
@@ -581,6 +585,13 @@ final class Plugin {
 					$c->get( MessageRepository::class ),
 					$c->get( VisitorRepository::class )
 				);
+			}
+		);
+
+		$this->container->singleton(
+			CustomerContext::class,
+			static function ( Container $c ): CustomerContext {
+				return new CustomerContext( $c->get( VisitorRepository::class ) );
 			}
 		);
 

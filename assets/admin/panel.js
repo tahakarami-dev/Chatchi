@@ -160,6 +160,9 @@
 		botTest: function ( data ) {
 			return request( 'POST', '/agent/settings/bot-test', { body: data } );
 		},
+		customer: function ( id ) {
+			return request( 'GET', '/agent/conversations/' + id + '/customer' );
+		},
 		transcript: function ( id ) {
 			return request( 'POST', '/agent/conversations/' + id + '/transcript' );
 		},
@@ -2163,8 +2166,88 @@
 					}
 				}, [ icon( 'mail' ), S.sendTranscript ] )
 			] ) : null,
+			this.buildCustomer( conv ),
 			this.buildTagEditor( conv )
 		);
+	};
+
+	/**
+	 * Where the visitor is and, on WooCommerce shops, their cart and
+	 * orders. Loaded when the details open and refreshed with them.
+	 */
+	Panel.prototype.buildCustomer = function ( conv ) {
+		var self = this;
+		var section = h( 'section', { className: 'cc-info-shop', 'aria-live': 'polite' } );
+		var cached = this.customerCache && this.customerCache.id === conv.id ? this.customerCache.data : null;
+
+		function render( data ) {
+			var nodes = [];
+
+			if ( data.page ) {
+				nodes.push( h( 'h3', {}, [ icon( 'eye' ), S.currentPage ] ) );
+				nodes.push( h( 'a', { className: 'cc-shop-page', href: data.page.url, target: '_blank', rel: 'noopener noreferrer', dir: 'auto', text: data.page.title || decodeSafe( data.page.url ) } ) );
+				if ( data.page.at ) {
+					nodes.push( h( 'p', { className: 'cc-hint', text: fmt.ago( new Date( data.page.at ) ) } ) );
+				}
+			}
+
+			if ( data.shop ) {
+				var cart = data.cart;
+				nodes.push( h( 'h3', {}, [ icon( 'cart' ), cart && cart.count ? S.cartCount.replace( '%s', fmt.number( cart.count ) ) : S.cart ] ) );
+				if ( cart && cart.items.length ) {
+					nodes.push( h( 'ul', { className: 'cc-shop-list' }, cart.items.map( function ( item ) {
+						return h( 'li', {}, [
+							item.url ? h( 'a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', text: item.name } ) : h( 'span', { text: item.name } ),
+							h( 'span', { className: 'cc-shop-qty', text: '× ' + fmt.number( item.quantity ) } ),
+							h( 'span', { className: 'cc-shop-price', text: item.total } )
+						] );
+					} ) ) );
+					nodes.push( h( 'p', { className: 'cc-shop-total' }, [ h( 'span', { text: S.cartTotal } ), h( 'strong', { text: cart.total } ) ] ) );
+				} else {
+					nodes.push( h( 'p', { className: 'cc-muted', text: S.cartEmpty } ) );
+				}
+
+				if ( data.can_orders && data.orders ) {
+					nodes.push( h( 'h3', {}, [ icon( 'clipboard' ), S.orders ] ) );
+					if ( data.orders.count ) {
+						nodes.push( h( 'p', { className: 'cc-hint', text: S.ordersSummary.replace( '%1$s', fmt.number( data.orders.count ) ).replace( '%2$s', data.orders.spent ) } ) );
+						nodes.push( h( 'ul', { className: 'cc-shop-orders' }, data.orders.items.map( function ( order ) {
+							var head = [
+								h( 'strong', { text: '#' + order.number } ),
+								h( 'span', { className: 'cc-order-status cc-order-status--' + order.status, text: order.status_label } ),
+								h( 'span', { className: 'cc-shop-price', text: order.total } )
+							];
+							return h( 'li', {}, [
+								order.url ? h( 'a', { className: 'cc-order-head', href: order.url, target: '_blank', rel: 'noopener noreferrer' }, head ) : h( 'div', { className: 'cc-order-head' }, head ),
+								h( 'p', { className: 'cc-hint', text: ( order.date ? fmt.ago( new Date( order.date ) ) + ' · ' : '' ) + order.items.join( '، ' ) } )
+							] );
+						} ) ) );
+					} else {
+						nodes.push( h( 'p', { className: 'cc-muted', text: S.noOrders } ) );
+					}
+				}
+			}
+
+			section.hidden = ! nodes.length;
+			section.replaceChildren.apply( section, nodes );
+		}
+
+		if ( cached ) {
+			render( cached );
+		} else {
+			section.hidden = true;
+		}
+
+		api.customer( conv.id ).then( function ( data ) {
+			self.customerCache = { id: conv.id, data: data };
+			if ( self.state.conv && self.state.conv.id === conv.id ) {
+				render( data );
+			}
+		} ).catch( function () {
+			// The rest of the details still work.
+		} );
+
+		return section;
 	};
 
 	/**

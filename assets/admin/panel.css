@@ -3050,3 +3050,142 @@ label.cc-button {
 .cc-tool[hidden] {
 	display: none;
 }
+
+/* Shop: current page, cart and orders in the details pane */
+
+.cc-info-shop {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 16px;
+	border-top: 1px solid var(--chatchi-border);
+}
+
+.cc-info-shop[hidden] {
+	display: none;
+}
+
+.cc-info-shop h3 {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--chatchi-text-muted);
+}
+
+.cc-info-shop h3:first-child {
+	margin-top: 0;
+}
+
+.cc-info-shop h3 svg {
+	width: 16px;
+	height: 16px;
+}
+
+.cc-shop-page {
+	color: var(--chatchi-primary);
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
+.cc-shop-list,
+.cc-shop-orders {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.cc-shop-list li {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.cc-shop-list a,
+.cc-shop-list li > span:first-child {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: inherit;
+}
+
+.cc-shop-qty {
+	color: var(--chatchi-text-subtle);
+	font-size: 12px;
+}
+
+.cc-shop-price {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.cc-shop-total {
+	display: flex;
+	justify-content: space-between;
+	margin: 0;
+	padding-top: 6px;
+	border-top: 1px dashed var(--chatchi-border);
+	font-size: 13px;
+}
+
+.cc-shop-orders li {
+	padding: 8px 10px;
+	border-radius: var(--chatchi-radius-sm);
+	background: var(--chatchi-bg);
+}
+
+.cc-order-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: inherit;
+	text-decoration: none;
+	font-size: 13px;
+}
+
+.cc-order-head .cc-shop-price {
+	margin-inline-start: auto;
+}
+
+a.cc-order-head:hover strong {
+	color: var(--chatchi-primary);
+}
+
+.cc-order-status {
+	padding: 0 8px;
+	border-radius: 9999px;
+	background: var(--chatchi-surface-muted);
+	color: var(--chatchi-text-muted);
+	font-size: 11px;
+	line-height: 20px;
+}
+
+.cc-order-status--completed {
+	background: var(--chatchi-success-soft);
+	color: var(--chatchi-success-text);
+}
+
+.cc-order-status--processing {
+	background: var(--chatchi-primary-soft);
+	color: var(--chatchi-primary);
+}
+
+.cc-order-status--on-hold,
+.cc-order-status--pending {
+	background: var(--chatchi-warning-soft);
+	color: var(--chatchi-warning-text);
+}
+
+.cc-order-status--cancelled,
+.cc-order-status--failed,
+.cc-order-status--refunded {
+	background: var(--chatchi-error-soft);
+	color: var(--chatchi-error-text);
+}

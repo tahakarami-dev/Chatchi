@@ -144,6 +144,16 @@ final class PanelStrings {
 			'sectionAppearance'    => __( 'Appearance', 'chatchi' ),
 			'sectionDisplay'       => __( 'Welcome & display', 'chatchi' ),
 			'sectionSecurity'      => __( 'IP & security', 'chatchi' ),
+			'currentPage'          => __( 'Viewing now', 'chatchi' ),
+			'cart'                 => __( 'Cart', 'chatchi' ),
+			'cartTotal'            => __( 'Cart total', 'chatchi' ),
+			'cartEmpty'            => __( 'The cart is empty.', 'chatchi' ),
+			'orders'               => __( 'Orders', 'chatchi' ),
+			'noOrders'             => __( 'No orders yet.', 'chatchi' ),
+			/* translators: %s: number of items. */
+			'cartCount'            => __( 'Cart (%s items)', 'chatchi' ),
+			/* translators: 1: number of orders, 2: amount spent. */
+			'ordersSummary'        => __( '%1$s orders, %2$s spent in total', 'chatchi' ),
 			'transcriptTitle'      => __( 'Chat transcript for visitors', 'chatchi' ),
 			'transcriptIntro'      => __( 'When a conversation ends, email the visitor a copy of it (visitors who gave an email address). Internal notes are never included.', 'chatchi' ),
 			'transcriptOn'         => __( 'Email transcripts automatically', 'chatchi' ),

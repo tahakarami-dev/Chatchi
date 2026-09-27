@@ -56,11 +56,12 @@
 	var request = client.request;
 
 	var api = {
-		session: function () {
-			return request( 'GET', '/widget/session' );
+		// withPage: tell the server which page this is (shown to agents).
+		session: function ( withPage ) {
+			return request( 'GET', '/widget/session', withPage ? { query: { url: window.location.href, title: document.title.slice( 0, 300 ) } } : undefined );
 		},
 		start: function ( profile ) {
-			var body = Object.assign( { page_url: window.location.href }, profile );
+			var body = Object.assign( { page_url: window.location.href, page_title: document.title.slice( 0, 300 ) }, profile );
 			return request( 'POST', '/widget/conversations', { body: body } );
 		},
 		messages: function ( id, query ) {
@@ -363,7 +364,7 @@
 
 		this.booting = true;
 
-		return api.session().then( function ( session ) {
+		return api.session( true ).then( function ( session ) {
 			self.sessionAt = Date.now();
 			self.booted = true;
 			self.booting = false;

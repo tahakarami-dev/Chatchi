@@ -9,6 +9,7 @@ namespace ChatChi\Rest;
 
 use ChatChi\Attachments\AttachmentService;
 use ChatChi\Availability\Availability;
+use ChatChi\Commerce\CustomerContext;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
 use ChatChi\Database\Repositories\AgentRepository;
@@ -46,6 +47,8 @@ final class WidgetController extends ConversationController {
 
 	private Availability $availability;
 
+	private ?CustomerContext $context;
+
 	/**
 	 * Rate-limit decisions per request object.
 	 *
@@ -58,17 +61,18 @@ final class WidgetController extends ConversationController {
 	private \SplObjectStorage $decisions;
 
 	/**
-	 * @param ConversationService $conversations Conversation use cases.
-	 * @param MessageService      $messages      Message use cases.
-	 * @param Presenter           $presenter     Response shapes.
-	 * @param VisitorService      $visitors      Visitor use cases.
-	 * @param AgentRepository     $agents        Agent storage, to name assigned agents.
-	 * @param MessageBody         $body          Message rules, to expose the length limit.
-	 * @param RequestGuard        $guard         Cross-site protection.
-	 * @param RateLimiter         $limiter       Rate limits.
-	 * @param SpamGuard           $spam          Bot checks for the start form.
-	 * @param Availability        $availability  Business hours and agent presence.
-	 * @param AttachmentService   $attachments   Files in conversations.
+	 * @param ConversationService  $conversations Conversation use cases.
+	 * @param MessageService       $messages      Message use cases.
+	 * @param Presenter            $presenter     Response shapes.
+	 * @param VisitorService       $visitors      Visitor use cases.
+	 * @param AgentRepository      $agents        Agent storage, to name assigned agents.
+	 * @param MessageBody          $body          Message rules, to expose the length limit.
+	 * @param RequestGuard         $guard         Cross-site protection.
+	 * @param RateLimiter          $limiter       Rate limits.
+	 * @param SpamGuard            $spam          Bot checks for the start form.
+	 * @param Availability         $availability  Business hours and agent presence.
+	 * @param AttachmentService    $attachments   Files in conversations.
+	 * @param CustomerContext|null $context       Page and cart tracking.
 	 */
 	public function __construct(
 		ConversationService $conversations,
@@ -81,7 +85,8 @@ final class WidgetController extends ConversationController {
 		RateLimiter $limiter,
 		SpamGuard $spam,
 		Availability $availability,
-		AttachmentService $attachments
+		AttachmentService $attachments,
+		?CustomerContext $context = null
 	) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
@@ -92,6 +97,7 @@ final class WidgetController extends ConversationController {
 		$this->limiter      = $limiter;
 		$this->spam         = $spam;
 		$this->availability = $availability;
+		$this->context      = $context;
 		$this->decisions    = new \SplObjectStorage();
 	}
 
@@ -113,6 +119,19 @@ final class WidgetController extends ConversationController {
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'session' ),
 				'permission_callback' => array( $this, 'permit_public' ),
+				'args'                => array(
+					// The page the widget loaded on; recorded for visitors who chatted.
+					'url'   => array(
+						'type'      => 'string',
+						'maxLength' => 2048,
+						'default'   => '',
+					),
+					'title' => array(
+						'type'      => 'string',
+						'maxLength' => 500,
+						'default'   => '',
+					),
+				),
 			)
 		);
 
@@ -150,6 +169,11 @@ final class WidgetController extends ConversationController {
 					'page_url'   => array(
 						'type'      => 'string',
 						'maxLength' => 2048,
+						'default'   => '',
+					),
+					'page_title' => array(
+						'type'      => 'string',
+						'maxLength' => 500,
 						'default'   => '',
 					),
 					// Sent from the leave-a-message form: email is required then.
@@ -237,6 +261,10 @@ final class WidgetController extends ConversationController {
 		$conversation = null;
 		$unread       = 0;
 
+		if ( $visitor && $this->context && '' !== (string) $request['url'] ) {
+			$this->context->record( $visitor, (string) $request['url'], (string) $request['title'] );
+		}
+
 		if ( $visitor ) {
 			$open = $this->conversations->open_for( $visitor );
 
@@ -303,6 +331,10 @@ final class WidgetController extends ConversationController {
 
 		if ( $conversation instanceof \WP_Error ) {
 			return $conversation;
+		}
+
+		if ( $this->context ) {
+			$this->context->record( $visitor, (string) $request['page_url'], (string) $request['page_title'] );
 		}
 
 		$data = $this->present_conversation( $conversation, Actor::visitor( $visitor ) );
