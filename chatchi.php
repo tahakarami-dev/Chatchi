@@ -1,12 +1,13 @@
 <?php
 /**
- * Plugin Name:       ChatChi | چت‌چی
- * Plugin URI:        https://github.com/tahakarami-dev/Chatchi
- * Description:       Lightweight, secure live chat for WordPress with a standalone, SaaS-style agent panel.
- * Version:           1.6.1
+ * Plugin Name:       چت‌چی
+ * Plugin URI:        https://www.rtl-theme.com/chatchi-wordpress-plugin/
+ * Description:       گفتگوی زنده‌ی سریع و امن برای وردپرس و ووکامرس، با پنل اپراتور مستقل و حرفه‌ای. ربات هوش مصنوعی با GapGPT و AvalAI، پیشنهاد پاسخ به اپراتور، نمایش سبد خرید و سفارش‌های مشتری، دعوت خودکار به گفتگو، امتیازدهی و گزارش‌های فروش، اعلان در تلگرام و بله، پیامک با کاوه‌نگار و ملی‌پیامک، منوی واتساپ و تلگرام، سؤالات متداول و حالت تیره؛ کاملاً فارسی و راست‌چین.
+ * Version:           1.0.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
- * Author:            Taha Karami
+ * Author:            طاها کرمی
+ * Author URI:        https://www.rtl-theme.com/author/taha-karami
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       chatchi
@@ -25,7 +26,7 @@ if ( defined( 'CHATCHI_VERSION' ) ) {
 	return;
 }
 
-define( 'CHATCHI_VERSION', '1.6.1' );
+define( 'CHATCHI_VERSION', '1.0.0' );
 define( 'CHATCHI_FILE', __FILE__ );
 define( 'CHATCHI_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CHATCHI_URL', plugin_dir_url( __FILE__ ) );
