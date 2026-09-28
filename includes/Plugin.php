@@ -56,6 +56,7 @@ use ChatChi\Notifications\SmsGateway;
 use ChatChi\Notifications\SmsNotifier;
 use ChatChi\Notifications\Transcript;
 use ChatChi\Rest\CannedController;
+use ChatChi\Rest\GuestAccess;
 use ChatChi\Rest\Presenter;
 use ChatChi\Rest\RequestGuard;
 use ChatChi\Rest\ReportsController;
@@ -284,6 +285,13 @@ final class Plugin {
 			SecurityModule::class,
 			static function ( Container $c ): SecurityModule {
 				return new SecurityModule( $c->get( RateLimiter::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			GuestAccess::class,
+			static function (): GuestAccess {
+				return new GuestAccess();
 			}
 		);
 	}
@@ -789,6 +797,7 @@ final class Plugin {
 			InstallNotice::class,
 			SecurityModule::class,
 			RestModule::class,
+			GuestAccess::class,
 			OfflineNotifier::class,
 			BotNotifier::class,
 			SmsNotifier::class,

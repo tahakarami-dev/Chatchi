@@ -8,6 +8,7 @@
 namespace ChatChi\Frontend;
 
 use ChatChi\Core\Contracts\Module;
+use ChatChi\Rest\GuestAccess;
 use ChatChi\Settings\ContactChannels;
 use ChatChi\Settings\ProactiveRules;
 use ChatChi\Settings\Settings;
@@ -164,6 +165,11 @@ final class WidgetModule implements Module {
 	public function config(): array {
 		$config = array(
 			'restUrl'   => esc_url_raw( rest_url( 'chatchi/v1' ) ),
+			// Used when the site's REST API is closed to guests.
+			'ajax'      => array(
+				'url'    => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
+				'action' => GuestAccess::AJAX_ACTION,
+			),
 			'nonce'     => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 			'styleUrls' => array(
 				esc_url_raw( add_query_arg( 'ver', CHATCHI_VERSION, CHATCHI_URL . 'assets/shared/tokens.css' ) ),
