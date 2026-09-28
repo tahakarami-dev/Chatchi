@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-28T09:09:26+00:00\n"
+"POT-Creation-Date: 2026-09-28T10:39:00+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -292,7 +292,7 @@ msgid "Yesterday"
 msgstr "دیروز"
 
 #: includes/Admin/PanelStrings.php:72
-#: includes/Notifications/Transcript.php:207
+#: includes/Notifications/Transcript.php:212
 msgid "You"
 msgstr "شما"
 
@@ -1785,8 +1785,8 @@ msgid "Use the default color"
 msgstr "برگشت به رنگ پیش‌فرض"
 
 #: includes/Admin/PanelStrings.php:473
-msgid "Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed."
-msgstr "یک رنگ انتخاب کن یا کدی مثل #5B5BD6 بنویس. اگر لازم باشد، متن روی آن خودکار تیره می‌شود."
+msgid "Pick a color, or type a code like #2563EB. Text on it switches to dark automatically when needed."
+msgstr "یک رنگ انتخاب کن یا کدی مثل #2563EB بنویس. اگر لازم باشد، متن روی آن خودکار تیره می‌شود."
 
 #: includes/Admin/PanelStrings.php:474
 msgid "This color is light: icons and links in this color may be hard to see on white."
@@ -2250,7 +2250,7 @@ msgstr "بازدیدکننده درخواست صحبت با یک انسان را
 #: includes/Conversations/ConversationService.php:549
 #: includes/Conversations/RatingService.php:74
 #: includes/Messages/MessageService.php:222
-#: includes/Notifications/Transcript.php:96
+#: includes/Notifications/Transcript.php:101
 #: includes/Rest/AdminPermission.php:41
 msgid "You are not allowed to do this."
 msgstr "اجازه‌ی انجام این کار را نداری."
@@ -2509,7 +2509,7 @@ msgid "We usually reply within a few minutes"
 msgstr "معمولاً چند دقیقه‌ای جواب می‌دهیم"
 
 #: includes/Frontend/WidgetStrings.php:27
-#: includes/Notifications/Transcript.php:216
+#: includes/Notifications/Transcript.php:224
 msgid "Support"
 msgstr "پشتیبانی"
 
@@ -2840,30 +2840,30 @@ msgstr "پیامک به بازدیدکننده ارسال نشد: %s"
 msgid "The visitor was not on the site; an SMS told them about the reply."
 msgstr "بازدیدکننده در سایت نبود؛ با پیامک از جواب باخبرش کردیم."
 
-#: includes/Notifications/Transcript.php:120
+#: includes/Notifications/Transcript.php:125
 msgid "This visitor has not given an email address."
 msgstr "این بازدیدکننده ایمیلی وارد نکرده است."
 
-#: includes/Notifications/Transcript.php:124
+#: includes/Notifications/Transcript.php:129
 msgid "There are no messages to send yet."
 msgstr "هنوز پیامی برای ارسال نیست."
 
 #. translators: %s: site name.
-#: includes/Notifications/Transcript.php:132
-#: includes/Notifications/Transcript.php:237
+#: includes/Notifications/Transcript.php:137
+#: includes/Notifications/Transcript.php:245
 #, php-format
 msgid "Your conversation with %s"
 msgstr "گفتگوی شما با %s"
 
-#: includes/Notifications/Transcript.php:146
+#: includes/Notifications/Transcript.php:151
 msgid "Sending the transcript was cancelled."
 msgstr "ارسال رونوشت لغو شد."
 
-#: includes/Notifications/Transcript.php:150
+#: includes/Notifications/Transcript.php:155
 msgid "The email could not be sent. Check that your site can send email."
 msgstr "ایمیل ارسال نشد. بررسی کن سایتت می‌تواند ایمیل بفرستد."
 
-#: includes/Notifications/Transcript.php:240
+#: includes/Notifications/Transcript.php:248
 msgid "This is a copy of your chat, for your records."
 msgstr "این نسخه‌ای از گفتگوی شماست که برای سابقه ارسال شده است."
 
@@ -3105,8 +3105,8 @@ msgid "Choose how visitors reach your site."
 msgstr "مشخص کن بازدیدکننده‌ها چطور به سایتت وصل می‌شوند."
 
 #: includes/Settings/SettingsValidator.php:550
-msgid "Enter a color code like #5B5BD6."
-msgstr "کد رنگ را به شکل #5B5BD6 وارد کن."
+msgid "Enter a color code like #2563EB."
+msgstr "کد رنگ را به شکل #2563EB وارد کن."
 
 #: includes/Settings/SettingsValidator.php:555
 msgid "Choose a corner for the widget."

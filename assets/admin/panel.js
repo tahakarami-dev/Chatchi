@@ -4454,7 +4454,7 @@
 	/* --------------------------- brand colors -------------------------- */
 
 	var DEFAULT_TEXT_ON_LIGHT = '#1A1A2E';
-	var COLOR_PRESETS = [ '#5B5BD6', '#2563EB', '#0D9488', '#16A34A', '#EA580C', '#DC2626', '#DB2777', '#1F2937' ];
+	var COLOR_PRESETS = [ '#2563EB', '#5B5BD6', '#0D9488', '#16A34A', '#EA580C', '#DC2626', '#DB2777', '#1F2937' ];
 
 	/**
 	 * Returns #RRGGBB for "#abc", "abc", "#aabbcc" or "aabbcc", else null.

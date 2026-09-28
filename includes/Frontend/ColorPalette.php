@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class ColorPalette {
 
-	public const DEFAULT_PRIMARY = '#5B5BD6';
+	public const DEFAULT_PRIMARY = '#2563EB';
 
 	private const DARK_TEXT = '#1A1A2E';
 
@@ -43,7 +43,7 @@ final class ColorPalette {
 		/**
 		 * Filters the widget's primary color.
 		 *
-		 * @param string $color Hex color, e.g. #5B5BD6: the one chosen in the settings, or the default.
+		 * @param string $color Hex color, e.g. #2563EB: the one chosen in the settings, or the default.
 		 */
 		$color = sanitize_hex_color( (string) apply_filters( 'chatchi_primary_color', '' !== $chosen ? $chosen : self::DEFAULT_PRIMARY ) );
 

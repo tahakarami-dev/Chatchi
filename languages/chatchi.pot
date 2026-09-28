@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-28T09:09:26+00:00\n"
+"POT-Creation-Date: 2026-09-28T10:39:00+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -290,7 +290,7 @@ msgid "Yesterday"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:72
-#: includes/Notifications/Transcript.php:207
+#: includes/Notifications/Transcript.php:212
 msgid "You"
 msgstr ""
 
@@ -1777,7 +1777,7 @@ msgid "Use the default color"
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:473
-msgid "Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed."
+msgid "Pick a color, or type a code like #2563EB. Text on it switches to dark automatically when needed."
 msgstr ""
 
 #: includes/Admin/PanelStrings.php:474
@@ -2242,7 +2242,7 @@ msgstr ""
 #: includes/Conversations/ConversationService.php:549
 #: includes/Conversations/RatingService.php:74
 #: includes/Messages/MessageService.php:222
-#: includes/Notifications/Transcript.php:96
+#: includes/Notifications/Transcript.php:101
 #: includes/Rest/AdminPermission.php:41
 msgid "You are not allowed to do this."
 msgstr ""
@@ -2501,7 +2501,7 @@ msgid "We usually reply within a few minutes"
 msgstr ""
 
 #: includes/Frontend/WidgetStrings.php:27
-#: includes/Notifications/Transcript.php:216
+#: includes/Notifications/Transcript.php:224
 msgid "Support"
 msgstr ""
 
@@ -2832,30 +2832,30 @@ msgstr ""
 msgid "The visitor was not on the site; an SMS told them about the reply."
 msgstr ""
 
-#: includes/Notifications/Transcript.php:120
+#: includes/Notifications/Transcript.php:125
 msgid "This visitor has not given an email address."
 msgstr ""
 
-#: includes/Notifications/Transcript.php:124
+#: includes/Notifications/Transcript.php:129
 msgid "There are no messages to send yet."
 msgstr ""
 
 #. translators: %s: site name.
-#: includes/Notifications/Transcript.php:132
-#: includes/Notifications/Transcript.php:237
+#: includes/Notifications/Transcript.php:137
+#: includes/Notifications/Transcript.php:245
 #, php-format
 msgid "Your conversation with %s"
 msgstr ""
 
-#: includes/Notifications/Transcript.php:146
+#: includes/Notifications/Transcript.php:151
 msgid "Sending the transcript was cancelled."
 msgstr ""
 
-#: includes/Notifications/Transcript.php:150
+#: includes/Notifications/Transcript.php:155
 msgid "The email could not be sent. Check that your site can send email."
 msgstr ""
 
-#: includes/Notifications/Transcript.php:240
+#: includes/Notifications/Transcript.php:248
 msgid "This is a copy of your chat, for your records."
 msgstr ""
 
@@ -3097,7 +3097,7 @@ msgid "Choose how visitors reach your site."
 msgstr ""
 
 #: includes/Settings/SettingsValidator.php:550
-msgid "Enter a color code like #5B5BD6."
+msgid "Enter a color code like #2563EB."
 msgstr ""
 
 #: includes/Settings/SettingsValidator.php:555

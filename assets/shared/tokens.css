@@ -6,9 +6,9 @@
 
 :root,
 :host {
-	--chatchi-primary: #5b5bd6;
-	--chatchi-primary-hover: #4a4ac4;
-	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #eeeefc);
+	--chatchi-primary: #2563eb;
+	--chatchi-primary-hover: #2157cf;
+	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #e9effd);
 	--chatchi-primary-contrast: #fff;
 	--chatchi-accent: #ff7a59;
 
@@ -31,7 +31,7 @@
 	--chatchi-shadow-sm: 0 1px 2px rgba(26, 26, 46, .06);
 	--chatchi-shadow-md: 0 4px 12px rgba(26, 26, 46, .08), 0 1px 3px rgba(26, 26, 46, .06);
 	--chatchi-shadow-lg: 0 16px 40px rgba(26, 26, 46, .14), 0 4px 12px rgba(26, 26, 46, .06);
-	--chatchi-focus-ring: 0 0 0 3px rgba(91, 91, 214, .35);
+	--chatchi-focus-ring: 0 0 0 3px rgba(37, 99, 235, .35);
 	--chatchi-duration-fast: 150ms;
 	--chatchi-duration-base: 200ms;
 	--chatchi-duration-slow: 250ms;
@@ -51,7 +51,7 @@
  * below can replace it with a tint of the brand color on a dark surface.
  */
 .chatchi {
-	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #eeeefc);
+	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #e9effd);
 }
 
 /*
