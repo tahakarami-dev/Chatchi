@@ -13,6 +13,7 @@ use ChatChi\Core\Contracts\Module;
 use ChatChi\Database\Repositories\AgentRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
+use ChatChi\Frontend\ColorPalette;
 use ChatChi\Models\Conversation;
 use ChatChi\Models\Message;
 use ChatChi\Settings\Settings;
@@ -44,19 +45,23 @@ final class Transcript implements Module {
 
 	private AgentRepository $agents;
 
+	private ColorPalette $palette;
+
 	/**
 	 * @param Settings            $settings      Plugin settings.
 	 * @param ConversationService $conversations Conversation access.
 	 * @param MessageRepository   $messages      Message storage.
 	 * @param VisitorRepository   $visitors      Visitor storage.
 	 * @param AgentRepository     $agents        Agent storage, for names.
+	 * @param ColorPalette|null   $palette       The site's brand color.
 	 */
-	public function __construct( Settings $settings, ConversationService $conversations, MessageRepository $messages, VisitorRepository $visitors, AgentRepository $agents ) {
+	public function __construct( Settings $settings, ConversationService $conversations, MessageRepository $messages, VisitorRepository $visitors, AgentRepository $agents, ?ColorPalette $palette = null ) {
 		$this->settings      = $settings;
 		$this->conversations = $conversations;
 		$this->messages      = $messages;
 		$this->visitors      = $visitors;
 		$this->agents        = $agents;
+		$this->palette       = $palette ?? new ColorPalette( $settings );
 	}
 
 	/**
@@ -206,6 +211,9 @@ final class Transcript implements Module {
 		$align = $rtl ? 'right' : 'left';
 		$you   = '' !== $visitor_name ? $visitor_name : __( 'You', 'chatchi' );
 		$rows  = '';
+		$brand = $this->palette->tokens();
+		// Agent names in the brand color when it reads well on white.
+		$name_color = '#FFFFFF' === $brand['primaryContrast'] ? $brand['primary'] : '#1a1a2e';
 
 		foreach ( $messages as $message ) {
 			if ( Message::SENDER_SYSTEM === $message->sender_type ) {
@@ -220,7 +228,7 @@ final class Transcript implements Module {
 			$rows .= sprintf(
 				'<tr><td style="padding:10px 14px;border-bottom:1px solid #eeeef3;text-align:%1$s;"><div style="font-size:12px;color:%2$s;margin-bottom:4px;"><strong>%3$s</strong> · %4$s</div><div style="font-size:14px;line-height:1.8;color:#1a1a2e;unicode-bidi:plaintext;">%5$s</div></td></tr>',
 				esc_attr( $align ),
-				$mine ? '#6b6b80' : '#5b5bd6',
+				esc_attr( $mine ? '#6b6b80' : $name_color ),
 				esc_html( $sender ),
 				esc_html( $time ),
 				nl2br( esc_html( $body ) )
@@ -230,14 +238,16 @@ final class Transcript implements Module {
 		$date = wp_date( (string) get_option( 'date_format' ), (int) strtotime( $conversation->created_at . ' UTC' ) );
 
 		return sprintf(
-			'<!doctype html><html dir="%1$s"><body style="margin:0;padding:24px;background:#f7f7fa;font-family:Tahoma,Arial,sans-serif;direction:%1$s;"><table role="presentation" width="100%%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;border-collapse:collapse;overflow:hidden;"><tr><td style="padding:18px 14px;background:#5b5bd6;color:#fff;text-align:%2$s;"><div style="font-size:16px;font-weight:bold;">%3$s</div><div style="font-size:12px;opacity:.9;">%4$s</div></td></tr>%5$s<tr><td style="padding:14px;font-size:12px;color:#8a8a9e;text-align:%2$s;">%6$s</td></tr></table></body></html>',
+			'<!doctype html><html dir="%1$s"><body style="margin:0;padding:24px;background:#f7f7fa;font-family:Tahoma,Arial,sans-serif;direction:%1$s;"><table role="presentation" width="100%%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;border-collapse:collapse;overflow:hidden;"><tr><td style="padding:18px 14px;background:%7$s;color:%8$s;text-align:%2$s;"><div style="font-size:16px;font-weight:bold;">%3$s</div><div style="font-size:12px;opacity:.9;">%4$s</div></td></tr>%5$s<tr><td style="padding:14px;font-size:12px;color:#8a8a9e;text-align:%2$s;">%6$s</td></tr></table></body></html>',
 			esc_attr( $dir ),
 			esc_attr( $align ),
 			/* translators: %s: site name. */
 			esc_html( sprintf( __( 'Your conversation with %s', 'chatchi' ), $site ) ),
 			esc_html( $date ),
 			$rows,
-			esc_html__( 'This is a copy of your chat, for your records.', 'chatchi' )
+			esc_html__( 'This is a copy of your chat, for your records.', 'chatchi' ),
+			esc_attr( $brand['primary'] ),
+			esc_attr( $brand['primaryContrast'] )
 		);
 	}
 }

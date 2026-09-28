@@ -547,7 +547,7 @@ final class SettingsValidator {
 
 				return null !== $color
 					? $color
-					: new \WP_Error( 'invalid', __( 'Enter a color code like #5B5BD6.', 'chatchi' ) );
+					: new \WP_Error( 'invalid', __( 'Enter a color code like #2563EB.', 'chatchi' ) );
 
 			case 'widget_position':
 				return in_array( $value, self::POSITIONS, true )
@@ -951,7 +951,7 @@ final class SettingsValidator {
 	 * Returns a color as #RRGGBB, an empty string for "default", or null
 	 * when the text is not a hex color.
 	 *
-	 * @param string $value Raw value, e.g. "#5b5bd6", "5B5BD6" or "#abc".
+	 * @param string $value Raw value, e.g. "#2563eb", "2563EB" or "#abc".
 	 */
 	private function color( string $value ): ?string {
 		$value = trim( $value );

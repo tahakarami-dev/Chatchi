@@ -42,13 +42,13 @@
 
 | Token | Value | کاربرد |
 |---|---|---|
-| `--chatchi-primary` | `#5B5BD6` | دکمه‌ی اصلی، حباب پیام بازدیدکننده، launcher، لینک فعال |
-| `--chatchi-primary-hover` | `#4A4AC4` | hover/pressed |
-| `--chatchi-primary-soft` | `#EEEEFC` | پس‌زمینه‌ی آیتم فعال، badge ملایم، focus fill |
+| `--chatchi-primary` | `#2563EB` | دکمه‌ی اصلی، حباب پیام بازدیدکننده، launcher، لینک فعال |
+| `--chatchi-primary-hover` | `#2157CF` | hover/pressed |
+| `--chatchi-primary-soft` | `#E9EFFD` | پس‌زمینه‌ی آیتم فعال، badge ملایم، focus fill |
 | `--chatchi-primary-contrast` | `#FFFFFF` | متن روی primary |
 | `--chatchi-accent` | `#FF7A59` | **فقط** نقطه‌ی «پیام جدید» و نشانگرهای کوچک (کنتراست متن سفید روی آن کافی نیست؛ برای متن استفاده نشود) |
 
-کنتراست‌های بررسی‌شده: سفید روی `#5B5BD6` = **5.37:1** ✅ · `#4A4AC4` روی `#EEEEFC` = **5.96:1** ✅
+کنتراست‌های بررسی‌شده: سفید روی `#2563EB` = **5.17:1** ✅ · `#2157CF` روی `#E9EFFD` = **5.48:1** ✅
 
 **رنگ اصلی قابل تنظیم توسط مدیر سایت (Phase 14):** سه مشتق `hover`، `soft` و `contrast` در سمت سرور (PHP) از رنگ انتخابی محاسبه می‌شوند. اگر کنتراست متن سفید روی رنگ انتخابی کمتر از 4.5 باشد، `--chatchi-primary-contrast` خودکار به `#1A1A2E` تغییر می‌کند.
 
@@ -76,7 +76,7 @@
 | Success | `#16A34A` | `#15803D` (5.0:1) | `#ECFDF3` |
 | Warning | `#D97706` | `#B45309` (5.0:1) | `#FFF7E6` |
 | Error | `#DC2626` | `#B91C1C` | `#FEF2F2` |
-| Info | `#5B5BD6` | `#4A4AC4` | `#EEEEFC` |
+| Info | `#2563EB` | `#2157CF` | `#E9EFFD` |
 
 ### 3.4 وضعیت‌های Conversation (پنل مدیریت)
 
@@ -99,7 +99,7 @@
 --chatchi-text          → gray-900
 --chatchi-text-muted    → gray-600
 --chatchi-text-subtle   → gray-500
---chatchi-focus-ring    → 0 0 0 3px rgba(91, 91, 214, .35)
+--chatchi-focus-ring    → 0 0 0 3px rgba(37, 99, 235, .35)
 ```
 
 ---

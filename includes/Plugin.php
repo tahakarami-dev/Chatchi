@@ -448,7 +448,8 @@ final class Plugin {
 					$c->get( Transcript::class ),
 					$c->get( CustomerContext::class ),
 					$c->get( VisitorRepository::class ),
-					$c->get( Assistant::class )
+					$c->get( Assistant::class ),
+					$c->get( AgentService::class )
 				);
 			}
 		);
@@ -645,7 +646,8 @@ final class Plugin {
 					$c->get( ConversationService::class ),
 					$c->get( MessageRepository::class ),
 					$c->get( VisitorRepository::class ),
-					$c->get( AgentRepository::class )
+					$c->get( AgentRepository::class ),
+					$c->get( ColorPalette::class )
 				);
 			}
 		);
