@@ -5314,17 +5314,22 @@
 		var modelField = input( 'ai_model', S.aiModel, { dir: 'ltr' }, ' ' );
 		var result = h( 'p', { className: 'cc-bot-result', role: 'status', hidden: true } );
 
+		// Presets fill in their own address; "another service" needs one.
 		function showProvider() {
-			var claude = draft.ai_provider === 'anthropic';
-			baseField.querySelector( 'input' ).placeholder = claude ? 'https://api.anthropic.com' : 'https://api.openai.com/v1';
-			baseField.querySelector( '.cc-hint' ).textContent = claude ? S.aiBaseUrlClaudeHint : S.aiBaseUrlOpenAiHint;
-			modelField.querySelector( 'input' ).placeholder = claude ? defaults.ai_model : S.aiModelPlaceholder;
-			modelField.querySelector( '.cc-hint' ).textContent = claude ? String( S.aiModelClaudeHint ).replace( '%s', defaults.ai_model ) : S.aiModelOpenAiHint;
+			var preset = defaults.ai_base_urls[ draft.ai_provider ] || '';
+			baseField.querySelector( 'input' ).placeholder = preset || 'https://api.example.com/v1';
+			baseField.querySelector( '.cc-hint' ).textContent = preset ? String( S.aiBaseUrlPresetHint ).replace( '%s', preset ) : S.aiBaseUrlCustomHint;
+			baseField.querySelector( '.cc-label' ).textContent = preset ? S.aiBaseUrl : S.aiBaseUrlRequired;
 		}
 
+		modelField.querySelector( 'input' ).placeholder = 'gpt-4o-mini';
+		modelField.querySelector( '.cc-hint' ).textContent = S.aiModelHint;
+
 		var providers = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-ai-provider-label' }, [
-			[ 'anthropic', S.aiClaude, S.aiClaudeHint ],
-			[ 'openai', S.aiOpenAi, S.aiOpenAiHint ]
+			[ 'gapgpt', S.aiGapGpt, S.aiGapGptHint ],
+			[ 'avalai', S.aiAvalAi, S.aiAvalAiHint ],
+			[ 'openai', S.aiOpenAi, S.aiOpenAiHint ],
+			[ 'custom', S.aiCustom, S.aiCustomHint ]
 		].map( function ( option ) {
 			var radio = h( 'input', { id: 'cc-ai-provider-' + option[ 0 ], type: 'radio', name: 'cc-ai-provider', value: option[ 0 ], checked: draft.ai_provider === option[ 0 ] } );
 			radio.addEventListener( 'change', function () {

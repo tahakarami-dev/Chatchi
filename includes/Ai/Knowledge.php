@@ -106,7 +106,7 @@ final class Knowledge {
 
 	/**
 	 * What the visitor is doing now: their page, cart and whether agents
-	 * are online. Changes between requests, so it is kept out of the cached part.
+	 * are online. Changes between requests, so it comes after the stable part.
 	 *
 	 * @param Visitor|null $visitor Visitor.
 	 */
