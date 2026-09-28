@@ -8,6 +8,7 @@
 namespace ChatChi\Rest;
 
 use ChatChi\Admin\PanelTheme;
+use ChatChi\Agents\AgentService;
 use ChatChi\Ai\Assistant;
 use ChatChi\Attachments\AttachmentService;
 use ChatChi\Commerce\CustomerContext;
@@ -41,6 +42,8 @@ final class AgentController extends ConversationController {
 
 	private ?Assistant $assistant;
 
+	private ?AgentService $agent_service;
+
 	/**
 	 * Agent whose presence was already recorded in this request.
 	 */
@@ -56,15 +59,17 @@ final class AgentController extends ConversationController {
 	 * @param CustomerContext|null   $context       Page, cart and orders.
 	 * @param VisitorRepository|null $visitors      Visitor storage.
 	 * @param Assistant|null         $assistant     AI reply suggestions.
+	 * @param AgentService|null      $agent_service Profile changes (name, picture).
 	 */
-	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null, ?CustomerContext $context = null, ?VisitorRepository $visitors = null, ?Assistant $assistant = null ) {
+	public function __construct( ConversationService $conversations, MessageService $messages, Presenter $presenter, AgentRepository $agents, AttachmentService $attachments, ?Transcript $transcript = null, ?CustomerContext $context = null, ?VisitorRepository $visitors = null, ?Assistant $assistant = null, ?AgentService $agent_service = null ) {
 		parent::__construct( $conversations, $messages, $presenter, $attachments );
 
-		$this->agents     = $agents;
-		$this->transcript = $transcript;
-		$this->context    = $context;
-		$this->visitors   = $visitors;
-		$this->assistant  = $assistant;
+		$this->agents        = $agents;
+		$this->transcript    = $transcript;
+		$this->context       = $context;
+		$this->visitors      = $visitors;
+		$this->assistant     = $assistant;
+		$this->agent_service = $agent_service;
 	}
 
 	/**
@@ -92,17 +97,36 @@ final class AgentController extends ConversationController {
 					'callback'            => array( $this, 'update_me' ),
 					'permission_callback' => array( $this, 'permit_actor' ),
 					'args'                => array(
-						'status' => array(
+						'status'       => array(
 							'type' => 'string',
 							'enum' => array( Agent::STATUS_ONLINE, Agent::STATUS_AWAY ),
 						),
 						// The panel's color theme, kept per user.
-						'theme'  => array(
+						'theme'        => array(
 							'type' => 'string',
 							'enum' => PanelTheme::THEMES,
 						),
+						// Every agent edits their own name and picture (0 removes it).
+						'display_name' => array(
+							'type'      => 'string',
+							'maxLength' => 100,
+						),
+						'avatar_id'    => array(
+							'type' => 'integer',
+							'enum' => array( 0 ),
+						),
 					),
 				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/agent/me/avatar',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'upload_my_avatar' ),
+				'permission_callback' => array( $this, 'permit_actor' ),
 			)
 		);
 
@@ -521,8 +545,32 @@ final class AgentController extends ConversationController {
 
 		$agent = $actor->agent_model();
 
-		if ( null === $request['status'] && null === $request['theme'] ) {
+		if ( null === $request['status'] && null === $request['theme'] && null === $request['display_name'] && null === $request['avatar_id'] ) {
 			return new \WP_Error( 'rest_missing_callback_param', __( 'Nothing to change.', 'chatchi' ), array( 'status' => 400 ) );
+		}
+
+		$profile = array();
+
+		if ( null !== $request['display_name'] ) {
+			$profile['display_name'] = (string) $request['display_name'];
+		}
+
+		if ( null !== $request['avatar_id'] ) {
+			$profile['avatar_id'] = 0;
+		}
+
+		if ( $profile ) {
+			if ( ! $this->agent_service ) {
+				return new \WP_Error( 'chatchi_unavailable', __( 'This is not available right now.', 'chatchi' ), array( 'status' => 503 ) );
+			}
+
+			$updated = $this->agent_service->update( $agent->id, $profile, $agent->user_id );
+
+			if ( $updated instanceof \WP_Error ) {
+				return $updated;
+			}
+
+			$agent = $updated;
 		}
 
 		if ( null !== $request['theme'] ) {
@@ -543,6 +591,34 @@ final class AgentController extends ConversationController {
 			 * @param Agent $agent Agent, with the new status.
 			 */
 			do_action( 'chatchi_agent_status_changed', $agent );
+		}
+
+		return $this->respond( $this->presenter->agent_self( $agent ) + array( 'theme' => PanelTheme::get( $agent->user_id ) ) );
+	}
+
+	/**
+	 * POST /agent/me/avatar (multipart, field "file"): the agent's own picture.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function upload_my_avatar( \WP_REST_Request $request ) {
+		$actor = $this->actor( $request );
+
+		if ( $actor instanceof \WP_Error ) {
+			return $actor;
+		}
+
+		if ( ! $this->agent_service ) {
+			return new \WP_Error( 'chatchi_unavailable', __( 'This is not available right now.', 'chatchi' ), array( 'status' => 503 ) );
+		}
+
+		$agent = $actor->agent_model();
+		$files = $request->get_file_params();
+		$agent = $this->agent_service->upload_avatar( $agent->id, isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null, $agent->user_id );
+
+		if ( $agent instanceof \WP_Error ) {
+			return $agent;
 		}
 
 		return $this->respond( $this->presenter->agent_self( $agent ) + array( 'theme' => PanelTheme::get( $agent->user_id ) ) );

@@ -179,7 +179,8 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/agent/me` | Current agent, with `status` and the `attachments` limits |
-| POST/PATCH | `/agent/me` | `status`: `online` or `away`, and/or `theme`: `light`, `dark` or `auto` (the panel's theme, saved per user) |
+| POST/PATCH | `/agent/me` | `status`: `online` or `away`, `theme`: `light`, `dark` or `auto` (the panel's theme, saved per user), `display_name` (2–100 characters) and/or `avatar_id: 0` (removes the picture) |
+| POST | `/agent/me/avatar` | Multipart `file`: the agent's own picture (JPG, PNG, GIF or WebP); returns the agent |
 | GET | `/agent/conversations` | Inbox: `status`, `search`, `assigned` (`mine` / `unassigned`), `tag`, `page`, `per_page` (≤100); `X-WP-Total` headers. Items carry `tags` |
 | GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
@@ -229,7 +230,9 @@ Administrators only (`manage_options`).
 
 `wp-admin/admin.php?page=chatchi` serves a standalone, full-screen app (no WordPress admin chrome). Access requires the virtual `chatchi_access_panel` capability, granted to site administrators and active agents. Administrators get an agent record automatically on their first visit.
 
-Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
+Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users (with an optional picture), rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
+
+Every agent, administrator or not, edits their own name and picture from **My profile** (the person icon in the rail). Pictures are JPG, PNG, GIF or WebP; before upload the panel scales photos so the shorter side is at most 512px (turned the right way up), so ordinary phone photos fit the size limit, and the server makes the square thumbnail. Uploading pictures for agents does not need the WordPress `upload_files` capability (some security plugins remove it), since only checked images of limited size are accepted.
 
 Administrators also get a **Settings** screen with twelve sections in four groups (Widget, Answering, Alerts, Protection), each saved on its own. Every setting only sets the default a filter receives, so code can still override it.
 

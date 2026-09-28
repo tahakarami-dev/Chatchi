@@ -142,18 +142,16 @@ final class AgentManagementController implements RouteProvider {
 	}
 
 	/**
-	 * Permission callback for uploads: administrators who may upload files.
+	 * Permission callback for agent pictures: administrators.
+	 *
+	 * The general upload_files capability is not required: the uploader only
+	 * accepts checked images of a limited size, and some security plugins
+	 * remove that capability, which used to hide picture uploads entirely.
 	 *
 	 * @return true|\WP_Error
 	 */
 	public function permit_upload() {
-		$allowed = $this->permit();
-
-		if ( true === $allowed && ! current_user_can( 'upload_files' ) ) {
-			return AdminPermission::forbidden();
-		}
-
-		return $allowed;
+		return $this->permit();
 	}
 
 	/**

@@ -229,10 +229,20 @@
 			return request( 'GET', '/agent/content', { query: { search: search } } );
 		},
 		uploadAvatar: function ( id, file ) {
+			return api.uploadPicture( '/agent/agents/' + id + '/avatar', file );
+		},
+		uploadMyAvatar: function ( file ) {
+			return api.uploadPicture( '/agent/me/avatar', file );
+		},
+		updateMe: function ( data ) {
+			// POST is accepted too, for servers that block PATCH.
+			return request( 'POST', '/agent/me', { body: data } );
+		},
+		uploadPicture: function ( path, file ) {
 			var form = new FormData();
 			form.append( 'file', file );
 
-			return fetch( client.endpoint( '/agent/agents/' + id + '/avatar' ), {
+			return fetch( client.endpoint( path ), {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { Accept: 'application/json', 'X-WP-Nonce': config.nonce },
@@ -271,6 +281,178 @@
 			return h( 'span', { className: className }, [ h( 'img', { src: url, alt: '' } ) ] );
 		}
 		return h( 'span', { className: className, 'aria-hidden': 'true', text: Core.initials( name ) || '?' } );
+	}
+
+	/**
+	 * A size for people: "2 MB", "1.5 MB" or "512 KB".
+	 */
+	function formatBytes( bytes ) {
+		if ( bytes >= 1048576 ) {
+			return fmt.number( Math.round( bytes / 104857.6 ) / 10 ) + ' MB';
+		}
+		return fmt.number( Math.max( 1, Math.round( bytes / 1024 ) ) ) + ' KB';
+	}
+
+	var AVATAR_SIDE = 512;
+
+	/**
+	 * Gets a chosen picture ready to upload: photos are scaled so their
+	 * shorter side is at most 512px (turned the right way up), so large
+	 * phone photos fit the upload limit. GIFs keep their animation, and
+	 * files the browser cannot read are sent as they are for the server to
+	 * explain.
+	 *
+	 * @return {Promise<File|Blob>}
+	 */
+	function prepareAvatar( file ) {
+		if ( ! window.createImageBitmap || file.type === 'image/gif' || ! /^image\//.test( file.type ) ) {
+			return Promise.resolve( file );
+		}
+
+		return window.createImageBitmap( file ).then( function ( bitmap ) {
+			var scale = Math.min( 1, AVATAR_SIDE / Math.min( bitmap.width, bitmap.height ) );
+
+			if ( scale === 1 && file.size <= config.maxAvatarBytes ) {
+				if ( bitmap.close ) {
+					bitmap.close();
+				}
+				return file;
+			}
+
+			var canvas = document.createElement( 'canvas' );
+			var width = Math.max( 1, Math.round( bitmap.width * scale ) );
+			var height = Math.max( 1, Math.round( bitmap.height * scale ) );
+			var alpha = file.type === 'image/png' || file.type === 'image/webp';
+			var type = alpha ? 'image/png' : 'image/jpeg';
+			var context = canvas.getContext( '2d' );
+
+			canvas.width = width;
+			canvas.height = height;
+			if ( ! alpha ) {
+				context.fillStyle = '#fff';
+				context.fillRect( 0, 0, width, height );
+			}
+			context.drawImage( bitmap, 0, 0, width, height );
+			if ( bitmap.close ) {
+				bitmap.close();
+			}
+
+			return new Promise( function ( resolve ) {
+				canvas.toBlob( function ( blob ) {
+					if ( ! blob ) {
+						resolve( file );
+						return;
+					}
+					var name = String( file.name || 'picture' ).replace( /\.[^.]*$/, '' ) + ( alpha ? '.png' : '.jpg' );
+					resolve( typeof window.File === 'function' ? new window.File( [ blob ], name, { type: type } ) : blob );
+				}, type, 0.9 );
+			} );
+		}, function () {
+			return file;
+		} );
+	}
+
+	/**
+	 * A profile picture with "Upload picture" and "Remove picture".
+	 *
+	 * With opts.upload the picture is sent right away; without it the file
+	 * is kept (see picked()) to send once the agent exists.
+	 *
+	 * @param {Object}   opts
+	 * @param {string}   opts.id        ID of the file input.
+	 * @param {string}   opts.name      Name, for the initials.
+	 * @param {?string}  opts.url       Current picture.
+	 * @param {Function} opts.showError Shows or clears (empty text) an error.
+	 * @param {Function} [opts.upload]  file → Promise of the updated agent.
+	 * @param {Function} [opts.remove]  () → Promise of the updated agent.
+	 * @param {Function} [opts.onDone]  Called with the updated agent.
+	 */
+	function pictureField( opts ) {
+		var picked = null;
+		var objectUrl = null;
+		var preview = avatar( opts.name, 'xl', opts.url );
+		var previewBox = h( 'span', { className: 'cc-picture__preview' }, [ preview ] );
+		var input = h( 'input', { type: 'file', accept: 'image/jpeg,image/png,image/gif,image/webp', className: 'cc-sr', id: opts.id } );
+		var labelText = h( 'span', { text: S.uploadPicture } );
+		var label = h( 'label', { className: 'cc-button cc-button--secondary', for: opts.id }, [ icon( 'image' ), labelText ] );
+		var remove = h( 'button', { type: 'button', className: 'cc-button cc-button--secondary', text: S.removePicture, hidden: ! opts.url } );
+
+		function show( url, name ) {
+			var next = avatar( name || opts.name, 'xl', url );
+			preview.replaceWith( next );
+			preview = next;
+		}
+
+		function busy( on ) {
+			label.classList.toggle( 'is-busy', on );
+			labelText.textContent = on ? S.uploading : S.uploadPicture;
+			input.disabled = remove.disabled = on;
+		}
+
+		function done( updated ) {
+			show( updated.avatar_url, updated.name );
+			remove.hidden = ! updated.avatar_url;
+			if ( opts.onDone ) {
+				opts.onDone( updated );
+			}
+		}
+
+		input.addEventListener( 'change', function () {
+			var chosen = input.files && input.files[ 0 ];
+
+			if ( ! chosen ) {
+				return;
+			}
+
+			opts.showError( '' );
+			busy( true );
+
+			prepareAvatar( chosen ).then( function ( ready ) {
+				if ( ready.size > config.maxAvatarBytes ) {
+					throw new Error( S.pictureTooLarge.replace( '%s', formatBytes( config.maxAvatarBytes ) ) );
+				}
+				if ( ! opts.upload ) {
+					if ( objectUrl ) {
+						URL.revokeObjectURL( objectUrl );
+					}
+					picked = ready;
+					objectUrl = URL.createObjectURL( ready );
+					show( objectUrl );
+					remove.hidden = false;
+					return null;
+				}
+				return opts.upload( ready ).then( done );
+			} ).catch( function ( error ) {
+				opts.showError( error.message || S.networkError );
+			} ).then( function () {
+				busy( false );
+				input.value = '';
+			} );
+		} );
+
+		remove.addEventListener( 'click', function () {
+			opts.showError( '' );
+			if ( ! opts.upload ) {
+				picked = null;
+				show( null );
+				remove.hidden = true;
+				return;
+			}
+			busy( true );
+			opts.remove().then( done ).catch( function ( error ) {
+				opts.showError( error.message || S.networkError );
+			} ).then( function () {
+				busy( false );
+			} );
+		} );
+
+		return {
+			preview: previewBox,
+			controls: h( 'div', { className: 'cc-inline cc-picture' }, [ label, input, remove ] ),
+			picked: function () {
+				return picked;
+			}
+		};
 	}
 
 	function isTyping() {
@@ -430,6 +612,7 @@
 	/* ------------------------------- rail ------------------------------ */
 
 	Panel.prototype.renderRail = function () {
+		var self = this;
 		var agent = this.state.agent;
 		var hasUnread = this.state.list.items.some( function ( item ) {
 			return item.unread_count > 0;
@@ -442,7 +625,9 @@
 		};
 		var inbox = view === 'inbox';
 
-		this.rail.replaceChildren(
+		// Items only administrators have are null for agents; replaceChildren
+		// would print those as the text "null".
+		this.rail.replaceChildren.apply( this.rail, [
 			h( 'span', { className: 'cc-logo', title: S.appName }, [ icon( 'chat' ) ] ),
 			h( 'a', { className: 'cc-rail-item' + ( inbox ? ' is-active' : '' ), href: '#/', 'aria-current': inbox ? 'page' : null, title: S.conversations, 'aria-label': S.conversations }, [
 				icon( 'inbox' ),
@@ -453,11 +638,21 @@
 			this.cannedView ? railLink( 'canned', '#/canned', S.canned, 'zap' ) : null,
 			this.settingsView ? railLink( 'settings', '#/settings', S.settings, 'sliders' ) : null,
 			h( 'span', { className: 'cc-rail-spacer' } ),
+			h( 'button', {
+				type: 'button',
+				className: 'cc-rail-item cc-profile-button',
+				title: S.myProfile,
+				'aria-label': S.myProfile,
+				'aria-haspopup': 'dialog',
+				onClick: function ( event ) {
+					self.openProfile( event.currentTarget );
+				}
+			}, [ icon( 'user' ) ] ),
 			this.buildThemeButton(),
 			this.buildAlertsButton(),
 			agent ? this.buildStatusButton( agent ) : null,
 			h( 'a', { className: 'cc-rail-item', href: config.adminUrl, title: S.backToWp, 'aria-label': S.backToWp }, [ icon( 'exit', 'cc-flip' ) ] )
-		);
+		].filter( Boolean ) );
 	};
 
 	/**
@@ -468,6 +663,134 @@
 	 * Light, dark, or the device's choice; saved on the agent's account.
 	 */
 	var PANEL_THEMES = [ 'light', 'dark', 'auto' ];
+
+	/**
+	 * "My profile": every agent's own name and picture, as visitors see them.
+	 *
+	 * @param {HTMLElement} opener Element that gets focus back on close.
+	 */
+	Panel.prototype.openProfile = function ( opener ) {
+		var self = this;
+		var me = this.state.agent;
+
+		if ( ! me || document.querySelector( '.cc-overlay' ) ) {
+			return;
+		}
+
+		var error = h( 'p', { className: 'cc-field-error', role: 'alert', hidden: true } );
+		var nameInput = h( 'input', { id: 'cc-profile-name', className: 'cc-input', type: 'text', maxlength: '100', value: me.name, required: true } );
+		var save = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
+
+		function showError( message ) {
+			error.textContent = message;
+			error.hidden = ! message;
+		}
+
+		function updated( agent ) {
+			self.state.agent = agent;
+			self.renderRail();
+			// The Agents screen reloads with the new name and picture.
+			if ( self.agentsView ) {
+				self.agentsView.loaded = false;
+			}
+		}
+
+		var picture = pictureField( {
+			id: 'cc-profile-file',
+			name: me.name,
+			url: me.avatar_url,
+			showError: showError,
+			upload: function ( file ) {
+				return api.uploadMyAvatar( file );
+			},
+			remove: function () {
+				return api.updateMe( { avatar_id: 0 } );
+			},
+			onDone: function ( agent ) {
+				updated( agent );
+				self.notify( S.saved );
+			}
+		} );
+
+		function close() {
+			document.removeEventListener( 'keydown', onKey, true );
+			overlay.remove();
+			if ( opener && opener.isConnected ) {
+				opener.focus();
+			} else {
+				var button = document.querySelector( '.cc-profile-button' );
+				if ( button ) {
+					button.focus();
+				}
+			}
+		}
+
+		function onKey( event ) {
+			if ( event.key === 'Escape' ) {
+				event.stopPropagation();
+				close();
+			}
+		}
+
+		var dialog = h( 'form', {
+			className: 'cc-card cc-modal',
+			role: 'dialog',
+			'aria-modal': 'true',
+			'aria-labelledby': 'cc-profile-title',
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				save.disabled = true;
+				save.textContent = S.saving;
+				showError( '' );
+				api.updateMe( { display_name: nameInput.value } ).then( function ( agent ) {
+					updated( agent );
+					self.notify( S.saved );
+					close();
+				} ).catch( function ( err ) {
+					save.disabled = false;
+					save.textContent = S.save;
+					showError( err.message );
+					nameInput.focus();
+				} );
+			}
+		}, [
+			h( 'div', { className: 'cc-modal__head' }, [
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-profile-title', text: S.myProfile } ),
+					h( 'p', { className: 'cc-hint', text: S.profileIntro } )
+				] ),
+				h( 'button', { type: 'button', className: 'cc-icon-button', 'aria-label': S.closeDialog, title: S.closeDialog, onClick: close }, [ icon( 'close' ) ] )
+			] ),
+			h( 'div', { className: 'cc-modal__picture' }, [
+				picture.preview,
+				h( 'div', { className: 'cc-modal__picture-fields' }, [
+					h( 'span', { className: 'cc-label', text: S.picture } ),
+					picture.controls,
+					h( 'p', { className: 'cc-hint', text: S.pictureHint } )
+				] )
+			] ),
+			h( 'label', { className: 'cc-label', for: 'cc-profile-name', text: S.displayName } ),
+			nameInput,
+			error,
+			h( 'div', { className: 'cc-inline' }, [
+				save,
+				h( 'button', { type: 'button', className: 'cc-button cc-button--secondary', text: S.cancel, onClick: close } )
+			] )
+		] );
+
+		var overlay = h( 'div', {
+			className: 'cc-overlay',
+			onClick: function ( event ) {
+				if ( event.target === overlay ) {
+					close();
+				}
+			}
+		}, [ dialog ] );
+
+		document.addEventListener( 'keydown', onKey, true );
+		document.querySelector( '.cc-shell' ).appendChild( overlay );
+		nameInput.focus();
+	};
 
 	Panel.prototype.buildThemeButton = function () {
 		var self = this;
@@ -3045,8 +3368,6 @@
 		var self = this;
 		var error = h( 'p', { className: 'cc-field-error', role: 'alert', hidden: true } );
 		var nameInput = h( 'input', { id: 'cc-agent-name', className: 'cc-input', type: 'text', maxlength: '100', value: agent.name, required: true } );
-		var preview = avatar( agent.name, 'xl', agent.avatar_url );
-		var file = h( 'input', { type: 'file', accept: 'image/jpeg,image/png,image/gif,image/webp', className: 'cc-sr', id: 'cc-agent-file' } );
 		var saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
 
 		function showError( message ) {
@@ -3054,34 +3375,24 @@
 			error.hidden = ! message;
 		}
 
-		file.addEventListener( 'change', function () {
-			var chosen = file.files && file.files[ 0 ];
-			if ( ! chosen ) {
-				return;
-			}
-			if ( chosen.size > config.maxAvatarBytes ) {
-				showError( S.pictureTooLarge.replace( '%s', fmt.number( Math.round( config.maxAvatarBytes / 1048576 ) ) + ' MB' ) );
-				file.value = '';
-				return;
-			}
-			showError( '' );
-			uploadLabel.textContent = S.uploading;
-			api.uploadAvatar( agent.id, chosen ).then( function ( updated ) {
+		var picture = pictureField( {
+			id: 'cc-agent-file',
+			name: agent.name,
+			url: agent.avatar_url,
+			showError: showError,
+			upload: function ( file ) {
+				return api.uploadAvatar( agent.id, file );
+			},
+			remove: function () {
+				return api.updateAgent( agent.id, { avatar_id: 0 } );
+			},
+			onDone: function ( updated ) {
 				self.replaceAgent( updated );
-				preview.replaceWith( avatar( updated.name, 'xl', updated.avatar_url ) );
 				agent.avatar_url = updated.avatar_url;
 				agent.avatar_id = updated.avatar_id;
 				self.panel.notify( S.saved );
-			} ).catch( function ( err ) {
-				showError( err.message );
-			} ).then( function () {
-				uploadLabel.textContent = S.uploadPicture;
-				file.value = '';
-				preview = self.el.querySelector( '.cc-agent-editor .cc-avatar' ) || preview;
-			} );
+			}
 		} );
-
-		var uploadLabel = h( 'label', { className: 'cc-button cc-button--secondary', for: 'cc-agent-file', text: S.uploadPicture } );
 
 		var form = h( 'form', {
 			className: 'cc-agent cc-agent-editor',
@@ -3103,29 +3414,12 @@
 				} );
 			}
 		}, [
-			preview,
+			picture.preview,
 			h( 'div', { className: 'cc-agent-editor__fields' }, [
 				h( 'label', { className: 'cc-label', for: 'cc-agent-name', text: S.displayName } ),
 				nameInput,
 				h( 'span', { className: 'cc-label', text: S.picture } ),
-				h( 'div', { className: 'cc-inline' }, [
-					config.canUpload ? uploadLabel : null,
-					config.canUpload ? file : null,
-					agent.avatar_id ? h( 'button', {
-						type: 'button',
-						className: 'cc-button cc-button--secondary',
-						text: S.removePicture,
-						onClick: function () {
-							api.updateAgent( agent.id, { avatar_id: 0 } ).then( function ( updated ) {
-								self.replaceAgent( updated );
-								self.render();
-								self.panel.notify( S.saved );
-							} ).catch( function ( err ) {
-								showError( err.message );
-							} );
-						}
-					} ) : null
-				] ),
+				picture.controls,
 				h( 'p', { className: 'cc-hint', text: S.pictureHint } ),
 				error,
 				h( 'div', { className: 'cc-inline' }, [
@@ -3246,6 +3540,14 @@
 		var nameInput = h( 'input', { id: 'cc-new-agent-name', className: 'cc-input', type: 'text', maxlength: '100', value: user.display_name } );
 		var submit = h( 'button', { type: 'submit', className: 'cc-button', text: S.create } );
 
+		function showError( message ) {
+			self.addError.textContent = message;
+			self.addError.hidden = ! message;
+		}
+
+		// Optional picture, uploaded as soon as the agent exists.
+		var picture = pictureField( { id: 'cc-new-agent-file', name: user.display_name, url: null, showError: showError } );
+
 		this.selectedUser = user;
 		this.results.querySelectorAll( '.cc-user' ).forEach( function ( button ) {
 			var selected = button.getAttribute( 'data-user-id' ) === String( user.id );
@@ -3261,10 +3563,19 @@
 				submit.textContent = S.saving;
 				self.addError.hidden = true;
 				api.createAgent( { user_id: user.id, display_name: nameInput.value } ).then( function ( agent ) {
+					var file = picture.picked();
 					self.state.agents.push( agent );
 					self.state.adding = false;
 					self.render();
 					self.panel.notify( S.saved );
+					if ( file ) {
+						api.uploadAvatar( agent.id, file ).then( function ( updated ) {
+							self.replaceAgent( updated );
+							self.render();
+						} ).catch( function ( error ) {
+							self.panel.notify( error.message, true );
+						} );
+					}
 				} ).catch( function ( error ) {
 					submit.disabled = false;
 					submit.textContent = S.create;
@@ -3273,6 +3584,13 @@
 				} );
 			}
 		}, [
+			h( 'div', { className: 'cc-add-picture' }, [
+				picture.preview,
+				h( 'div', { className: 'cc-add-picture__fields' }, [
+					h( 'span', { className: 'cc-label', text: S.pictureOptional } ),
+					picture.controls
+				] )
+			] ),
 			h( 'label', { className: 'cc-label', for: 'cc-new-agent-name', text: S.displayName } ),
 			nameInput,
 			submit

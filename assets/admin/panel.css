@@ -4516,3 +4516,109 @@ a.cc-order-head:hover strong {
 		animation: none;
 	}
 }
+
+/* ------------------------------------------------------------------ */
+/* Profile pictures: shared field, add form, "My profile" dialog       */
+/* ------------------------------------------------------------------ */
+
+.cc-picture__preview {
+	display: flex;
+	flex-shrink: 0;
+}
+
+.cc-picture .cc-button svg {
+	width: 16px;
+	height: 16px;
+}
+
+.cc-picture label.is-busy {
+	opacity: .7;
+	pointer-events: none;
+}
+
+.cc-add-picture {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	width: 100%;
+	padding-bottom: 4px;
+}
+
+.cc-add-picture__fields {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+
+.cc-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: grid;
+	place-items: center;
+	padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+	background: rgba(15, 15, 30, .45);
+	overflow-y: auto;
+	animation: cc-overlay-in var(--chatchi-duration-base) var(--chatchi-ease-out);
+}
+
+.cc-modal {
+	width: min(460px, 100%);
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 24px;
+	box-shadow: var(--chatchi-shadow-lg);
+}
+
+.cc-modal__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.cc-modal__head h2 {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 700;
+}
+
+.cc-modal__head .cc-hint {
+	margin-top: 4px;
+}
+
+.cc-modal__picture {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 4px 0 8px;
+}
+
+.cc-modal__picture-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+
+@keyframes cc-overlay-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (max-width: 480px) {
+	.cc-modal__picture,
+	.cc-add-picture {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cc-overlay {
+		animation: none;
+	}
+}

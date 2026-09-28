@@ -87,7 +87,11 @@ final class PanelStrings {
 			'picture'              => __( 'Profile picture', 'chatchi' ),
 			'uploadPicture'        => __( 'Upload picture', 'chatchi' ),
 			'removePicture'        => __( 'Remove picture', 'chatchi' ),
-			'pictureHint'          => __( 'Square JPG, PNG, GIF or WebP.', 'chatchi' ),
+			'pictureHint'          => __( 'A JPG, PNG, GIF or WebP image. Large photos are made smaller automatically.', 'chatchi' ),
+			'pictureOptional'      => __( 'Profile picture (optional)', 'chatchi' ),
+			'myProfile'            => __( 'My profile', 'chatchi' ),
+			'profileIntro'         => __( 'The name and picture visitors see when you reply.', 'chatchi' ),
+			'closeDialog'          => __( 'Close', 'chatchi' ),
 			/* translators: %s: maximum file size. */
 			'pictureTooLarge'      => __( 'The image must be smaller than %s.', 'chatchi' ),
 			'active'               => __( 'Active', 'chatchi' ),
