@@ -55,7 +55,10 @@ final class SettingsValidator {
 
 	public const SMS_MESSAGE_MAX_LENGTH = 300;
 
-	public const AI_PROVIDERS = array( 'anthropic', 'openai' );
+	/**
+	 * AI services, all OpenAI-compatible (see Ai\AiClient::BASE_URLS).
+	 */
+	public const AI_PROVIDERS = AiClient::PROVIDERS;
 
 	public const AI_BOT_MODES = array( 'offline', 'always' );
 
@@ -182,11 +185,10 @@ final class SettingsValidator {
 			// Empty means "use the translated default text".
 			'sms_message'              => '',
 			// AI (see Ai\AiClient): the bot and reply suggestions for agents.
-			'ai_provider'              => 'anthropic',
+			'ai_provider'              => 'gapgpt',
 			'ai_api_key'               => '',
 			// Empty means the provider's own API address.
 			'ai_base_url'              => '',
-			// Empty means the default model (Claude: claude-opus-5).
 			'ai_model'                 => '',
 			'ai_bot_enabled'           => false,
 			'ai_bot_mode'              => 'offline',
@@ -282,13 +284,16 @@ final class SettingsValidator {
 			}
 		}
 
-		// The AI features need a key, and OpenAI-compatible services a model name.
+		// The AI features need a key and a model; "another service" its address.
 		if ( ! empty( $settings['ai_bot_enabled'] ) || ! empty( $settings['ai_suggest_enabled'] ) ) {
 			if ( '' === $settings['ai_api_key'] ) {
 				$errors['ai_api_key'] = __( 'Enter the API key of your AI service.', 'chatchi' );
 			}
-			if ( 'openai' === $settings['ai_provider'] && '' === $settings['ai_model'] ) {
+			if ( '' === $settings['ai_model'] ) {
 				$errors['ai_model'] = __( 'Enter the model name.', 'chatchi' );
+			}
+			if ( 'custom' === $settings['ai_provider'] && '' === $settings['ai_base_url'] ) {
+				$errors['ai_base_url'] = __( "Enter your AI service's API address.", 'chatchi' );
 			}
 		}
 

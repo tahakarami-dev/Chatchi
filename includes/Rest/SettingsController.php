@@ -279,7 +279,8 @@ final class SettingsController implements RouteProvider {
 				'notify_email'    => (string) get_option( 'admin_email' ),
 				'sms_message'     => $this->settings->default_sms_message(),
 				'ai_bot_name'     => $this->settings->default_bot_name(),
-				'ai_model'        => AiClient::DEFAULT_ANTHROPIC_MODEL,
+				// Default API address of each AI service.
+				'ai_base_urls'    => AiClient::BASE_URLS,
 			),
 			'limits'    => array(
 				'welcome_message' => SettingsValidator::WELCOME_MAX_LENGTH,
