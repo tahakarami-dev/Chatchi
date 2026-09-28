@@ -223,7 +223,14 @@ Administrators only (`manage_options`).
 
 Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
 
-Administrators also get a **Settings** screen with twelve sections, each saved on its own (unsaved sections are marked in the sub-menu). Every setting only sets the default a filter receives, so code can still override it:
+Administrators also get a **Settings** screen with twelve sections in four groups (Widget, Answering, Alerts, Protection), each saved on its own. Every setting only sets the default a filter receives, so code can still override it.
+
+- **Finding a setting**: the search box above the sections finds any section, heading or field by name (Arabic ي/ك match Persian ی/ک); Enter or a click opens its section and highlights it.
+- **Saving**: a bar at the bottom of each section says whether it has unsaved changes and offers *Discard* and *Save* (also Ctrl+S / Cmd+S, with any keyboard layout). Sections with unsaved changes are marked in the menu, and leaving the panel with unsaved changes asks first.
+- **Switchable features** (welcome message, business hours, email, Bale and Telegram bots, SMS, AI bot, contact channels, FAQ, visitor files) show their settings only while they are on.
+- **Business hours** are picked from 24-hour menus in the site's digits, every half hour, with "end of day" (24:00) for closing times; one click copies the first open day's hours to every open day.
+- **Setup guide**: with no conversation open, administrators see the steps that make the chat useful (color and title, team, hours, phone alerts, FAQ, and the optional AI assistant), which are done, and a link to the site. It can be hidden (remembered in that browser) and shown again.
+
 
 - **Channels & FAQ** (`#/settings/contact`): WhatsApp, Telegram, Bale and phone numbers (up to 6, reorderable, each with an optional label) shown in a menu the chat button opens, and up to 30 frequently asked questions visitors see before their first message. Numbers are stored normalized (WhatsApp `0912…` becomes `98912…`) and links are built only from them (`wa.me`, `t.me`, `ble.ir`, `tel:`).
 - **AI** (`#/settings/ai`): the service (GapGPT — the default —, AvalAI, OpenAI, or another OpenAI-compatible service), key, model, and the API address (each preset has its own; required for another service), "test the connection"; the bot (on/off, only when nobody is online or always first, name, extra instructions, up to 20 pages, posts or products it knows, most replies per conversation); reply suggestions for agents; and the most AI requests per day.

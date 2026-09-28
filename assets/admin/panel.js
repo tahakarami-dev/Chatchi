@@ -953,6 +953,9 @@
 
 		if ( id !== this.state.selectedId ) {
 			this.select( id );
+		} else if ( ! id && config.canManageSettings ) {
+			// Back from settings or agents: the setup guide may have changed.
+			this.renderConversation( true );
 		}
 	};
 
@@ -1435,13 +1438,147 @@
 		this.newIds = {};
 	};
 
+	/**
+	 * Whether the administrator hid the setup guide (remembered in this
+	 * browser); with an argument, remembers it.
+	 */
+	Panel.prototype.setupHidden = function ( hide ) {
+		var key = 'chatchi_setup_hidden';
+		try {
+			if ( typeof hide === 'boolean' ) {
+				if ( hide ) {
+					window.localStorage.setItem( key, '1' );
+				} else {
+					window.localStorage.removeItem( key );
+				}
+			}
+			return window.localStorage.getItem( key ) === '1';
+		} catch ( e ) {
+			return !! this.setupHiddenHere;
+		}
+	};
+
+	/**
+	 * The setup guide shown to administrators when no conversation is open:
+	 * the steps that make the chat useful, with what is already done.
+	 * Returns null while loading, when hidden, or for agents.
+	 */
+	Panel.prototype.buildSetup = function () {
+		var self = this;
+
+		if ( ! config.canManageSettings || this.setupHidden() ) {
+			return null;
+		}
+
+		if ( ! this.setupSettings || ! this.setupAgents ) {
+			if ( ! this.setupLoading ) {
+				this.setupLoading = true;
+				Promise.all( [
+					this.setupSettings ? Promise.resolve( { settings: this.setupSettings } ) : api.settings(),
+					this.setupAgents ? Promise.resolve( this.setupAgents ) : api.agents()
+				] ).then( function ( results ) {
+					self.setupSettings = self.setupSettings || results[ 0 ].settings;
+					self.setupAgents = self.setupAgents || results[ 1 ];
+					self.setupLoading = false;
+					if ( ! self.state.selectedId ) {
+						self.renderConversation( true );
+					}
+				} ).catch( function () {
+					// The guide is optional: without it the usual empty state stays.
+					self.setupLoading = false;
+				} );
+			}
+			return null;
+		}
+
+		var settings = this.setupSettings;
+		var active = this.setupAgents.filter( function ( agent ) {
+			return agent.is_active;
+		} ).length;
+
+		var steps = [
+			{ done: !! ( settings.primary_color || settings.widget_title || settings.widget_subtitle ), icon: 'palette', title: S.setupAppearance, hint: S.setupAppearanceHint, href: '#/settings/appearance' },
+			{ done: active > 1, icon: 'users', title: S.setupTeam, hint: S.setupTeamHint, href: '#/agents' },
+			{ done: !! settings.hours_enabled, icon: 'clock', title: S.setupHours, hint: S.setupHoursHint, href: '#/settings/hours' },
+			{ done: !! ( settings.bale_enabled || settings.telegram_enabled ), icon: 'bell', title: S.setupAlerts, hint: S.setupAlertsHint, href: '#/settings/notifications' },
+			{ done: !! ( settings.faq_enabled && settings.faq && settings.faq.length ), icon: 'help', title: S.setupFaq, hint: S.setupFaqHint, href: '#/settings/contact' },
+			{ done: !! ( settings.ai_bot_enabled || settings.ai_suggest_enabled ), icon: 'sparkles', title: S.setupAi, hint: S.setupAiHint, href: '#/settings/ai', optional: true }
+		];
+		var done = steps.filter( function ( step ) {
+			return step.done;
+		} ).length;
+		var allDone = done === steps.length;
+
+		var bar = h( 'span', { className: 'cc-setup__bar', 'aria-hidden': 'true' }, [ h( 'span', {} ) ] );
+		bar.firstChild.style.width = Math.round( done / steps.length * 100 ) + '%';
+
+		return h( 'section', { className: 'cc-setup', 'aria-labelledby': 'cc-setup-title' }, [
+			h( 'div', { className: 'cc-setup__head' }, [
+				h( 'span', { className: 'cc-setup__icon', 'aria-hidden': 'true' }, [ icon( allDone ? 'check' : 'sparkles' ) ] ),
+				h( 'div', {}, [
+					h( 'h2', { id: 'cc-setup-title', text: allDone ? S.setupAllDone : S.setupTitle } ),
+					h( 'p', { className: 'cc-hint', text: allDone ? S.selectHint : S.setupIntro } )
+				] )
+			] ),
+			h( 'div', { className: 'cc-setup__progress' }, [
+				bar,
+				h( 'span', { text: String( S.setupProgress ).replace( '%1$s', fmt.number( done ) ).replace( '%2$s', fmt.number( steps.length ) ) } )
+			] ),
+			h( 'ol', { className: 'cc-setup__steps' }, steps.map( function ( step ) {
+				return h( 'li', {}, [
+					h( 'a', { className: 'cc-setup__step' + ( step.done ? ' is-done' : '' ), href: step.href }, [
+						h( 'span', { className: 'cc-setup__mark', 'aria-hidden': 'true' }, [ icon( step.done ? 'check' : step.icon ) ] ),
+						h( 'span', { className: 'cc-setup__text' }, [
+							h( 'strong', {}, [
+								step.title,
+								step.optional && ! step.done ? h( 'span', { className: 'cc-setup__tag', text: S.setupOptional } ) : null
+							] ),
+							h( 'small', { text: step.hint } )
+						] ),
+						h( 'span', { className: 'cc-setup__state' }, step.done ? [ h( 'span', { className: 'cc-sr', text: S.setupDone } ) ] : [ icon( 'chevron', 'cc-setup__go' ) ] )
+					] )
+				] );
+			} ) ),
+			h( 'div', { className: 'cc-setup__foot' }, [
+				config.homeUrl ? h( 'a', { className: 'cc-button cc-button--secondary', href: config.homeUrl, target: '_blank', rel: 'noopener' }, [ icon( 'link' ), h( 'span', { text: S.setupViewSite } ) ] ) : null,
+				h( 'button', {
+					type: 'button',
+					className: 'cc-link-button',
+					text: S.setupHide,
+					onClick: function () {
+						self.setupHiddenHere = true;
+						self.setupHidden( true );
+						self.renderConversation( true );
+					}
+				} )
+			] )
+		] );
+	};
+
 	Panel.prototype.buildConversation = function () {
 		var self = this;
 		var state = this.state;
 		var conv = state.conv;
 
 		if ( ! state.selectedId ) {
-			return [ h( 'div', { className: 'cc-state' }, [ icon( 'chat' ), h( 'h2', { text: S.selectConversation } ), h( 'p', { text: S.selectHint } ) ] ) ];
+			var guide = this.buildSetup();
+			if ( guide ) {
+				return [ h( 'div', { className: 'cc-setup-wrap' }, [ guide ] ) ];
+			}
+			return [ h( 'div', { className: 'cc-state' }, [
+				icon( 'chat' ),
+				h( 'h2', { text: S.selectConversation } ),
+				h( 'p', { text: S.selectHint } ),
+				config.canManageSettings && this.setupHidden() ? h( 'button', {
+					type: 'button',
+					className: 'cc-link-button',
+					text: S.setupShow,
+					onClick: function () {
+						self.setupHidden( false );
+						self.renderConversation( true );
+					}
+				} ) : null
+			] ) ];
 		}
 
 		var back = h( 'a', { className: 'cc-icon-button cc-back', href: '#/', 'aria-label': S.back, title: S.back }, [ icon( 'back', 'cc-flip' ) ] );
@@ -2771,6 +2908,11 @@
 		var self = this;
 		var state = this.state;
 
+		// The setup guide counts the active agents.
+		if ( ! state.loading && ! state.error ) {
+			this.panel.setupAgents = state.agents;
+		}
+
 		// Responses can arrive after the admin moved on to another screen.
 		if ( this.panel.view !== 'agents' ) {
 			return;
@@ -3617,6 +3759,29 @@
 		this.items = [];
 		this.searchTimer = null;
 		this.searchTicket = 0;
+		this.query = '';
+		this.saving = false;
+
+		var self = this;
+
+		// Ctrl+S / Cmd+S saves the open section (by key position, so it
+		// works with a Persian keyboard layout too).
+		document.addEventListener( 'keydown', function ( event ) {
+			if ( ( event.ctrlKey || event.metaKey ) && ! event.altKey && event.code === 'KeyS' && self.panel.view === 'settings' && self.data && ! self.state.loading ) {
+				event.preventDefault();
+				if ( ! self.saving ) {
+					self.save();
+				}
+			}
+		} );
+
+		// Leaving the panel with unsaved settings asks first.
+		window.addEventListener( 'beforeunload', function ( event ) {
+			if ( self.hasUnsaved() ) {
+				event.preventDefault();
+				event.returnValue = '';
+			}
+		} );
 	}
 
 	/**
@@ -3624,19 +3789,63 @@
 	 * errors and unsaved changes stay where they belong.
 	 */
 	var SETTINGS_SECTIONS = [
+		// Widget: what visitors see.
 		{ id: 'general', icon: 'power', keys: [ 'widget_enabled', 'widget_sound', 'visitor_cookie_days', 'delete_data_on_uninstall' ] },
 		{ id: 'appearance', icon: 'palette', keys: [ 'primary_color', 'widget_position', 'widget_theme', 'widget_title', 'widget_subtitle' ] },
 		{ id: 'form', icon: 'clipboard', keys: [ 'form_name', 'form_email', 'form_phone', 'form_intro' ] },
 		{ id: 'display', icon: 'eye', keys: [ 'welcome_enabled', 'welcome_message', 'display_mode', 'display_targets', 'display_ids' ] },
-		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
-		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
-		{ id: 'sales', icon: 'message', keys: [ 'proactive', 'rating_enabled' ] },
 		{ id: 'contact', icon: 'help', keys: [ 'channels_enabled', 'channels', 'faq_enabled', 'faq' ] },
+		// Answering: who replies, when, and how chats begin.
+		{ id: 'hours', icon: 'clock', keys: [ 'hours_enabled', 'hours', 'offline_mode', 'offline_no_agents', 'offline_message' ] },
 		{ id: 'ai', icon: 'sparkles', keys: [ 'ai_provider', 'ai_api_key', 'ai_base_url', 'ai_model', 'ai_bot_enabled', 'ai_bot_mode', 'ai_bot_name', 'ai_instructions', 'ai_knowledge_ids', 'ai_max_replies', 'ai_suggest_enabled', 'ai_daily_limit' ] },
+		{ id: 'sales', icon: 'message', keys: [ 'proactive', 'rating_enabled' ] },
+		// Alerts: to the team and to visitors.
+		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
 		{ id: 'sms', icon: 'phone', keys: [ 'sms_enabled', 'sms_provider', 'sms_api_key', 'sms_username', 'sms_password', 'sms_sender', 'sms_message', 'sms_delay' ] },
+		// Protection.
 		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
+
+	var SETTINGS_GROUPS = [
+		{ label: S.groupWidget, ids: [ 'general', 'appearance', 'form', 'display', 'contact' ] },
+		{ label: S.groupAnswering, ids: [ 'hours', 'ai', 'sales' ] },
+		{ label: S.groupAlerts, ids: [ 'notifications', 'sms' ] },
+		{ label: S.groupProtection, ids: [ 'limits', 'security' ] }
+	];
+
+	/**
+	 * What the settings search finds: the headings and field labels of each
+	 * section (the text shown on screen, so a result can be found and shown).
+	 */
+	var SETTINGS_INDEX = {
+		general: [ 'widgetOnTitle', 'widgetOn', 'soundTitle', 'visitorsTitle', 'visitorDays', 'dataTitle', 'deleteData' ],
+		appearance: [ 'appearanceTitle', 'brandColor', 'position', 'widgetTheme', 'widgetTitle', 'widgetSubtitle' ],
+		form: [ 'formTitle', 'formIntroTitle', 'phone', 'email' ],
+		display: [ 'welcomeTitle', 'welcomeText', 'displayTitle', 'shortcodeTitle' ],
+		contact: [ 'channelsTitle', 'faqTitle' ],
+		hours: [ 'hoursTitle', 'offlineTitle', 'offlineModeLabel', 'offlineNoAgents', 'offlineMessage' ],
+		ai: [ 'aiTitle', 'aiApiKey', 'aiModel', 'aiBaseUrl', 'aiBotTitle', 'aiMode', 'aiBotName', 'aiInstructions', 'aiKnowledge', 'aiMaxReplies', 'aiSuggestTitle', 'aiLimitTitle', 'aiDailyLimit' ],
+		sales: [ 'invitesTitle', 'ratingTitle' ],
+		notifications: [ 'notifyTitle', 'notifyEmail', 'botWhenTitle', 'baleTitle', 'telegramTitle', 'telegramApiUrl', 'transcriptTitle' ],
+		sms: [ 'smsTitle', 'smsProvider', 'smsKavenegar', 'smsMelipayamak', 'smsSender', 'smsTextTitle', 'smsDelay', 'smsTestTitle' ],
+		limits: [ 'spamTitle', 'limitsTitle', 'limitMessagesVisitor', 'limitMessagesIp', 'limitStartsVisitor', 'limitStartsIp', 'messagesTitle', 'messageMaxLength', 'filesTitle', 'filesMaxSize' ],
+		security: [ 'ipTitle', 'proxyHeader', 'trustedProxies' ]
+	};
+
+	/**
+	 * Text as searched: Arabic letters as Persian, no zero-width joiners,
+	 * lower case, and no "%d" style placeholders.
+	 */
+	function searchable( text ) {
+		return String( text )
+			.replace( /\s*\(?[^()]*%\d?\$?[ds][^()]*\)?/g, '' )
+			.replace( /[يى]/g, 'ی' )
+			.replace( /ك/g, 'ک' )
+			.replace( /[‌‏‎]/g, '' )
+			.toLowerCase()
+			.trim();
+	}
 
 	var NUMBER_SETTINGS = [ 'ai_max_replies', 'ai_daily_limit', 'sms_delay', 'visitor_cookie_days', 'message_max_length', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'attachment_max_mb' ];
 
@@ -3681,6 +3890,8 @@
 		var self = this;
 
 		this.data = data;
+		// The setup guide on the inbox follows the saved settings.
+		this.panel.setupSettings = data.settings;
 		( sections || SETTINGS_SECTIONS.map( function ( s ) {
 			return s.id;
 		} ) ).forEach( function ( id ) {
@@ -3832,7 +4043,8 @@
 			h( 'div', {}, [
 				h( 'h1', { text: S.settings } ),
 				h( 'p', { text: S.settingsIntro } )
-			] )
+			] ),
+			config.homeUrl ? h( 'a', { className: 'cc-button cc-button--secondary cc-view-site', href: config.homeUrl, target: '_blank', rel: 'noopener' }, [ icon( 'link' ), h( 'span', { text: S.viewSite } ) ] ) : null
 		] );
 
 		var body;
@@ -3867,11 +4079,33 @@
 		if ( ! this.state.loading && ! this.state.error && this.section === 'display' && this.draft.display_mode !== 'all' ) {
 			this.searchContent( '' );
 		}
+
+		if ( ! this.state.loading && ! this.state.error ) {
+			this.syncSaveBar();
+			this.showFound();
+
+			// On narrow screens the sections are a scrolling row; keep the
+			// open one in view.
+			var active = this.navLinks && this.navLinks[ this.section ];
+			if ( active && window.matchMedia( '(max-width: 1023px)' ).matches ) {
+				active.scrollIntoView( { block: 'nearest', inline: 'center' } );
+			}
+		}
 	};
 
-	SettingsView.prototype.buildNav = function () {
+	/**
+	 * Whether any section has changes that are not saved yet.
+	 */
+	SettingsView.prototype.hasUnsaved = function () {
 		var self = this;
-		var labels = {
+
+		return !! this.data && ! this.state.loading && ! this.state.error && SETTINGS_SECTIONS.some( function ( section ) {
+			return self.isDirty( section.id );
+		} );
+	};
+
+	SettingsView.prototype.sectionLabel = function ( id ) {
+		return {
 			general: S.sectionGeneral,
 			appearance: S.sectionAppearance,
 			form: S.sectionForm,
@@ -3884,26 +4118,222 @@
 			sms: S.sectionSms,
 			ai: S.sectionAi,
 			security: S.sectionSecurity
-		};
+		}[ id ] || id;
+	};
+
+	/**
+	 * Settings that match the search: section names, headings and labels.
+	 * Every word typed must appear.
+	 */
+	SettingsView.prototype.findSettings = function ( query ) {
+		var self = this;
+		var words = searchable( query ).split( /\s+/ ).filter( Boolean );
+		var found = [];
+
+		if ( ! words.length ) {
+			return found;
+		}
+
+		function matches( text ) {
+			var haystack = searchable( text );
+			return words.every( function ( word ) {
+				return haystack.indexOf( word ) !== -1;
+			} );
+		}
+
+		SETTINGS_SECTIONS.forEach( function ( section ) {
+			var label = self.sectionLabel( section.id );
+
+			if ( matches( label ) ) {
+				found.push( { section: section.id, text: label, target: '' } );
+			}
+
+			( SETTINGS_INDEX[ section.id ] || [] ).forEach( function ( key ) {
+				var text = S[ key ];
+				if ( text && matches( text + ' ' + label ) && ! found.some( function ( item ) {
+					return item.section === section.id && item.text === text;
+				} ) ) {
+					found.push( { section: section.id, text: text, target: text } );
+				}
+			} );
+		} );
+
+		return found.slice( 0, 12 );
+	};
+
+	/**
+	 * Opens a search result: its section, scrolled to the setting.
+	 */
+	SettingsView.prototype.openFound = function ( item ) {
+		this.query = '';
+		this.found = item.target;
+
+		if ( this.section === item.section ) {
+			this.render();
+		} else {
+			window.location.hash = '#/settings/' + item.section;
+		}
+	};
+
+	/**
+	 * Scrolls to and briefly highlights the setting a search result names.
+	 */
+	SettingsView.prototype.showFound = function () {
+		var wanted = this.found;
+		var form = this.el.querySelector( 'form.cc-settings' );
+
+		this.found = '';
+
+		if ( ! wanted || ! form ) {
+			return;
+		}
+
+		var prefix = searchable( wanted );
+		var target = Array.prototype.find.call( form.querySelectorAll( 'h2, .cc-label, .cc-switch__label, .cc-radio strong' ), function ( el ) {
+			return searchable( el.textContent ).indexOf( prefix ) === 0;
+		} );
+
+		if ( ! target ) {
+			return;
+		}
+
+		// A field inside a switched-off feature is hidden: show its card.
+		if ( ! target.offsetParent ) {
+			target = target.closest( '.cc-settings__section' ) || target;
+		}
+
+		var card = target.closest( '.cc-field, .cc-number-field, .cc-settings__section' ) || target;
+
+		card.scrollIntoView( { block: 'center' } );
+		card.classList.remove( 'cc-found' );
+		void card.offsetWidth;
+		card.classList.add( 'cc-found' );
+
+		var labelFor = target.getAttribute && target.getAttribute( 'for' );
+		var field = labelFor ? document.getElementById( labelFor ) : null;
+		if ( field && field.offsetParent && typeof field.focus === 'function' ) {
+			field.focus( { preventScroll: true } );
+		}
+	};
+
+	SettingsView.prototype.buildNav = function () {
+		var self = this;
 
 		this.navLinks = {};
 
-		return h( 'nav', { className: 'cc-subnav', 'aria-label': S.settings }, SETTINGS_SECTIONS.map( function ( section ) {
-			var current = section.id === self.section;
-			var dirty = self.isDirty( section.id );
-			var link = h( 'a', {
+		function link( id ) {
+			var section = settingsSection( id );
+			var current = id === self.section;
+			var dirty = self.isDirty( id );
+			var item = h( 'a', {
 				className: 'cc-subnav__item' + ( current ? ' is-active' : '' ) + ( dirty ? ' is-dirty' : '' ),
-				href: '#/settings/' + section.id,
+				href: '#/settings/' + id,
 				'aria-current': current ? 'page' : null
 			}, [
 				icon( section.icon ),
-				h( 'span', { text: labels[ section.id ] } ),
+				h( 'span', { text: self.sectionLabel( id ) } ),
 				h( 'span', { className: 'cc-subnav__dot', title: S.unsaved, 'aria-label': S.unsaved, hidden: ! dirty } )
 			] );
 
-			self.navLinks[ section.id ] = link;
-			return link;
+			self.navLinks[ id ] = item;
+			return item;
+		}
+
+		var groups = h( 'div', { className: 'cc-subnav__groups' }, SETTINGS_GROUPS.map( function ( group, index ) {
+			var headingId = 'cc-subnav-group-' + index;
+			return h( 'div', { className: 'cc-subnav__group', role: 'group', 'aria-labelledby': headingId }, [
+				h( 'span', { id: headingId, className: 'cc-subnav__heading', text: group.label } )
+			].concat( group.ids.map( link ) ) );
 		} ) );
+
+		// Search: results replace the sections while something is typed.
+		var results = h( 'div', { className: 'cc-subnav__results', role: 'listbox', 'aria-label': S.settingsSearch, hidden: true } );
+		var search = h( 'input', {
+			id: 'cc-settings-search',
+			className: 'cc-input cc-subnav__search',
+			type: 'search',
+			placeholder: S.settingsSearch,
+			'aria-label': S.settingsSearch,
+			'aria-controls': 'cc-settings-search-results',
+			autocomplete: 'off',
+			spellcheck: 'false'
+		} );
+		results.id = 'cc-settings-search-results';
+		search.value = this.query;
+
+		function fill() {
+			var query = search.value.trim();
+			var found = query ? self.findSettings( query ) : [];
+
+			self.query = search.value;
+			results.hidden = ! query;
+			groups.hidden = !! query;
+
+			if ( ! query ) {
+				results.replaceChildren();
+				return;
+			}
+
+			results.replaceChildren.apply( results, found.length ? found.map( function ( item, index ) {
+				return h( 'button', {
+					type: 'button',
+					className: 'cc-subnav__result' + ( index === 0 ? ' is-first' : '' ),
+					role: 'option',
+					onClick: function () {
+						self.openFound( item );
+					}
+				}, [
+					icon( settingsSection( item.section ).icon ),
+					h( 'span', {}, [
+						h( 'strong', { text: item.text.replace( /\s*\(?[^()]*%\d?\$?[ds][^()]*\)?/g, '' ) } ),
+						item.target ? h( 'small', { text: self.sectionLabel( item.section ) } ) : null
+					] )
+				] );
+			} ) : [ h( 'p', { className: 'cc-hint cc-subnav__empty', text: String( S.settingsNoMatch ).replace( '%s', query ) } ) ] );
+		}
+
+		search.addEventListener( 'input', fill );
+		search.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Enter' ) {
+				event.preventDefault();
+				var first = results.querySelector( '.cc-subnav__result' );
+				if ( first ) {
+					first.click();
+				}
+			} else if ( event.key === 'Escape' && search.value ) {
+				event.preventDefault();
+				event.stopPropagation();
+				search.value = '';
+				fill();
+			} else if ( event.key === 'ArrowDown' ) {
+				var option = results.querySelector( '.cc-subnav__result' );
+				if ( option ) {
+					event.preventDefault();
+					option.focus();
+				}
+			}
+		} );
+		results.addEventListener( 'keydown', function ( event ) {
+			var options = Array.prototype.slice.call( results.querySelectorAll( '.cc-subnav__result' ) );
+			var at = options.indexOf( document.activeElement );
+			if ( at === -1 || ( event.key !== 'ArrowDown' && event.key !== 'ArrowUp' ) ) {
+				return;
+			}
+			event.preventDefault();
+			if ( event.key === 'ArrowUp' && at === 0 ) {
+				search.focus();
+			} else {
+				( options[ at + ( event.key === 'ArrowDown' ? 1 : -1 ) ] || options[ at ] ).focus();
+			}
+		} );
+
+		fill();
+
+		return h( 'nav', { className: 'cc-subnav', 'aria-label': S.settings }, [
+			h( 'div', { className: 'cc-subnav__search-wrap' }, [ icon( 'search' ), search ] ),
+			results,
+			groups
+		] );
 	};
 
 	/**
@@ -3920,6 +4350,33 @@
 				link.querySelector( '.cc-subnav__dot' ).hidden = ! dirty;
 			}
 		} );
+
+		this.syncSaveBar();
+	};
+
+	/**
+	 * The save bar says whether the open section has unsaved changes, and
+	 * offers to discard them.
+	 */
+	SettingsView.prototype.syncSaveBar = function () {
+		if ( ! this.saveBar ) {
+			return;
+		}
+
+		var dirty = this.isDirty( this.section );
+
+		this.saveBar.classList.toggle( 'is-dirty', dirty );
+		this.discardButton.hidden = ! dirty || this.saving;
+		this.saveStatus.textContent = dirty ? S.unsavedHere : S.allSaved;
+	};
+
+	/**
+	 * Puts the open section back to its saved values.
+	 */
+	SettingsView.prototype.discard = function () {
+		this.resetDraft( this.section );
+		this.render();
+		this.panel.notify( S.discarded );
 	};
 
 	SettingsView.prototype.buildForm = function () {
@@ -3927,7 +4384,24 @@
 		var children;
 
 		this.errors = {};
-		this.saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save } );
+		this.saveButton = h( 'button', { type: 'submit', className: 'cc-button', text: S.save, title: S.saveShortcut, 'aria-keyshortcuts': 'Control+S' } );
+		this.discardButton = h( 'button', {
+			type: 'button',
+			className: 'cc-button cc-button--ghost cc-savebar__discard',
+			text: S.discard,
+			hidden: true,
+			onClick: function () {
+				self.discard();
+			}
+		} );
+		this.saveStatus = h( 'p', { className: 'cc-savebar__status', role: 'status', 'aria-live': 'polite' } );
+		this.saveBar = h( 'div', { className: 'cc-savebar' }, [
+			this.saveStatus,
+			h( 'div', { className: 'cc-savebar__buttons' }, [
+				this.discardButton,
+				h( 'div', { className: 'cc-settings__actions' }, [ this.saveButton ] )
+			] )
+		] );
 
 		if ( this.section === 'general' ) {
 			children = [ this.buildGeneral() ];
@@ -3963,7 +4437,7 @@
 				event.preventDefault();
 				self.save();
 			}
-		}, children.concat( [ h( 'div', { className: 'cc-settings__actions' }, [ this.saveButton ] ) ] ) );
+		}, children.concat( [ this.saveBar ] ) );
 
 		// Any edit may change which sections have unsaved changes.
 		[ 'input', 'change', 'click' ].forEach( function ( type ) {
@@ -4467,6 +4941,9 @@
 
 	SettingsView.prototype.buildLimits = function () {
 		var draft = this.draft;
+		var filesBox = this.reveal( draft.attachments_enabled, [
+			this.numberField( 'attachment_max_mb', S.filesMaxSize, S.megabytes, S.filesServerLimit.replace( '%s', fmt.number( this.data.limits.upload_max_mb ) ) )
+		] );
 
 		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-spam-title' }, [
@@ -4505,9 +4982,10 @@
 					] ),
 					this.buildSwitch( 'cc-attachments-enabled', S.filesOn, draft.attachments_enabled, function ( on ) {
 						draft.attachments_enabled = on;
+						filesBox.hidden = ! on;
 					} )
 				] ),
-				this.numberField( 'attachment_max_mb', S.filesMaxSize, S.megabytes, S.filesServerLimit.replace( '%s', fmt.number( this.data.limits.upload_max_mb ) ) ),
+				filesBox,
 				this.fieldError( 'attachments_enabled' )
 			] )
 		] );
@@ -4534,27 +5012,57 @@
 		var draft = this.draft;
 		var limit = this.data.limits.offline_message;
 
+		/**
+		 * A time menu in the site's digits, every half hour; "24:00" (end of
+		 * day) only for closing times. A saved time off the half hour stays.
+		 */
+		function timeSelect( value, closing, label ) {
+			var times = [];
+			for ( var minutes = closing ? 30 : 0; minutes <= ( closing ? 1440 : 1410 ); minutes += 30 ) {
+				times.push( ( '0' + Math.floor( minutes / 60 ) ).slice( -2 ) + ':' + ( '0' + minutes % 60 ).slice( -2 ) );
+			}
+			if ( times.indexOf( value ) === -1 ) {
+				times.push( value );
+				times.sort();
+			}
+
+			return h( 'select', { className: 'cc-input cc-select cc-input--time', 'aria-label': label }, times.map( function ( time ) {
+				var shown = time.split( ':' ).map( function ( part ) {
+					return fmt.number( part ).padStart( 2, fmt.number( 0 ) );
+				} ).join( ':' );
+				return h( 'option', { value: time, selected: time === value, text: time === '24:00' ? shown + ' (' + S.hoursEndOfDay + ')' : shown } );
+			} ) );
+		}
+
+		var controls = {};
+
 		var rows = weekOrder().map( function ( day ) {
 			var entry = draft.hours[ day ];
 			var id = 'cc-hours-' + day;
 			var on = h( 'input', { id: id, type: 'checkbox', checked: entry.on } );
-			var from = h( 'input', { type: 'time', className: 'cc-input cc-input--time', value: entry.from, step: '300', 'aria-label': dayName( day ) + ' — ' + S.hoursFrom, disabled: ! entry.on } );
-			var to = h( 'input', { type: 'time', className: 'cc-input cc-input--time', value: entry.to === '24:00' ? '23:59' : entry.to, step: '300', 'aria-label': dayName( day ) + ' — ' + S.hoursTo, disabled: ! entry.on } );
+			var from = timeSelect( entry.from, false, dayName( day ) + ' — ' + S.hoursFrom );
+			var to = timeSelect( entry.to, true, dayName( day ) + ' — ' + S.hoursTo );
 			var row = h( 'div', { className: 'cc-hours__row' + ( entry.on ? '' : ' is-closed' ) } );
+
+			from.disabled = to.disabled = ! entry.on;
+			controls[ day ] = { from: from, to: to };
 
 			on.addEventListener( 'change', function () {
 				entry.on = on.checked;
 				from.disabled = to.disabled = ! on.checked;
 				row.classList.toggle( 'is-closed', ! on.checked );
 				self.clearError( 'hours' );
+				syncCopy();
 			} );
-			from.addEventListener( 'input', function () {
+			from.addEventListener( 'change', function () {
 				entry.from = from.value;
 				self.clearError( 'hours' );
+				syncCopy();
 			} );
-			to.addEventListener( 'input', function () {
+			to.addEventListener( 'change', function () {
 				entry.to = to.value;
 				self.clearError( 'hours' );
+				syncCopy();
 			} );
 
 			row.append(
@@ -4566,7 +5074,59 @@
 			return row;
 		} );
 
-		var week = h( 'div', { className: 'cc-hours' + ( draft.hours_enabled ? '' : ' is-off' ) }, rows );
+		// Copies the first open day's hours to every other open day.
+		var copy = h( 'button', {
+			type: 'button',
+			className: 'cc-link-button cc-hours__copy',
+			onClick: function () {
+				var first = firstOpen();
+				if ( ! first ) {
+					return;
+				}
+				weekOrder().forEach( function ( day ) {
+					var entry = draft.hours[ day ];
+					if ( entry.on && day !== first ) {
+						entry.from = draft.hours[ first ].from;
+						entry.to = draft.hours[ first ].to;
+						controls[ day ].from.value = entry.from;
+						controls[ day ].to.value = entry.to;
+					}
+				} );
+				self.clearError( 'hours' );
+				syncCopy();
+				self.syncNav();
+				self.panel.notify( S.hoursCopied );
+			}
+		} );
+
+		function firstOpen() {
+			return weekOrder().filter( function ( day ) {
+				return draft.hours[ day ].on;
+			} )[ 0 ] || null;
+		}
+
+		// Offered only when some open day has other hours than the first.
+		function syncCopy() {
+			var first = firstOpen();
+			var differs = !! first && weekOrder().some( function ( day ) {
+				var entry = draft.hours[ day ];
+				return entry.on && ( entry.from !== draft.hours[ first ].from || entry.to !== draft.hours[ first ].to );
+			} );
+			copy.hidden = ! differs;
+			if ( first ) {
+				copy.textContent = String( S.hoursCopy ).replace( '%s', dayName( first ) );
+			}
+		}
+
+		syncCopy();
+
+		var week = this.reveal( draft.hours_enabled, [
+			h( 'div', { className: 'cc-hours' }, rows ),
+			h( 'div', { className: 'cc-settings__row' }, [
+				h( 'p', { className: 'cc-hint', text: S.hoursTimezone.replace( '%s', this.data.timezone ) } ),
+				copy
+			] )
+		] );
 
 		var modes = [ [ 'message', S.offlineModeMessage, S.offlineModeMessageHint ], [ 'chat', S.offlineModeChat, S.offlineModeChatHint ] ];
 		var modeGroup = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-offline-mode-label' }, modes.map( function ( mode ) {
@@ -4608,11 +5168,10 @@
 					] ),
 					this.buildSwitch( 'cc-hours-enabled', S.hoursOn, draft.hours_enabled, function ( on ) {
 						draft.hours_enabled = on;
-						week.classList.toggle( 'is-off', ! on );
+						week.hidden = ! on;
 					} )
 				] ),
 				week,
-				h( 'p', { className: 'cc-hint', text: S.hoursTimezone.replace( '%s', this.data.timezone ) } ),
 				this.fieldError( 'hours' )
 			] ),
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-offline-title' }, [
@@ -4643,12 +5202,19 @@
 		var self = this;
 		var draft = this.draft;
 
-		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email, disabled: ! draft.notify_email_enabled } );
+		var email = h( 'input', { id: 'cc-notify-email', className: 'cc-input', type: 'email', dir: 'ltr', placeholder: this.data.defaults.notify_email } );
 		email.value = draft.notify_email;
 		email.addEventListener( 'input', function () {
 			draft.notify_email = email.value;
 			self.clearError( 'notify_email' );
 		} );
+
+		var emailBox = this.reveal( draft.notify_email_enabled, [
+			h( 'label', { className: 'cc-label', for: 'cc-notify-email', text: S.notifyEmail } ),
+			email,
+			h( 'p', { className: 'cc-hint', text: S.notifyEmailHint } ),
+			this.fieldError( 'notify_email' )
+		] );
 
 		var whens = [ [ 'new', S.botNotifyNew, S.botNotifyNewHint ], [ 'offline', S.botNotifyOffline, S.botNotifyOfflineHint ] ];
 		var when = h( 'div', { className: 'cc-radios', role: 'radiogroup', 'aria-labelledby': 'cc-bot-when-title' }, whens.map( function ( option ) {
@@ -4670,13 +5236,10 @@
 					] ),
 					this.buildSwitch( 'cc-notify-enabled', S.notifyOn, draft.notify_email_enabled, function ( on ) {
 						draft.notify_email_enabled = on;
-						email.disabled = ! on;
+						emailBox.hidden = ! on;
 					} )
 				] ),
-				h( 'label', { className: 'cc-label', for: 'cc-notify-email', text: S.notifyEmail } ),
-				email,
-				h( 'p', { className: 'cc-hint', text: S.notifyEmailHint } ),
-				this.fieldError( 'notify_email' )
+				emailBox
 			] ),
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-bot-when-title' }, [
 				h( 'div', {}, [
@@ -4766,18 +5329,24 @@
 			fields.push( h( 'p', { className: 'cc-hint', text: S.telegramApiUrlHint } ) );
 		}
 
+		var box = this.reveal( draft[ service + '_enabled' ], [
+			h( 'p', { className: 'cc-hint cc-hint--pre', text: help } ),
+			h( 'div', { className: 'cc-bot-fields' }, fields ),
+			h( 'div', { className: 'cc-bot-test' }, [ test, result ] )
+		] );
+
 		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': prefix + '-title' }, [
 			h( 'div', { className: 'cc-settings__head' }, [
 				h( 'div', {}, [
 					h( 'h2', { id: prefix + '-title', text: title } ),
-					h( 'p', { className: 'cc-hint cc-hint--pre', text: help } )
+					h( 'p', { className: 'cc-hint', text: service === 'bale' ? S.baleIntro : S.telegramIntro } )
 				] ),
 				this.buildSwitch( prefix + '-enabled', S.botOn, draft[ service + '_enabled' ], function ( on ) {
 					draft[ service + '_enabled' ] = on;
+					box.hidden = ! on;
 				} )
 			] ),
-			h( 'div', { className: 'cc-bot-fields' }, fields ),
-			h( 'div', { className: 'cc-bot-test' }, [ test, result ] ),
+			box,
 			this.fieldError( service + '_enabled' )
 		] );
 	};
@@ -5060,6 +5629,12 @@
 			] );
 		} );
 
+		var box = this.reveal( draft.channels_enabled, [
+			editor.list,
+			this.fieldError( 'channels' ),
+			h( 'div', {}, [ editor.add ] )
+		] );
+
 		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-channels-title' }, [
 			h( 'div', { className: 'cc-settings__head' }, [
 				h( 'div', {}, [
@@ -5068,13 +5643,12 @@
 				] ),
 				this.buildSwitch( 'cc-channels-enabled', S.channelsOn, draft.channels_enabled, function ( on ) {
 					draft.channels_enabled = on;
+					box.hidden = ! on;
 					self.clearError( 'channels_enabled' );
 				} )
 			] ),
-			editor.list,
-			this.fieldError( 'channels' ),
-			this.fieldError( 'channels_enabled' ),
-			h( 'div', {}, [ editor.add ] )
+			box,
+			this.fieldError( 'channels_enabled' )
 		] );
 	};
 
@@ -5120,6 +5694,12 @@
 			] );
 		} );
 
+		var box = this.reveal( draft.faq_enabled, [
+			editor.list,
+			this.fieldError( 'faq' ),
+			h( 'div', {}, [ editor.add ] )
+		] );
+
 		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-faq-title' }, [
 			h( 'div', { className: 'cc-settings__head' }, [
 				h( 'div', {}, [
@@ -5128,11 +5708,10 @@
 				] ),
 				this.buildSwitch( 'cc-faq-enabled', S.faqOn, draft.faq_enabled, function ( on ) {
 					draft.faq_enabled = on;
+					box.hidden = ! on;
 				} )
 			] ),
-			editor.list,
-			this.fieldError( 'faq' ),
-			h( 'div', {}, [ editor.add ] )
+			box
 		] );
 	};
 
@@ -5246,6 +5825,30 @@
 
 		var phoneOff = this.data.settings.form_phone === 'off';
 
+		var setup = this.reveal( draft.sms_enabled, [
+			phoneOff ? h( 'p', { className: 'cc-banner cc-banner--warning', role: 'note' }, [ icon( 'alert' ), h( 'span', { text: S.smsPhoneOff } ) ] ) : null,
+			h( 'span', { className: 'cc-label', id: 'cc-sms-provider-label', text: S.smsProvider } ),
+			providers,
+			kavenegar,
+			melipayamak,
+			sender,
+			this.fieldError( 'sms_provider' )
+		] );
+		var textCard = h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-text-title', hidden: ! draft.sms_enabled }, [
+			h( 'h2', { id: 'cc-sms-text-title', text: S.smsTextTitle } ),
+			h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: message.id, text: S.smsMessage } ), counter ] ),
+			message,
+			h( 'p', { className: 'cc-hint', text: S.smsMessageHint } ),
+			this.fieldError( 'sms_message' ),
+			this.numberField( 'sms_delay', S.smsDelay, S.minutes, S.smsDelayHint )
+		] );
+		var testCard = h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-test-title', hidden: ! draft.sms_enabled }, [
+			h( 'h2', { id: 'cc-sms-test-title', text: S.smsTestTitle } ),
+			h( 'p', { className: 'cc-hint', text: S.smsTestIntro } ),
+			h( 'label', { className: 'cc-label', for: phone.id, text: S.smsTestPhone } ),
+			h( 'div', { className: 'cc-bot-test' }, [ phone, test, result ] )
+		] );
+
 		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-title' }, [
 				h( 'div', { className: 'cc-settings__head' }, [
@@ -5255,32 +5858,15 @@
 					] ),
 					this.buildSwitch( 'cc-sms-enabled', S.smsOn, draft.sms_enabled, function ( on ) {
 						draft.sms_enabled = on;
+						setup.hidden = textCard.hidden = testCard.hidden = ! on;
 						self.clearError( 'sms_enabled' );
 					} )
 				] ),
-				phoneOff ? h( 'p', { className: 'cc-banner cc-banner--warning', role: 'note' }, [ icon( 'alert' ), h( 'span', { text: S.smsPhoneOff } ) ] ) : null,
-				h( 'span', { className: 'cc-label', id: 'cc-sms-provider-label', text: S.smsProvider } ),
-				providers,
-				kavenegar,
-				melipayamak,
-				sender,
-				this.fieldError( 'sms_provider' ),
+				setup,
 				this.fieldError( 'sms_enabled' )
 			] ),
-			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-text-title' }, [
-				h( 'h2', { id: 'cc-sms-text-title', text: S.smsTextTitle } ),
-				h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: message.id, text: S.smsMessage } ), counter ] ),
-				message,
-				h( 'p', { className: 'cc-hint', text: S.smsMessageHint } ),
-				this.fieldError( 'sms_message' ),
-				this.numberField( 'sms_delay', S.smsDelay, S.minutes, S.smsDelayHint )
-			] ),
-			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-sms-test-title' }, [
-				h( 'h2', { id: 'cc-sms-test-title', text: S.smsTestTitle } ),
-				h( 'p', { className: 'cc-hint', text: S.smsTestIntro } ),
-				h( 'label', { className: 'cc-label', for: phone.id, text: S.smsTestPhone } ),
-				h( 'div', { className: 'cc-bot-test' }, [ phone, test, result ] )
-			] )
+			textCard,
+			testCard
 		] );
 	};
 
@@ -5404,6 +5990,18 @@
 		} );
 		count();
 
+		var botBox = this.reveal( draft.ai_bot_enabled, [
+			h( 'span', { className: 'cc-label', id: 'cc-ai-mode-label', text: S.aiMode } ),
+			modes,
+			nameField,
+			h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: instructions.id, text: S.aiInstructions } ), counter ] ),
+			instructions,
+			h( 'p', { className: 'cc-hint', text: S.aiInstructionsHint } ),
+			this.fieldError( 'ai_instructions' ),
+			this.buildKnowledgePicker(),
+			this.numberField( 'ai_max_replies', S.aiMaxReplies, S.aiReplies, S.aiMaxRepliesHint )
+		] );
+
 		return h( 'div', { className: 'cc-settings' }, [
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ai-title' }, [
 				h( 'div', {}, [
@@ -5425,18 +6023,11 @@
 					] ),
 					this.buildSwitch( 'cc-ai-bot-enabled', S.aiBotOn, draft.ai_bot_enabled, function ( on ) {
 						draft.ai_bot_enabled = on;
+						botBox.hidden = ! on;
 						self.clearError( 'ai_api_key' );
 					} )
 				] ),
-				h( 'span', { className: 'cc-label', id: 'cc-ai-mode-label', text: S.aiMode } ),
-				modes,
-				nameField,
-				h( 'div', { className: 'cc-label-row' }, [ h( 'label', { className: 'cc-label', for: instructions.id, text: S.aiInstructions } ), counter ] ),
-				instructions,
-				h( 'p', { className: 'cc-hint', text: S.aiInstructionsHint } ),
-				this.fieldError( 'ai_instructions' ),
-				this.buildKnowledgePicker(),
-				this.numberField( 'ai_max_replies', S.aiMaxReplies, S.aiReplies, S.aiMaxRepliesHint )
+				botBox
 			] ),
 			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-ai-suggest-title' }, [
 				h( 'div', { className: 'cc-settings__head' }, [
@@ -5562,7 +6153,6 @@
 			className: 'cc-input cc-textarea',
 			rows: '3',
 			placeholder: this.data.defaults.welcome_message,
-			disabled: ! draft.welcome_enabled,
 			'aria-describedby': 'cc-welcome-hint'
 		} );
 		textarea.value = draft.welcome_message;
@@ -5582,9 +6172,19 @@
 		} );
 		count();
 
+		var box = this.reveal( draft.welcome_enabled, [
+			h( 'label', { className: 'cc-label', for: 'cc-welcome-message', text: S.welcomeText } ),
+			textarea,
+			h( 'div', { className: 'cc-settings__row' }, [
+				h( 'p', { id: 'cc-welcome-hint', className: 'cc-hint', text: S.welcomeDefault } ),
+				counter
+			] ),
+			this.fieldError( 'welcome_message' )
+		] );
+
 		var toggle = this.buildSwitch( 'cc-welcome-enabled', S.welcomeEnabled, draft.welcome_enabled, function ( on ) {
 			draft.welcome_enabled = on;
-			textarea.disabled = ! on;
+			box.hidden = ! on;
 		} );
 
 		return h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-welcome-title' }, [
@@ -5595,15 +6195,16 @@
 				] ),
 				toggle
 			] ),
-			h( 'label', { className: 'cc-label', for: 'cc-welcome-message', text: S.welcomeText } ),
-			textarea,
-			h( 'div', { className: 'cc-settings__row' }, [
-				h( 'p', { id: 'cc-welcome-hint', className: 'cc-hint', text: S.welcomeDefault } ),
-				counter
-			] ),
-			this.fieldError( 'welcome_message' ),
+			box,
 			this.fieldError( 'welcome_enabled' )
 		] );
+	};
+
+	/**
+	 * Settings of a feature, shown only while its switch is on.
+	 */
+	SettingsView.prototype.reveal = function ( on, children ) {
+		return h( 'div', { className: 'cc-reveal', hidden: ! on }, children );
 	};
 
 	SettingsView.prototype.buildSwitch = function ( id, label, on, onChange ) {
@@ -5963,17 +6564,25 @@
 
 		button.disabled = true;
 		button.textContent = S.saving;
+		this.saving = true;
+		this.syncSaveBar();
 
 		api.saveSettings( this.payload( section ) ).then( function ( data ) {
+			self.saving = false;
 			self.apply( data, [ section ] );
 			if ( section === 'appearance' ) {
 				applyBrandColor( data.effective.primary_color );
 			}
+			// Keeps the scroll position: the form is rebuilt in place.
+			var top = self.el.scrollTop;
 			self.render();
+			self.el.scrollTop = top;
 			self.panel.notify( S.saved );
 		} ).catch( function ( error ) {
+			self.saving = false;
 			button.disabled = false;
 			button.textContent = S.save;
+			self.syncSaveBar();
 
 			var fields = ( error.data && error.data.fields ) || {};
 			var shown = false;

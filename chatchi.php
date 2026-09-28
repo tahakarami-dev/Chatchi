@@ -123,3 +123,15 @@ add_action(
 		chatchi()->boot();
 	}
 );
+
+// Orders are read only through the WooCommerce API, so both order storages
+// (posts and HPOS tables) work; the chat does not touch the checkout.
+add_action(
+	'before_woocommerce_init',
+	function () {
+		if ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\FeaturesUtil' ) ) {
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', CHATCHI_FILE, true );
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', CHATCHI_FILE, true );
+		}
+	}
+);

@@ -130,6 +130,7 @@ final class PanelPage {
 			'locale'            => str_replace( '_', '-', determine_locale() ),
 			'dir'               => is_rtl() ? 'rtl' : 'ltr',
 			'adminUrl'          => esc_url_raw( admin_url() ),
+			'homeUrl'           => esc_url_raw( home_url( '/' ) ),
 			'userEditUrl'       => esc_url_raw( admin_url( 'user-edit.php' ) ),
 			// Shown on desktop notifications; empty when the site has no icon.
 			'iconUrl'           => esc_url_raw( (string) get_site_icon_url( 192 ) ),
