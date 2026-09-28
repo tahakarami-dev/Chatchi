@@ -524,6 +524,50 @@ final class PanelStrings {
 			'messagesTitle'        => __( 'Messages', 'chatchi' ),
 			'messageMaxLength'     => __( 'Longest message', 'chatchi' ),
 			'characters'           => __( 'characters', 'chatchi' ),
+			// Save bar and settings navigation.
+			'discard'              => __( 'Discard', 'chatchi' ),
+			'discarded'            => __( 'Changes discarded.', 'chatchi' ),
+			'unsavedHere'          => __( 'You have unsaved changes in this section.', 'chatchi' ),
+			'allSaved'             => __( 'All changes are saved.', 'chatchi' ),
+			'saveShortcut'         => __( 'Save (Ctrl+S)', 'chatchi' ),
+			'groupWidget'          => __( 'Widget', 'chatchi' ),
+			'groupAnswering'       => __( 'Answering', 'chatchi' ),
+			'groupAlerts'          => __( 'Alerts', 'chatchi' ),
+			'groupProtection'      => __( 'Protection', 'chatchi' ),
+			'settingsSearch'       => __( 'Search settings', 'chatchi' ),
+			/* translators: %s: search text. */
+			'settingsNoMatch'      => __( 'No setting matches “%s”.', 'chatchi' ),
+			'viewSite'             => __( 'View site', 'chatchi' ),
+			// Business hours.
+			/* translators: %s: day name. */
+			'hoursCopy'            => __( 'Use %s’s hours for every open day', 'chatchi' ),
+			'hoursCopied'          => __( 'Hours copied to every open day.', 'chatchi' ),
+			'hoursEndOfDay'        => __( 'end of day', 'chatchi' ),
+			'baleIntro'            => __( 'A message in Bale for new chats, on your phone or computer.', 'chatchi' ),
+			'telegramIntro'        => __( 'A message in Telegram for new chats, on your phone or computer.', 'chatchi' ),
+			// Setup guide for administrators.
+			'setupTitle'           => __( 'Get ChatChi ready', 'chatchi' ),
+			'setupIntro'           => __( 'A few short steps to get the most out of chat on your site.', 'chatchi' ),
+			/* translators: 1: steps done, 2: all steps. */
+			'setupProgress'        => __( '%1$s of %2$s done', 'chatchi' ),
+			'setupAppearance'      => __( 'Pick the color and title of the chat', 'chatchi' ),
+			'setupAppearanceHint'  => __( 'So the chat looks like part of your brand.', 'chatchi' ),
+			'setupTeam'            => __( 'Add your team', 'chatchi' ),
+			'setupTeamHint'        => __( 'So more than one person can answer visitors.', 'chatchi' ),
+			'setupHours'           => __( 'Set your business hours', 'chatchi' ),
+			'setupHoursHint'       => __( 'Visitors see when to expect a reply.', 'chatchi' ),
+			'setupAlerts'          => __( 'Get new chats on your phone', 'chatchi' ),
+			'setupAlertsHint'      => __( 'Through Bale or Telegram, so no chat is missed.', 'chatchi' ),
+			'setupFaq'             => __( 'Add frequently asked questions', 'chatchi' ),
+			'setupFaqHint'         => __( 'Visitors find answers themselves, and the AI bot learns them too.', 'chatchi' ),
+			'setupAi'              => __( 'Turn on the AI assistant', 'chatchi' ),
+			'setupAiHint'          => __( 'It answers when nobody is online, or drafts replies for your team.', 'chatchi' ),
+			'setupOptional'        => __( 'Optional', 'chatchi' ),
+			'setupDone'            => __( 'Done', 'chatchi' ),
+			'setupAllDone'         => __( 'All set: your chat is ready.', 'chatchi' ),
+			'setupHide'            => __( 'Hide the guide', 'chatchi' ),
+			'setupShow'            => __( 'Setup guide', 'chatchi' ),
+			'setupViewSite'        => __( 'See the chat on your site', 'chatchi' ),
 		);
 	}
 }

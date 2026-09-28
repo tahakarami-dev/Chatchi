@@ -1495,12 +1495,7 @@ label.cc-button {
 }
 
 .cc-settings__actions {
-	position: sticky;
-	bottom: 0;
 	display: flex;
-	justify-content: flex-end;
-	padding: 12px 0;
-	background: linear-gradient(to top, var(--chatchi-bg) 70%, transparent);
 }
 
 .cc-textarea {
@@ -1618,9 +1613,6 @@ label.cc-button {
 	transition: opacity var(--chatchi-duration-fast);
 }
 
-.cc-hours.is-off {
-	opacity: .5;
-}
 
 .cc-hours__row {
 	display: flex;
@@ -1657,10 +1649,9 @@ label.cc-button {
 }
 
 .cc-input--time {
-	width: 116px;
+	width: auto;
+	min-width: 104px;
 	height: 38px;
-	direction: ltr;
-	text-align: center;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -1685,7 +1676,7 @@ label.cc-button {
 	}
 
 	.cc-input--time {
-		width: 100px;
+		min-width: 96px;
 	}
 }
 
@@ -4058,4 +4049,470 @@ a.cc-order-head:hover strong {
 .cc-knowledge-results .cc-user:disabled {
 	cursor: default;
 	opacity: .6;
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings: save bar, grouped navigation, search, features that      */
+/* reveal their settings, setup guide                                 */
+/* ------------------------------------------------------------------ */
+
+.cc-reveal {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.cc-reveal[hidden],
+.cc-settings__section[hidden],
+.cc-button[hidden] {
+	display: none;
+}
+
+.cc-settings__head > .cc-switch {
+	flex-shrink: 0;
+}
+
+.cc-switch__label {
+	white-space: nowrap;
+}
+
+/* The save bar stays at the bottom of the screen while the section scrolls. */
+.cc-savebar {
+	position: sticky;
+	bottom: 0;
+	z-index: 5;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 4px;
+	padding: 10px 12px 10px 16px;
+	border-radius: var(--chatchi-radius-md);
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-md), 0 0 0 1px var(--chatchi-border);
+	transition: box-shadow var(--chatchi-duration-fast);
+}
+
+[dir="rtl"] .cc-savebar {
+	padding: 10px 16px 10px 12px;
+}
+
+.cc-savebar__status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	color: var(--chatchi-text-muted);
+	font-size: 13px;
+}
+
+.cc-savebar__status::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: var(--chatchi-success);
+}
+
+.cc-savebar.is-dirty {
+	box-shadow: var(--chatchi-shadow-lg), 0 0 0 1px var(--chatchi-warning);
+}
+
+.cc-savebar.is-dirty .cc-savebar__status {
+	color: var(--chatchi-text);
+	font-weight: 500;
+}
+
+.cc-savebar.is-dirty .cc-savebar__status::before {
+	background: var(--chatchi-warning);
+}
+
+.cc-savebar__buttons {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.cc-button--ghost {
+	background: transparent;
+	color: var(--chatchi-text-muted);
+}
+
+.cc-button--ghost:hover {
+	background: var(--chatchi-surface-muted);
+	color: var(--chatchi-text);
+}
+
+/* Section navigation: search, then the sections in groups. */
+.cc-subnav__search-wrap {
+	position: relative;
+	margin-bottom: 8px;
+}
+
+.cc-subnav__search-wrap svg {
+	position: absolute;
+	top: 50%;
+	inset-inline-start: 10px;
+	width: 16px;
+	height: 16px;
+	color: var(--chatchi-text-subtle);
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+
+.cc-subnav__search {
+	height: 38px;
+	padding-inline-start: 34px;
+	font-size: 13px;
+}
+
+.cc-subnav__groups {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.cc-subnav__groups[hidden],
+.cc-subnav__results[hidden] {
+	display: none;
+}
+
+.cc-subnav__group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.cc-subnav__heading {
+	padding: 0 12px 4px;
+	color: var(--chatchi-text-subtle);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .02em;
+}
+
+.cc-subnav .cc-subnav__item {
+	padding: 8px 12px;
+}
+
+.cc-subnav__results {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.cc-subnav__result {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	width: 100%;
+	padding: 8px 12px;
+	border-radius: var(--chatchi-radius-sm);
+	color: var(--chatchi-text);
+	text-align: start;
+}
+
+.cc-subnav__result svg {
+	width: 16px;
+	height: 16px;
+	margin-top: 2px;
+	flex-shrink: 0;
+	color: var(--chatchi-text-subtle);
+}
+
+.cc-subnav__result span {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.cc-subnav__result strong {
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.cc-subnav__result small {
+	color: var(--chatchi-text-subtle);
+	font-size: 12px;
+}
+
+.cc-subnav__result:hover,
+.cc-subnav__result:focus-visible,
+.cc-subnav__result.is-first {
+	background: var(--chatchi-primary-soft);
+}
+
+.cc-subnav__empty {
+	padding: 8px 12px;
+}
+
+/* A setting found by search blinks once. */
+.cc-found {
+	animation: cc-found 1.6s var(--chatchi-ease-out);
+}
+
+@keyframes cc-found {
+	0%,
+	40% {
+		box-shadow: 0 0 0 3px var(--chatchi-focus-ring);
+	}
+
+	100% {
+		box-shadow: 0 0 0 3px transparent;
+	}
+}
+
+.cc-view-site {
+	flex-shrink: 0;
+	text-decoration: none;
+}
+
+.cc-view-site svg {
+	width: 16px;
+	height: 16px;
+}
+
+.cc-hours__copy {
+	flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+	.cc-subnav__groups {
+		flex-direction: row;
+		gap: 4px;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.cc-subnav__group {
+		display: contents;
+	}
+
+	.cc-subnav__heading {
+		display: none;
+	}
+
+	.cc-subnav {
+		flex-direction: column;
+		overflow: visible;
+	}
+
+	.cc-subnav__search-wrap {
+		margin-bottom: 0;
+	}
+
+	.cc-subnav .cc-subnav__item {
+		flex-shrink: 0;
+	}
+}
+
+@media (max-width: 640px) {
+	.cc-savebar,
+	[dir="rtl"] .cc-savebar {
+		padding: 8px 10px;
+	}
+
+	.cc-savebar__status {
+		font-size: 12px;
+	}
+
+	.cc-view-site span {
+		display: none;
+	}
+}
+
+/* Setup guide on the empty conversation pane. */
+.cc-setup {
+	width: min(560px, calc(100% - 48px));
+	margin: auto;
+	padding: 24px;
+	border-radius: var(--chatchi-radius-lg);
+	background: var(--chatchi-surface);
+	box-shadow: var(--chatchi-shadow-sm), 0 0 0 1px var(--chatchi-border);
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.cc-setup__head {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+}
+
+.cc-setup__head h2 {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 700;
+}
+
+.cc-setup__head .cc-hint {
+	margin-top: 4px;
+}
+
+.cc-setup__icon {
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	flex-shrink: 0;
+	border-radius: var(--chatchi-radius-md);
+	background: var(--chatchi-primary-soft);
+	color: var(--chatchi-primary);
+}
+
+.cc-setup__icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+.cc-setup__progress {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	color: var(--chatchi-text-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.cc-setup__bar {
+	flex: 1;
+	height: 6px;
+	border-radius: 9999px;
+	background: var(--chatchi-surface-muted);
+	overflow: hidden;
+}
+
+.cc-setup__bar span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--chatchi-success);
+	transition: width var(--chatchi-duration-slow) var(--chatchi-ease-out);
+}
+
+.cc-setup__steps {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.cc-setup__step {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 10px 12px;
+	border-radius: var(--chatchi-radius-sm);
+	color: var(--chatchi-text);
+	text-decoration: none;
+	transition: background-color var(--chatchi-duration-fast);
+}
+
+.cc-setup__step:hover {
+	background: var(--chatchi-bg);
+}
+
+.cc-setup__mark {
+	display: grid;
+	place-items: center;
+	width: 32px;
+	height: 32px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: var(--chatchi-bg);
+	color: var(--chatchi-text-muted);
+	box-shadow: inset 0 0 0 1px var(--chatchi-border);
+}
+
+.cc-setup__mark svg {
+	width: 16px;
+	height: 16px;
+}
+
+.cc-setup__step.is-done .cc-setup__mark {
+	background: var(--chatchi-success-soft);
+	color: var(--chatchi-success-text);
+	box-shadow: none;
+}
+
+.cc-setup__text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.cc-setup__text strong {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 500;
+}
+
+.cc-setup__step.is-done .cc-setup__text strong {
+	color: var(--chatchi-text-muted);
+	text-decoration: line-through;
+	text-decoration-color: var(--chatchi-border-strong);
+}
+
+.cc-setup__text small {
+	color: var(--chatchi-text-subtle);
+	font-size: 12px;
+}
+
+.cc-setup__tag {
+	padding: 1px 8px;
+	border-radius: 9999px;
+	background: var(--chatchi-surface-muted);
+	color: var(--chatchi-text-muted);
+	font-size: 11px;
+	font-weight: 500;
+}
+
+.cc-setup__go {
+	width: 16px;
+	height: 16px;
+	color: var(--chatchi-text-subtle);
+	transform: rotate(-90deg);
+}
+
+[dir="rtl"] .cc-setup__go {
+	transform: rotate(90deg);
+}
+
+.cc-setup__foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.cc-setup__foot .cc-button {
+	text-decoration: none;
+}
+
+.cc-setup__foot svg {
+	width: 16px;
+	height: 16px;
+}
+
+.cc-setup-wrap {
+	flex: 1;
+	display: flex;
+	min-height: 0;
+	padding: 32px 0;
+	overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cc-found {
+		animation: none;
+	}
 }

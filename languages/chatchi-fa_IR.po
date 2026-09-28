@@ -11,7 +11,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-28T07:03:55+00:00\n"
+"POT-Creation-Date: 2026-09-28T08:00:29+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -64,12 +64,12 @@ msgid "Sorry, you are not allowed to access this page."
 msgstr "متأسفیم، اجازه‌ی دسترسی به این صفحه را نداری."
 
 #. translators: %s: site name.
-#: includes/Admin/PanelPage.php:154
+#: includes/Admin/PanelPage.php:155
 #, php-format
 msgid "ChatChi — %s"
 msgstr "چت‌چی — %s"
 
-#: includes/Admin/PanelPage.php:175
+#: includes/Admin/PanelPage.php:176
 msgid "The ChatChi panel needs JavaScript."
 msgstr "پنل چت‌چی برای کار کردن به JavaScript نیاز دارد."
 
@@ -1917,6 +1917,7 @@ msgid "Off"
 msgstr "خاموش"
 
 #: includes/Admin/PanelStrings.php:508
+#: includes/Admin/PanelStrings.php:565
 msgid "Optional"
 msgstr "اختیاری"
 
@@ -1991,6 +1992,160 @@ msgstr "حداکثر طول پیام"
 #: includes/Admin/PanelStrings.php:526
 msgid "characters"
 msgstr "نویسه"
+
+#: includes/Admin/PanelStrings.php:528
+msgid "Discard"
+msgstr "بازگردانی"
+
+#: includes/Admin/PanelStrings.php:529
+msgid "Changes discarded."
+msgstr "تغییرها برگردانده شد."
+
+#: includes/Admin/PanelStrings.php:530
+msgid "You have unsaved changes in this section."
+msgstr "در این بخش تغییرهای ذخیره‌نشده داری."
+
+#: includes/Admin/PanelStrings.php:531
+msgid "All changes are saved."
+msgstr "همه‌ی تغییرها ذخیره شده است."
+
+#: includes/Admin/PanelStrings.php:532
+msgid "Save (Ctrl+S)"
+msgstr "ذخیره (Ctrl+S)"
+
+#: includes/Admin/PanelStrings.php:533
+msgid "Widget"
+msgstr "ویجت"
+
+#: includes/Admin/PanelStrings.php:534
+msgid "Answering"
+msgstr "پاسخ‌گویی"
+
+#: includes/Admin/PanelStrings.php:535
+msgid "Alerts"
+msgstr "اطلاع‌رسانی"
+
+#: includes/Admin/PanelStrings.php:536
+msgid "Protection"
+msgstr "امنیت و محافظت"
+
+#: includes/Admin/PanelStrings.php:537
+msgid "Search settings"
+msgstr "جستجو در تنظیمات"
+
+#. translators: %s: search text.
+#: includes/Admin/PanelStrings.php:539
+#, php-format
+msgid "No setting matches “%s”."
+msgstr "تنظیمی با «%s» پیدا نشد."
+
+#: includes/Admin/PanelStrings.php:540
+msgid "View site"
+msgstr "مشاهده‌ی سایت"
+
+#. translators: %s: day name.
+#: includes/Admin/PanelStrings.php:543
+#, php-format
+msgid "Use %s’s hours for every open day"
+msgstr "ساعت‌های %s را برای همه‌ی روزهای باز بگذار"
+
+#: includes/Admin/PanelStrings.php:544
+msgid "Hours copied to every open day."
+msgstr "ساعت‌ها روی همه‌ی روزهای باز اعمال شد."
+
+#: includes/Admin/PanelStrings.php:545
+msgid "end of day"
+msgstr "پایان روز"
+
+#: includes/Admin/PanelStrings.php:546
+msgid "A message in Bale for new chats, on your phone or computer."
+msgstr "برای گفتگوهای جدید در بله پیام بگیر؛ روی گوشی یا کامپیوتر."
+
+#: includes/Admin/PanelStrings.php:547
+msgid "A message in Telegram for new chats, on your phone or computer."
+msgstr "برای گفتگوهای جدید در تلگرام پیام بگیر؛ روی گوشی یا کامپیوتر."
+
+#: includes/Admin/PanelStrings.php:549
+msgid "Get ChatChi ready"
+msgstr "راه‌اندازی چت‌چی"
+
+#: includes/Admin/PanelStrings.php:550
+msgid "A few short steps to get the most out of chat on your site."
+msgstr "چند قدم کوتاه تا بیشترین استفاده را از گفتگوی سایتت ببری."
+
+#. translators: 1: steps done, 2: all steps.
+#: includes/Admin/PanelStrings.php:552
+#, php-format
+msgid "%1$s of %2$s done"
+msgstr "%1$s از %2$s انجام شده"
+
+#: includes/Admin/PanelStrings.php:553
+msgid "Pick the color and title of the chat"
+msgstr "رنگ و عنوان گفتگو را انتخاب کن"
+
+#: includes/Admin/PanelStrings.php:554
+msgid "So the chat looks like part of your brand."
+msgstr "تا گفتگو شبیه برند خودت باشد."
+
+#: includes/Admin/PanelStrings.php:555
+msgid "Add your team"
+msgstr "همکارانت را اضافه کن"
+
+#: includes/Admin/PanelStrings.php:556
+msgid "So more than one person can answer visitors."
+msgstr "تا بیش از یک نفر به بازدیدکننده‌ها جواب بدهد."
+
+#: includes/Admin/PanelStrings.php:557
+msgid "Set your business hours"
+msgstr "ساعت کاری را تنظیم کن"
+
+#: includes/Admin/PanelStrings.php:558
+msgid "Visitors see when to expect a reply."
+msgstr "بازدیدکننده می‌بیند کی منتظر جواب باشد."
+
+#: includes/Admin/PanelStrings.php:559
+msgid "Get new chats on your phone"
+msgstr "گفتگوهای جدید را روی گوشی‌ات بگیر"
+
+#: includes/Admin/PanelStrings.php:560
+msgid "Through Bale or Telegram, so no chat is missed."
+msgstr "با بله یا تلگرام، تا هیچ گفتگویی از دست نرود."
+
+#: includes/Admin/PanelStrings.php:561
+msgid "Add frequently asked questions"
+msgstr "سؤالات متداول را اضافه کن"
+
+#: includes/Admin/PanelStrings.php:562
+msgid "Visitors find answers themselves, and the AI bot learns them too."
+msgstr "بازدیدکننده‌ها خودشان جواب را پیدا می‌کنند و ربات هوشمند هم آن‌ها را یاد می‌گیرد."
+
+#: includes/Admin/PanelStrings.php:563
+msgid "Turn on the AI assistant"
+msgstr "دستیار هوش مصنوعی را روشن کن"
+
+#: includes/Admin/PanelStrings.php:564
+msgid "It answers when nobody is online, or drafts replies for your team."
+msgstr "وقتی کسی آنلاین نیست جواب می‌دهد، یا برای تیمت پیش‌نویس پاسخ می‌نویسد."
+
+#: includes/Admin/PanelStrings.php:566
+msgid "Done"
+msgstr "انجام شد"
+
+#: includes/Admin/PanelStrings.php:567
+msgid "All set: your chat is ready."
+msgstr "همه چیز آماده است؛ گفتگوی سایتت راه افتاده."
+
+#: includes/Admin/PanelStrings.php:568
+msgid "Hide the guide"
+msgstr "پنهان کردن راهنما"
+
+#: includes/Admin/PanelStrings.php:569
+msgid "Setup guide"
+msgstr "راهنمای راه‌اندازی"
+
+#: includes/Admin/PanelStrings.php:570
+msgid "See the chat on your site"
+msgstr "گفتگو را در سایت ببین"
 
 #: includes/Agents/AgentService.php:84
 msgid "This user does not exist."
