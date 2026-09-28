@@ -51,7 +51,10 @@
 		restUrl: config.restUrl,
 		nonce: config.nonce,
 		networkError: S.networkError,
-		dropExpiredNonce: true
+		dropExpiredNonce: true,
+		// When the site closes the REST API to guests.
+		ajaxUrl: config.ajax && config.ajax.url,
+		ajaxAction: config.ajax && config.ajax.action
 	} );
 	var request = client.request;
 

@@ -307,6 +307,16 @@ Administrators also get a **Settings** screen with twelve sections in four group
 - **Notifications**: a soft two-note chime (Web Audio, no sound file) when a reply arrives while the chat is closed or the tab is in the background, and the count in the tab title until the visitor comes back. The sound can be turned off in Settings → General.
 - A message of one to three emoji is shown large without a bubble, and a "latest message" button appears when the visitor scrolls up, with a dot when new messages arrive below.
 
+## Guests on restricted sites
+
+Visitors who are not logged in chat through the widget's own routes (`chatchi/v1/widget/…`), which do not need a WordPress account: they identify the visitor by an HttpOnly cookie and carry their own protections (same-site requests only, bot checks on the start form, rate limits). Three things on real sites stop guests while logged-in users are unaffected, and ChatChi handles each:
+
+- **Security plugins closing the REST API to guests** ("Disable REST API", "restrict REST API to logged-in users", hardening snippets on `rest_authentication_errors`): the widget's routes are let through for guests, after every other filter; the rest of the site's API stays closed, and a failed nonce check (which protects logged-in users) is never overridden. Filter `chatchi_allow_guest_widget_api` (return false to keep them closed).
+- **Firewalls or server rules blocking `/wp-json/`** for guests: when the REST API refuses a request with an error that is not ChatChi's own (401, 403, 404, 405, 406, 410 or 501, or an HTML error page), the widget sends it again to `admin-ajax.php?action=chatchi_widget&route=/widget/…`, which runs the same REST route with its own permission checks, and keeps using that way for the rest of the visit. Only the widget's routes are reachable there; logged-in users count as signed in only with a valid REST nonce, as over REST.
+- **Caches storing REST responses for guests** (LiteSpeed Cache does by default): every ChatChi REST response is sent with `Cache-Control: no-store, private`, `X-LiteSpeed-Cache-Control: no-cache` and `DONOTCACHEPAGE`.
+
+Sites that answer on both `example.com` and `www.example.com` (or on http and https) also work: the widget calls the API on the page's own address, and the same-site check accepts the site's host with or without `www.`.
+
 ## Troubleshooting
 
 - **"Not sent" in the widget:** when a site administrator is logged in, the widget shows the technical cause under a failed message (HTTP status, error code, and the server's explanation). Visitors never see it. The same message is always written to the server's PHP error log as `[ChatChi] … error: …`.

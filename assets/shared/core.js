@@ -311,22 +311,62 @@
 		this.data = data || {};
 	}
 
+	var TRANSPORT_KEY = 'chatchi_transport';
+
+	/**
+	 * A site address on this page's own origin when it only differs by
+	 * "www." or http/https: sites often answer on both, and a request to the
+	 * other one would be cross-origin, without the visitor's cookie.
+	 */
+	function sameOrigin( address ) {
+		var url = new URL( address, window.location.href );
+		var bare = function ( host ) {
+			return host.toLowerCase().replace( /^www\./, '' );
+		};
+
+		if ( url.origin !== window.location.origin && bare( url.hostname ) === bare( window.location.hostname ) ) {
+			url.protocol = window.location.protocol;
+			url.host = window.location.host;
+		}
+
+		return url;
+	}
+
 	/**
 	 * REST client for chatchi/v1. Works with pretty permalinks (/wp-json/)
 	 * and plain ones (?rest_route=). Sends the WordPress nonce when given and
 	 * continues without it if it has expired.
+	 *
+	 * With options.ajaxUrl, requests the REST API refuses for reasons that are
+	 * not ChatChi's own (a security plugin or firewall closing it to guests)
+	 * are sent again through admin-ajax.php, which runs the same route; the
+	 * rest of the visit then uses that way.
 	 */
 	function createApi( options ) {
-		var state = { nonce: options.nonce || '' };
+		var state = { nonce: options.nonce || '', ajax: false };
+
+		if ( options.ajaxUrl ) {
+			try {
+				state.ajax = window.sessionStorage.getItem( TRANSPORT_KEY ) === 'ajax';
+			} catch ( e ) {}
+		}
 
 		function endpoint( path, query ) {
-			var url = new URL( options.restUrl, window.location.href );
-			var route = url.searchParams.get( 'rest_route' );
+			var url;
 
-			if ( route !== null ) {
-				url.searchParams.set( 'rest_route', route.replace( /\/$/, '' ) + path );
+			if ( state.ajax ) {
+				url = sameOrigin( options.ajaxUrl );
+				url.searchParams.set( 'action', options.ajaxAction || 'chatchi_widget' );
+				url.searchParams.set( 'route', path );
 			} else {
-				url.pathname = url.pathname.replace( /\/$/, '' ) + path;
+				url = sameOrigin( options.restUrl );
+				var route = url.searchParams.get( 'rest_route' );
+
+				if ( route !== null ) {
+					url.searchParams.set( 'rest_route', route.replace( /\/$/, '' ) + path );
+				} else {
+					url.pathname = url.pathname.replace( /\/$/, '' ) + path;
+				}
 			}
 
 			Object.keys( query || {} ).forEach( function ( key ) {
@@ -336,6 +376,27 @@
 			} );
 
 			return url.toString();
+		}
+
+		/**
+		 * Whether a failed REST request was refused by something other than
+		 * ChatChi (its own errors all start with "chatchi_"), so trying
+		 * admin-ajax.php may help. Switches to it when so.
+		 */
+		function switchToAjax( status, code ) {
+			if ( ! options.ajaxUrl || state.ajax || /^chatchi_/.test( code ) || code === 'rest_cookie_invalid_nonce' ) {
+				return false;
+			}
+			if ( [ 401, 403, 404, 405, 406, 410, 501 ].indexOf( status ) === -1 ) {
+				return false;
+			}
+
+			state.ajax = true;
+			try {
+				window.sessionStorage.setItem( TRANSPORT_KEY, 'ajax' );
+			} catch ( e ) {}
+
+			return true;
 		}
 
 		function request( method, path, opts, isRetry ) {
@@ -379,6 +440,10 @@
 						return request( method, path, opts, true );
 					}
 
+					if ( switchToAjax( response.status, code ) ) {
+						return request( method, path, opts, isRetry );
+					}
+
 					throw new ApiError( response.status, code, data && data.message ? data.message : options.networkError, data ? data.data : { raw: raw } );
 				} );
 			}, function () {
@@ -390,7 +455,7 @@
 		 * Sends a multipart form (files) with upload progress, which fetch()
 		 * cannot report. Resolves and rejects like request().
 		 */
-		function upload( path, form, onProgress ) {
+		function upload( path, form, onProgress, isRetry ) {
 			return new Promise( function ( resolve, reject ) {
 				var xhr = new XMLHttpRequest();
 
@@ -418,6 +483,11 @@
 
 					var code = data && data.code ? data.code : ( xhr.status >= 200 && xhr.status < 300 ? 'invalid_response' : 'http_' + xhr.status );
 
+					if ( ! isRetry && switchToAjax( xhr.status, code ) ) {
+						resolve( upload( path, form, onProgress, true ) );
+						return;
+					}
+
 					reject( new ApiError( xhr.status, code, data && data.message ? data.message : options.networkError, data ? data.data : {} ) );
 				};
 				xhr.onerror = function () {
@@ -433,7 +503,15 @@
 		 * users (images cannot send headers) and, optionally, as a download.
 		 */
 		function fileUrl( url, download ) {
-			var address = new URL( url, window.location.href );
+			var address = sameOrigin( url );
+			var namespace = '/chatchi/v1';
+			var route = address.searchParams.get( 'rest_route' ) || address.pathname;
+			var at = route.indexOf( namespace + '/' );
+
+			// Through admin-ajax.php when the REST API is closed to this visitor.
+			if ( state.ajax && at !== -1 ) {
+				address = new URL( endpoint( route.slice( at + namespace.length ) ) );
+			}
 
 			if ( state.nonce ) {
 				address.searchParams.set( '_wpnonce', state.nonce );
