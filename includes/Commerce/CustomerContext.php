@@ -244,7 +244,7 @@ final class CustomerContext {
 				'total'        => $this->money( (float) $order->get_total() ),
 				'date'         => $created ? gmdate( 'Y-m-d\TH:i:s\Z', $created->getTimestamp() ) : null,
 				'items'        => array_slice( $names, 0, 5 ),
-				'url'          => current_user_can( 'edit_shop_orders' ) ? admin_url( 'post.php?post=' . $order->get_id() . '&action=edit' ) : '',
+				'url'          => current_user_can( 'edit_shop_orders' ) ? $order->get_edit_order_url() : '',
 			);
 		}
 
