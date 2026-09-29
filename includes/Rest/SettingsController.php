@@ -161,6 +161,7 @@ final class SettingsController implements RouteProvider {
 			'notify_email_enabled'     => $flag,
 			'notify_email'             => $text( 200 ),
 			'attachments_enabled'      => $flag,
+			'voice_enabled'            => $flag,
 			'telegram_enabled'         => $flag,
 			'telegram_token'           => $text( 200 ),
 			'telegram_chat_id'         => $text( 100 ),

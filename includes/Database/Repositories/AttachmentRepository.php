@@ -42,6 +42,7 @@ final class AttachmentRepository extends Repository {
 			'size'            => '%d',
 			'width'           => '%d',
 			'height'          => '%d',
+			'duration'        => '%d',
 			'path'            => '%s',
 			'created_at'      => '%s',
 		);
@@ -58,7 +59,7 @@ final class AttachmentRepository extends Repository {
 	 * Records a stored file.
 	 *
 	 * @param int                  $conversation_id Conversation ID.
-	 * @param array<string, mixed> $file            file_name, mime, size, width, height, path.
+	 * @param array<string, mixed> $file            file_name, mime, size, width, height, duration, path.
 	 *
 	 * @throws DatabaseException When the insert fails.
 	 */
@@ -72,6 +73,7 @@ final class AttachmentRepository extends Repository {
 				'size'            => max( 0, (int) $file['size'] ),
 				'width'           => max( 0, (int) ( $file['width'] ?? 0 ) ),
 				'height'          => max( 0, (int) ( $file['height'] ?? 0 ) ),
+				'duration'        => max( 0, (int) ( $file['duration'] ?? 0 ) ),
 				'path'            => (string) $file['path'],
 				'created_at'      => $this->now(),
 			)

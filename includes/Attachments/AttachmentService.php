@@ -27,6 +27,10 @@ defined( 'ABSPATH' ) || exit;
  * Files are checked by their content, not only their name, against a short
  * list of safe types (pictures, PDF, Office documents, text and ZIP). SVG
  * and HTML are never accepted, as browsers would run scripts in them.
+ *
+ * Voice messages are recorded in the browser and sent the same way, flagged
+ * as voice: they are checked by their audio signature, named by the server
+ * and played inside the conversation.
  */
 final class AttachmentService {
 
@@ -47,6 +51,11 @@ final class AttachmentService {
 		'xls'          => 'application/vnd.ms-excel',
 		'xlsx'         => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 	);
+
+	/**
+	 * Longest voice message, in seconds.
+	 */
+	public const VOICE_MAX_SECONDS = 300;
 
 	private ConversationService $conversations;
 
@@ -144,16 +153,27 @@ final class AttachmentService {
 	}
 
 	/**
+	 * Whether visitors may send voice messages. Agents always may.
+	 */
+	public function voice_for_visitors(): bool {
+		return (bool) $this->settings->get( 'voice_enabled' );
+	}
+
+	/**
 	 * Settings the widget and panel need.
 	 *
 	 * @param Actor|null $actor Who will upload; null for visitors before they start.
-	 * @return array{enabled: bool, max_bytes: int, accept: string}
+	 * @return array{enabled: bool, max_bytes: int, accept: string, voice: bool, voice_max_seconds: int}
 	 */
 	public function client_config( ?Actor $actor = null ): array {
+		$agent = $actor && $actor->is_agent();
+
 		return array(
-			'enabled'   => ( $actor && $actor->is_agent() ) || $this->enabled_for_visitors(),
-			'max_bytes' => $this->max_bytes(),
-			'accept'    => $this->accept(),
+			'enabled'           => $agent || $this->enabled_for_visitors(),
+			'max_bytes'         => $this->max_bytes(),
+			'accept'            => $this->accept(),
+			'voice'             => $agent || $this->voice_for_visitors(),
+			'voice_max_seconds' => self::VOICE_MAX_SECONDS,
 		);
 	}
 
@@ -164,16 +184,22 @@ final class AttachmentService {
 	 * @param int                       $conversation_id Conversation ID.
 	 * @param array<string, mixed>|null $file            Entry of $_FILES.
 	 * @param string|null               $client_id       Client UUID, makes retries safe.
+	 * @param bool                      $voice           Whether it is a recorded voice message.
+	 * @param int                       $duration        Length of a voice message in seconds, as the recorder measured it.
 	 * @return Message|\WP_Error The new message, with attachment_id set.
 	 */
-	public function upload( Actor $actor, int $conversation_id, ?array $file, ?string $client_id = null ) {
+	public function upload( Actor $actor, int $conversation_id, ?array $file, ?string $client_id = null, bool $voice = false, int $duration = 0 ) {
 		$conversation = $this->conversations->get( $actor, $conversation_id );
 
 		if ( $conversation instanceof \WP_Error ) {
 			return $conversation;
 		}
 
-		if ( $actor->is_visitor() && ! $this->enabled_for_visitors() ) {
+		if ( $voice && $actor->is_visitor() && ! $this->voice_for_visitors() ) {
+			return $this->error( 'chatchi_voice_disabled', __( 'Voice messages are turned off.', 'chatchi' ), 403 );
+		}
+
+		if ( ! $voice && $actor->is_visitor() && ! $this->enabled_for_visitors() ) {
 			return $this->error( 'chatchi_attachments_disabled', __( 'Sending files is turned off.', 'chatchi' ), 403 );
 		}
 
@@ -181,7 +207,7 @@ final class AttachmentService {
 			return $this->error( 'chatchi_conversation_closed', __( 'This conversation has been closed.', 'chatchi' ), 409 );
 		}
 
-		$checked = $this->check( $file );
+		$checked = $voice ? $this->check_voice( $file, $duration ) : $this->check( $file );
 
 		if ( $checked instanceof \WP_Error ) {
 			return $checked;
@@ -200,7 +226,8 @@ final class AttachmentService {
 			return Failure::report( $e, 'Attachment', 'chatchi_attachment_failed' );
 		}
 
-		$message = $this->messages->send( $actor, $conversation->id, $this->caption( $attachment->file_name ), $client_id );
+		$caption = $voice ? __( 'Voice message', 'chatchi' ) : $this->caption( $attachment->file_name );
+		$message = $this->messages->send( $actor, $conversation->id, $caption, $client_id );
 
 		if ( $message instanceof \WP_Error || $message->attachment_id > 0 ) {
 			// Refused, or a retry of a file that was already sent.
@@ -339,6 +366,85 @@ final class AttachmentService {
 			'width'     => $width,
 			'height'    => $height,
 		);
+	}
+
+	/**
+	 * Checks a recorded voice message by its audio signature; returns the
+	 * details to store. The name is the server's own, never the browser's.
+	 *
+	 * @param array<string, mixed>|null $file     Entry of $_FILES.
+	 * @param int                       $duration Length in seconds, from the recorder.
+	 * @return array{file_name: string, mime: string, size: int, duration: int}|\WP_Error
+	 */
+	private function check_voice( ?array $file, int $duration ) {
+		if ( ! $file || ! isset( $file['tmp_name'], $file['size'], $file['error'] ) ) {
+			return $this->error( 'chatchi_attachment_missing', __( 'Record a voice message to send.', 'chatchi' ), 400 );
+		}
+
+		$too_large = in_array( (int) $file['error'], array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true );
+
+		if ( $too_large || ( UPLOAD_ERR_OK === (int) $file['error'] && (int) $file['size'] > $this->max_bytes() ) ) {
+			return $this->error(
+				'chatchi_attachment_too_large',
+				/* translators: %s: maximum file size, e.g. "5 MB". */
+				sprintf( __( 'The voice message must be smaller than %s. Record a shorter one.', 'chatchi' ), size_format( $this->max_bytes() ) ),
+				413
+			);
+		}
+
+		if ( UPLOAD_ERR_OK !== (int) $file['error'] || (int) $file['size'] <= 0 || ! is_file( (string) $file['tmp_name'] ) ) {
+			return $this->error( 'chatchi_attachment_failed', __( 'The voice message could not be uploaded.', 'chatchi' ), 400 );
+		}
+
+		$mime = self::audio_type( (string) file_get_contents( (string) $file['tmp_name'], false, null, 0, 16 ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading the signature of an upload.
+
+		if ( null === $mime ) {
+			return $this->error( 'chatchi_attachment_type', __( 'This voice message could not be read. Please record it again.', 'chatchi' ), 415 );
+		}
+
+		$extensions = array(
+			'audio/webm' => 'webm',
+			'audio/ogg'  => 'ogg',
+			'audio/mp4'  => 'm4a',
+			'audio/mpeg' => 'mp3',
+			'audio/wav'  => 'wav',
+		);
+
+		return array(
+			'file_name' => 'voice-' . gmdate( 'Ymd-His' ) . '.' . $extensions[ $mime ],
+			'mime'      => $mime,
+			'size'      => (int) $file['size'],
+			'duration'  => max( 0, min( self::VOICE_MAX_SECONDS + 5, $duration ) ),
+		);
+	}
+
+	/**
+	 * The audio type of a file from its first bytes, or null.
+	 *
+	 * @param string $head First 16 bytes of the file.
+	 */
+	public static function audio_type( string $head ): ?string {
+		if ( 0 === strpos( $head, "\x1A\x45\xDF\xA3" ) ) {
+			return 'audio/webm';
+		}
+
+		if ( 0 === strpos( $head, 'OggS' ) ) {
+			return 'audio/ogg';
+		}
+
+		if ( 'ftyp' === substr( $head, 4, 4 ) ) {
+			return 'audio/mp4';
+		}
+
+		if ( 0 === strpos( $head, 'RIFF' ) && 'WAVE' === substr( $head, 8, 4 ) ) {
+			return 'audio/wav';
+		}
+
+		if ( 0 === strpos( $head, 'ID3' ) || ( strlen( $head ) > 1 && "\xFF" === $head[0] && ( ord( $head[1] ) & 0xE0 ) === 0xE0 ) ) {
+			return 'audio/mpeg';
+		}
+
+		return null;
 	}
 
 	/**

@@ -72,7 +72,10 @@
 		download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
 		edit: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
 		trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
-		headset: '<path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Zm0 0a9 9 0 1 1 18 0m0 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"/><path d="M21 16v2a4 4 0 0 1-4 4h-5"/>'
+		headset: '<path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Zm0 0a9 9 0 1 1 18 0m0 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"/><path d="M21 16v2a4 4 0 0 1-4 4h-5"/>',
+		mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
+		play: '<path class="cc-fill" d="M7 4.5v15a1 1 0 0 0 1.52.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z"/>',
+		pause: '<rect class="cc-fill" x="6" y="4" width="4" height="16" rx="1.2"/><rect class="cc-fill" x="14" y="4" width="4" height="16" rx="1.2"/>'
 	};
 
 	/**
@@ -542,6 +545,433 @@
 		return new Intl.NumberFormat( locale || 'fa-IR', { maximumFractionDigits: value < 10 && unit > 0 ? 1 : 0 } ).format( value ) + ' ' + units[ unit ];
 	}
 
+	/* ------------------------------ voice ------------------------------ */
+
+	/**
+	 * "0:07", "12:30", with the formatter's digits.
+	 */
+	function clock( seconds, digits ) {
+		var total = Math.max( 0, Math.floor( seconds || 0 ) );
+		var sec = total % 60;
+		var text = Math.floor( total / 60 ) + ':' + ( sec < 10 ? '0' : '' ) + sec;
+
+		return digits ? text.replace( /\d/g, function ( d ) {
+			return digits( Number( d ) );
+		} ) : text;
+	}
+
+	/**
+	 * Whether this browser can record voice messages. Microphones need a
+	 * secure page (HTTPS).
+	 */
+	function canRecord() {
+		return !! ( window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder );
+	}
+
+	/**
+	 * Records voice messages from the microphone.
+	 *
+	 * The recording outlives re-renders: every composer calls mount() for a
+	 * fresh mic button and recording bar, and all mounted views show the
+	 * same recording. Options:
+	 * - strings: record, cancel, send, recording, micBlocked, micFailed
+	 * - maxSeconds: recording stops and is sent at this length
+	 * - digits: formats a digit for the locale
+	 * - toolClass: class of the mic button, like the other composer tools
+	 * - context(): remembered at the start and given back with the result
+	 * - onRecorded( { file, duration, src, context } )
+	 * - onError( message )
+	 */
+	function createVoiceRecorder( opts ) {
+		var S = opts.strings;
+		var rec = null;
+		var starting = false;
+		var views = [];
+
+		function elapsed() {
+			return rec ? ( Date.now() - rec.startedAt ) / 1000 : 0;
+		}
+
+		function update() {
+			views = views.filter( function ( view ) {
+				return view.host.isConnected;
+			} );
+			views.forEach( function ( view ) {
+				view.host.classList.toggle( 'is-recording', !! rec );
+				view.bar.hidden = ! rec;
+				view.time.textContent = clock( elapsed(), opts.digits );
+				view.button.disabled = starting;
+			} );
+		}
+
+		function pickType() {
+			var types = [ 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm' ];
+
+			if ( ! window.MediaRecorder.isTypeSupported ) {
+				return '';
+			}
+
+			for ( var i = 0; i < types.length; i++ ) {
+				if ( window.MediaRecorder.isTypeSupported( types[ i ] ) ) {
+					return types[ i ];
+				}
+			}
+
+			return '';
+		}
+
+		function release( current ) {
+			window.clearInterval( current.timer );
+			current.stream.getTracks().forEach( function ( track ) {
+				track.stop();
+			} );
+		}
+
+		function start() {
+			if ( rec || starting || ! canRecord() ) {
+				return;
+			}
+
+			starting = true;
+			update();
+
+			navigator.mediaDevices.getUserMedia( { audio: { echoCancellation: true, noiseSuppression: true } } ).then( function ( stream ) {
+				var type = pickType();
+				var media = type ? new window.MediaRecorder( stream, { mimeType: type, audioBitsPerSecond: 32000 } ) : new window.MediaRecorder( stream );
+				var current = { media: media, stream: stream, chunks: [], startedAt: Date.now(), context: opts.context ? opts.context() : null };
+
+				media.addEventListener( 'dataavailable', function ( event ) {
+					if ( event.data && event.data.size ) {
+						current.chunks.push( event.data );
+					}
+				} );
+				media.start( 1000 );
+
+				current.timer = window.setInterval( function () {
+					update();
+					if ( elapsed() >= opts.maxSeconds ) {
+						finish( true );
+					}
+				}, 250 );
+
+				starting = false;
+				rec = current;
+				update();
+			} ).catch( function ( error ) {
+				starting = false;
+				update();
+				opts.onError( error && ( error.name === 'NotAllowedError' || error.name === 'SecurityError' ) ? S.micBlocked : S.micFailed );
+			} );
+		}
+
+		/**
+		 * Stops recording; sends it, or throws it away.
+		 */
+		function finish( send ) {
+			var current = rec;
+
+			if ( ! current ) {
+				return;
+			}
+
+			rec = null;
+			update();
+
+			var duration = Math.min( opts.maxSeconds, Math.round( ( Date.now() - current.startedAt ) / 1000 ) );
+
+			current.media.addEventListener( 'stop', function () {
+				release( current );
+
+				// A tap by mistake is not a message.
+				if ( ! send || ! current.chunks.length || Date.now() - current.startedAt < 700 ) {
+					return;
+				}
+
+				var type = ( current.media.mimeType || current.chunks[ 0 ].type || 'audio/webm' ).split( ';' )[ 0 ];
+				var extension = { 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' }[ type ] || 'webm';
+				var blob = new Blob( current.chunks, { type: type } );
+				var file;
+
+				try {
+					file = new File( [ blob ], 'voice.' + extension, { type: type } );
+				} catch ( e ) {
+					// Old Safari: a Blob with a name works the same in FormData.
+					file = blob;
+					file.name = 'voice.' + extension;
+				}
+
+				opts.onRecorded( {
+					file: file,
+					duration: Math.max( 1, duration ),
+					src: window.URL && URL.createObjectURL ? URL.createObjectURL( blob ) : '',
+					context: current.context
+				} );
+			} );
+
+			try {
+				current.media.stop();
+			} catch ( e ) {
+				release( current );
+			}
+		}
+
+		function mount( host ) {
+			var view = { host: host };
+
+			view.button = h( 'button', {
+				type: 'button',
+				className: opts.toolClass + ' cc-rec-button',
+				title: S.record,
+				'aria-label': S.record,
+				onClick: start
+			}, [ icon( 'mic' ) ] );
+
+			view.time = h( 'span', { className: 'cc-rec__time', text: clock( elapsed(), opts.digits ) } );
+			view.bar = h( 'div', { className: 'cc-rec', role: 'group', 'aria-label': S.recording, hidden: ! rec }, [
+				h( 'button', {
+					type: 'button',
+					className: 'cc-rec__cancel',
+					title: S.cancel,
+					'aria-label': S.cancel,
+					onClick: function () {
+						finish( false );
+					}
+				}, [ icon( 'trash' ) ] ),
+				h( 'span', { className: 'cc-rec__status', role: 'status' }, [
+					h( 'span', { className: 'cc-rec__dot', 'aria-hidden': 'true' } ),
+					view.time,
+					h( 'span', { className: 'cc-rec__label', text: S.recording } )
+				] ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-rec__send',
+					title: S.send,
+					'aria-label': S.send,
+					onClick: function () {
+						finish( true );
+					}
+				}, [ icon( 'send' ) ] )
+			] );
+
+			// Escape throws the recording away.
+			view.bar.addEventListener( 'keydown', function ( event ) {
+				if ( event.key === 'Escape' ) {
+					event.preventDefault();
+					event.stopPropagation();
+					finish( false );
+				}
+			} );
+
+			views.push( view );
+			window.requestAnimationFrame( update );
+
+			return { button: view.button, bar: view.bar };
+		}
+
+		return {
+			supported: canRecord,
+			mount: mount,
+			isRecording: function () {
+				return !! rec;
+			},
+			cancel: function () {
+				finish( false );
+			}
+		};
+	}
+
+	/**
+	 * Plays voice messages in a conversation: one at a time, surviving
+	 * re-renders of the message list. Files are fetched once (with the
+	 * visitor's or agent's credentials) and played from memory.
+	 * Options:
+	 * - strings: play, pause, voiceMessage, loadFailed
+	 * - digits: formats a digit for the locale
+	 * - onError( message )
+	 */
+	function createVoicePlayer( opts ) {
+		var S = opts.strings;
+		var audio = null;
+		var currentKey = null;
+		var loadingKey = null;
+		var sources = {};
+		var bubbles = [];
+
+		function load( url ) {
+			if ( ! sources[ url ] ) {
+				sources[ url ] = window.fetch( url, { credentials: 'same-origin' } ).then( function ( response ) {
+					if ( ! response.ok ) {
+						throw new Error( 'http_' + response.status );
+					}
+					return response.blob();
+				} ).then( function ( blob ) {
+					return URL.createObjectURL( blob );
+				} );
+				sources[ url ].catch( function () {
+					delete sources[ url ];
+				} );
+			}
+
+			return sources[ url ];
+		}
+
+		function length( bubble ) {
+			var real = audio && currentKey === bubble.key && isFinite( audio.duration ) ? audio.duration : 0;
+			return real || bubble.duration || 0;
+		}
+
+		function update() {
+			bubbles = bubbles.filter( function ( bubble ) {
+				return bubble.el.isConnected;
+			} );
+			bubbles.forEach( function ( bubble ) {
+				var active = currentKey === bubble.key && audio;
+				var playing = !! ( active && ! audio.paused );
+				var total = length( bubble );
+				var now = active ? audio.currentTime : 0;
+				var progress = total ? Math.min( 1, now / total ) : 0;
+
+				bubble.el.classList.toggle( 'is-playing', playing );
+				bubble.el.classList.toggle( 'is-loading', loadingKey === bubble.key );
+				bubble.button.replaceChildren( icon( playing ? 'pause' : 'play' ) );
+				bubble.button.setAttribute( 'aria-label', playing ? S.pause : S.play );
+				bubble.fill.style.width = ( progress * 100 ) + '%';
+				bubble.track.setAttribute( 'aria-valuenow', String( Math.round( now ) ) );
+				bubble.track.setAttribute( 'aria-valuemax', String( Math.round( total ) ) );
+				bubble.track.setAttribute( 'aria-valuetext', clock( now, opts.digits ) + ' / ' + clock( total, opts.digits ) );
+				bubble.time.textContent = clock( active && ( playing || now > 0 ) ? now : total, opts.digits );
+			} );
+		}
+
+		function ensureAudio() {
+			if ( ! audio ) {
+				audio = new window.Audio();
+				audio.preload = 'auto';
+				[ 'play', 'pause', 'timeupdate', 'loadedmetadata', 'durationchange' ].forEach( function ( name ) {
+					audio.addEventListener( name, update );
+				} );
+				audio.addEventListener( 'ended', function () {
+					audio.currentTime = 0;
+					update();
+				} );
+			}
+			return audio;
+		}
+
+		function play( bubble, from ) {
+			if ( currentKey === bubble.key && audio && audio.src ) {
+				if ( typeof from === 'number' ) {
+					audio.currentTime = from;
+				}
+				if ( audio.paused ) {
+					audio.play().catch( function () {} );
+				} else if ( typeof from !== 'number' ) {
+					audio.pause();
+				}
+				update();
+				return;
+			}
+
+			if ( audio ) {
+				audio.pause();
+			}
+
+			currentKey = bubble.key;
+			loadingKey = bubble.key;
+			update();
+
+			( bubble.src ? Promise.resolve( bubble.src ) : load( bubble.url ) ).then( function ( src ) {
+				if ( currentKey !== bubble.key ) {
+					return;
+				}
+				loadingKey = null;
+				ensureAudio().src = src;
+				if ( from ) {
+					audio.currentTime = from;
+				}
+				return audio.play();
+			} ).catch( function () {
+				if ( loadingKey === bubble.key ) {
+					loadingKey = null;
+					currentKey = null;
+					opts.onError( S.loadFailed );
+				}
+			} ).then( update );
+		}
+
+		/**
+		 * A voice message bubble. item: key (unique), url (from the API) or
+		 * src (a local recording), duration in seconds; className for the
+		 * bubble; extra (a node shown under the player, e.g. upload progress).
+		 */
+		function element( item ) {
+			var bubble = { key: String( item.key ), url: item.url, src: item.src, duration: item.duration || 0 };
+
+			bubble.button = h( 'button', {
+				type: 'button',
+				className: 'cc-voice__play',
+				'aria-label': S.play,
+				onClick: function () {
+					play( bubble );
+				}
+			}, [ icon( 'play' ) ] );
+			bubble.fill = h( 'span', { className: 'cc-voice__fill' } );
+			bubble.track = h( 'span', {
+				className: 'cc-voice__track',
+				role: 'slider',
+				tabindex: '0',
+				'aria-label': S.voiceMessage,
+				'aria-valuemin': '0',
+				'aria-valuemax': String( bubble.duration ),
+				'aria-valuenow': '0',
+				onClick: function ( event ) {
+					var box = bubble.track.getBoundingClientRect();
+					var rtl = window.getComputedStyle( bubble.track ).direction === 'rtl';
+					var fraction = Math.min( 1, Math.max( 0, ( rtl ? box.right - event.clientX : event.clientX - box.left ) / box.width ) );
+					play( bubble, fraction * length( bubble ) );
+				},
+				onKeydown: function ( event ) {
+					var step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[ event.key ];
+					if ( ! step ) {
+						return;
+					}
+					event.preventDefault();
+					if ( window.getComputedStyle( bubble.track ).direction === 'rtl' && ( event.key === 'ArrowRight' || event.key === 'ArrowLeft' ) ) {
+						step = -step;
+					}
+					var now = currentKey === bubble.key && audio ? audio.currentTime : 0;
+					play( bubble, Math.min( length( bubble ), Math.max( 0, now + step ) ) );
+				}
+			}, [ bubble.fill ] );
+			bubble.time = h( 'span', { className: 'cc-voice__time', text: clock( bubble.duration, opts.digits ) } );
+
+			bubble.el = h( 'div', { className: ( item.className || '' ) + ' cc-voice' }, [
+				bubble.button,
+				h( 'span', { className: 'cc-voice__body' }, [
+					h( 'span', { className: 'cc-voice__row' }, [ icon( 'mic', 'cc-voice__mic' ), bubble.track ] ),
+					bubble.time,
+					item.extra || null
+				] )
+			] );
+
+			bubbles.push( bubble );
+			window.requestAnimationFrame( update );
+
+			return bubble.el;
+		}
+
+		return {
+			element: element,
+			stop: function () {
+				if ( audio ) {
+					audio.pause();
+				}
+				currentKey = null;
+				update();
+			}
+		};
+	}
+
 	window.ChatChiCore = {
 		fileSize: fileSize,
 		h: h,
@@ -551,6 +981,10 @@
 		initials: initials,
 		createFormatter: createFormatter,
 		createApi: createApi,
-		ApiError: ApiError
+		ApiError: ApiError,
+		clock: clock,
+		canRecord: canRecord,
+		createVoiceRecorder: createVoiceRecorder,
+		createVoicePlayer: createVoicePlayer
 	};
 }() );
