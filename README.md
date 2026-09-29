@@ -179,7 +179,8 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/agent/me` | Current agent, with `status` and the `attachments` limits |
-| POST/PATCH | `/agent/me` | `status`: `online` or `away`, and/or `theme`: `light`, `dark` or `auto` (the panel's theme, saved per user) |
+| POST/PATCH | `/agent/me` | `status`: `online` or `away`, `theme`: `light`, `dark` or `auto` (the panel's theme, saved per user), `display_name` (2–100 characters) and/or `avatar_id: 0` (removes the picture) |
+| POST | `/agent/me/avatar` | Multipart `file`: the agent's own picture (JPG, PNG, GIF or WebP); returns the agent |
 | GET | `/agent/conversations` | Inbox: `status`, `search`, `assigned` (`mine` / `unassigned`), `tag`, `page`, `per_page` (≤100); `X-WP-Total` headers. Items carry `tags` |
 | GET | `/agent/conversations/{id}` | Conversation with visitor, assigned agent, last message, unread count |
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
@@ -229,7 +230,9 @@ Administrators only (`manage_options`).
 
 `wp-admin/admin.php?page=chatchi` serves a standalone, full-screen app (no WordPress admin chrome). Access requires the virtual `chatchi_access_panel` capability, granted to site administrators and active agents. Administrators get an agent record automatically on their first visit.
 
-Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users, rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
+Administrators also get an **Agents** screen (`#/agents`) to add agents from existing WordPress users (with an optional picture), rename them, upload a profile picture and switch them on or off. Visitors only ever see an agent's display name and picture, never their login or email.
+
+Every agent, administrator or not, edits their own name and picture from **My profile** (the person icon in the rail). Pictures are JPG, PNG, GIF or WebP; before upload the panel scales photos so the shorter side is at most 512px (turned the right way up), so ordinary phone photos fit the size limit, and the server makes the square thumbnail. Uploading pictures for agents does not need the WordPress `upload_files` capability (some security plugins remove it), since only checked images of limited size are accepted.
 
 Administrators also get a **Settings** screen with twelve sections in four groups (Widget, Answering, Alerts, Protection), each saved on its own. Every setting only sets the default a filter receives, so code can still override it.
 
@@ -303,6 +306,16 @@ Administrators also get a **Settings** screen with twelve sections in four group
 - **Typing indicators**: visitors see three dots and "typing…" in the header while an agent writes; agents see "typing…" above their composer while the visitor writes. Each side signals at most every 3 seconds while typing.
 - **Notifications**: a soft two-note chime (Web Audio, no sound file) when a reply arrives while the chat is closed or the tab is in the background, and the count in the tab title until the visitor comes back. The sound can be turned off in Settings → General.
 - A message of one to three emoji is shown large without a bubble, and a "latest message" button appears when the visitor scrolls up, with a dot when new messages arrive below.
+
+## Guests on restricted sites
+
+Visitors who are not logged in chat through the widget's own routes (`chatchi/v1/widget/…`), which do not need a WordPress account: they identify the visitor by an HttpOnly cookie and carry their own protections (same-site requests only, bot checks on the start form, rate limits). Three things on real sites stop guests while logged-in users are unaffected, and ChatChi handles each:
+
+- **Security plugins closing the REST API to guests** ("Disable REST API", "restrict REST API to logged-in users", hardening snippets on `rest_authentication_errors`): the widget's routes are let through for guests, after every other filter; the rest of the site's API stays closed, and a failed nonce check (which protects logged-in users) is never overridden. Filter `chatchi_allow_guest_widget_api` (return false to keep them closed).
+- **Firewalls or server rules blocking `/wp-json/`** for guests: when the REST API refuses a request with an error that is not ChatChi's own (401, 403, 404, 405, 406, 410 or 501, or an HTML error page), the widget sends it again to `admin-ajax.php?action=chatchi_widget&route=/widget/…`, which runs the same REST route with its own permission checks, and keeps using that way for the rest of the visit. Only the widget's routes are reachable there; logged-in users count as signed in only with a valid REST nonce, as over REST.
+- **Caches storing REST responses for guests** (LiteSpeed Cache does by default): every ChatChi REST response is sent with `Cache-Control: no-store, private`, `X-LiteSpeed-Cache-Control: no-cache` and `DONOTCACHEPAGE`.
+
+Sites that answer on both `example.com` and `www.example.com` (or on http and https) also work: the widget calls the API on the page's own address, and the same-site check accepts the site's host with or without `www.`.
 
 ## Troubleshooting
 

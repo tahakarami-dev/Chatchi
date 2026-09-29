@@ -80,6 +80,7 @@ final class Presenter {
 	public function agent_self( Agent $agent ): array {
 		return $this->agent( $agent ) + array(
 			'user_id'   => $agent->user_id,
+			'avatar_id' => $agent->avatar_id,
 			'is_active' => $agent->is_active,
 			'status'    => $agent->status,
 		);

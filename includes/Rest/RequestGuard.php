@@ -43,9 +43,33 @@ final class RequestGuard {
 		}
 
 		$origin_host = wp_parse_url( $origin, PHP_URL_HOST );
-		$site_host   = wp_parse_url( home_url(), PHP_URL_HOST );
 
-		return is_string( $origin_host ) && is_string( $site_host ) && strtolower( $origin_host ) === strtolower( $site_host );
+		if ( ! is_string( $origin_host ) ) {
+			return false;
+		}
+
+		// The site's own address, with or without "www." (many sites answer
+		// on both), and WordPress's own address when it differs.
+		foreach ( array( home_url(), site_url() ) as $address ) {
+			$site_host = wp_parse_url( $address, PHP_URL_HOST );
+
+			if ( is_string( $site_host ) && self::bare_host( $origin_host ) === self::bare_host( $site_host ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * A host name in lower case, without a leading "www.".
+	 *
+	 * @param string $host Host name.
+	 */
+	private static function bare_host( string $host ): string {
+		$host = strtolower( $host );
+
+		return 0 === strpos( $host, 'www.' ) ? substr( $host, 4 ) : $host;
 	}
 
 	/**

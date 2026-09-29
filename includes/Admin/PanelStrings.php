@@ -87,7 +87,11 @@ final class PanelStrings {
 			'picture'              => __( 'Profile picture', 'chatchi' ),
 			'uploadPicture'        => __( 'Upload picture', 'chatchi' ),
 			'removePicture'        => __( 'Remove picture', 'chatchi' ),
-			'pictureHint'          => __( 'Square JPG, PNG, GIF or WebP.', 'chatchi' ),
+			'pictureHint'          => __( 'A JPG, PNG, GIF or WebP image. Large photos are made smaller automatically.', 'chatchi' ),
+			'pictureOptional'      => __( 'Profile picture (optional)', 'chatchi' ),
+			'myProfile'            => __( 'My profile', 'chatchi' ),
+			'profileIntro'         => __( 'The name and picture visitors see when you reply.', 'chatchi' ),
+			'closeDialog'          => __( 'Close', 'chatchi' ),
 			/* translators: %s: maximum file size. */
 			'pictureTooLarge'      => __( 'The image must be smaller than %s.', 'chatchi' ),
 			'active'               => __( 'Active', 'chatchi' ),
@@ -470,7 +474,7 @@ final class PanelStrings {
 			/* translators: %s: color code. */
 			'presetColor'          => __( 'Use %s', 'chatchi' ),
 			'resetColor'           => __( 'Use the default color', 'chatchi' ),
-			'colorHint'            => __( 'Pick a color, or type a code like #5B5BD6. Text on it switches to dark automatically when needed.', 'chatchi' ),
+			'colorHint'            => __( 'Pick a color, or type a code like #2563EB. Text on it switches to dark automatically when needed.', 'chatchi' ),
 			'colorLowContrast'     => __( 'This color is light: icons and links in this color may be hard to see on white.', 'chatchi' ),
 			/* translators: %s: color code. */
 			'colorOverridden'      => __( 'Code on your site sets the color to %s, so the widget uses that.', 'chatchi' ),
