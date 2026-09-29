@@ -156,6 +156,16 @@ abstract class ConversationController implements RouteProvider {
 							'type'    => 'string',
 							'pattern' => '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
 						),
+						'voice'     => array(
+							'type'    => 'boolean',
+							'default' => false,
+						),
+						'duration'  => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'maximum' => 3600,
+							'default' => 0,
+						),
 					)
 				),
 			)
@@ -283,7 +293,9 @@ abstract class ConversationController implements RouteProvider {
 			$actor,
 			(int) $request['id'],
 			$request['body'],
-			is_string( $client_id ) && '' !== $client_id ? $client_id : null
+			is_string( $client_id ) && '' !== $client_id ? $client_id : null,
+			(bool) $request['voice'],
+			(int) $request['duration']
 		);
 
 		if ( $message instanceof \WP_Error ) {
@@ -319,7 +331,8 @@ abstract class ConversationController implements RouteProvider {
 	}
 
 	/**
-	 * POST …/attachments: sends a file (multipart field "file").
+	 * POST …/attachments: sends a file (multipart field "file"), or a
+	 * recorded voice message with voice=1 and its duration in seconds.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -337,7 +350,9 @@ abstract class ConversationController implements RouteProvider {
 			$actor,
 			(int) $request['id'],
 			isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null,
-			is_string( $client_id ) && '' !== $client_id ? $client_id : null
+			is_string( $client_id ) && '' !== $client_id ? $client_id : null,
+			(bool) $request['voice'],
+			(int) $request['duration']
 		);
 
 		if ( $message instanceof \WP_Error ) {
@@ -354,7 +369,8 @@ abstract class ConversationController implements RouteProvider {
 	 * GET …/attachments/{attachment_id}: the file itself.
 	 *
 	 * Sent with headers that stop browsers from running anything in it:
-	 * only pictures are shown inline, everything else is downloaded, and
+	 * only pictures and voice messages are shown inline, everything else is
+	 * downloaded, and
 	 * a sandboxing Content-Security-Policy applies either way.
 	 *
 	 * @param \WP_REST_Request $request Request.
@@ -375,7 +391,7 @@ abstract class ConversationController implements RouteProvider {
 
 		list( $attachment, $path ) = $result;
 
-		$inline = $attachment->is_image() && ! $request['download'];
+		$inline = ( $attachment->is_image() || $attachment->is_audio() ) && ! $request['download'];
 
 		// Nothing printed before (notices, other plugins) may corrupt the file.
 		while ( ob_get_level() > 0 ) {
@@ -387,7 +403,7 @@ abstract class ConversationController implements RouteProvider {
 		header( 'Content-Length: ' . (string) filesize( $path ) );
 		header( 'Content-Disposition: ' . ( $inline ? 'inline' : 'attachment' ) . "; filename*=UTF-8''" . rawurlencode( $attachment->file_name ) );
 		header( 'X-Content-Type-Options: nosniff' );
-		header( "Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox" );
+		header( "Content-Security-Policy: default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox" );
 		header( 'Cross-Origin-Resource-Policy: same-origin' );
 		header( 'Cache-Control: private, max-age=86400' );
 

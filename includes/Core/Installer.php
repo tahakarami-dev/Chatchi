@@ -53,7 +53,8 @@ final class Installer {
 	 * after a back-off so a broken database cannot slow down every request.
 	 */
 	public function maybe_upgrade(): void {
-		if ( get_option( self::VERSION_OPTION ) === CHATCHI_VERSION ) {
+		// The table version too: a new column may ship without a new plugin version.
+		if ( get_option( self::VERSION_OPTION ) === CHATCHI_VERSION && get_option( Schema::VERSION_OPTION ) === Schema::VERSION ) {
 			return;
 		}
 

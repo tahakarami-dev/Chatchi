@@ -43,6 +43,11 @@ final class Attachment {
 
 	public int $height = 0;
 
+	/**
+	 * Length of voice messages in seconds; 0 for other files.
+	 */
+	public int $duration = 0;
+
 	public string $path = '';
 
 	public string $created_at = '';
@@ -60,6 +65,7 @@ final class Attachment {
 		$attachment->size            = (int) $row['size'];
 		$attachment->width           = (int) $row['width'];
 		$attachment->height          = (int) $row['height'];
+		$attachment->duration        = (int) ( $row['duration'] ?? 0 );
 		$attachment->path            = (string) $row['path'];
 		$attachment->created_at      = (string) $row['created_at'];
 
@@ -71,6 +77,13 @@ final class Attachment {
 	 */
 	public function is_image(): bool {
 		return in_array( $this->mime, array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ), true );
+	}
+
+	/**
+	 * Whether the file is a voice message, played in the conversation.
+	 */
+	public function is_audio(): bool {
+		return in_array( $this->mime, array( 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav' ), true );
 	}
 
 	/**
@@ -86,6 +99,7 @@ final class Attachment {
 			'size'            => $this->size,
 			'width'           => $this->width,
 			'height'          => $this->height,
+			'duration'        => $this->duration,
 			'path'            => $this->path,
 			'created_at'      => $this->created_at,
 		);

@@ -71,7 +71,7 @@ final class PanelPage {
 		header( 'X-Content-Type-Options: nosniff' );
 		header( 'Referrer-Policy: same-origin' );
 		header( 'Cross-Origin-Opener-Policy: same-origin' );
-		header( 'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()' );
+		header( 'Permissions-Policy: camera=(), microphone=(self), geolocation=(), payment=()' );
 	}
 
 	/**
