@@ -10,6 +10,7 @@ namespace ChatChi\Ai;
 use ChatChi\Availability\Availability;
 use ChatChi\Conversations\Actor;
 use ChatChi\Conversations\ConversationService;
+use ChatChi\Database\Repositories\AttachmentRepository;
 use ChatChi\Database\Repositories\ConversationRepository;
 use ChatChi\Database\Repositories\MessageRepository;
 use ChatChi\Database\Repositories\VisitorRepository;
@@ -65,6 +66,8 @@ final class Assistant {
 
 	private Knowledge $knowledge;
 
+	private ?AttachmentRepository $attachments;
+
 	/**
 	 * @param Settings               $settings      Plugin settings.
 	 * @param ConversationService    $conversations Conversation access.
@@ -75,8 +78,9 @@ final class Assistant {
 	 * @param Availability           $availability  Whether agents are online.
 	 * @param AiClient               $client        The language model.
 	 * @param Knowledge              $knowledge     Prompts.
+	 * @param AttachmentRepository   $attachments   Files, to spot voice messages.
 	 */
-	public function __construct( Settings $settings, ConversationService $conversations, ConversationRepository $repository, MessageRepository $messages, VisitorRepository $visitors, MessageService $events, Availability $availability, AiClient $client, Knowledge $knowledge ) {
+	public function __construct( Settings $settings, ConversationService $conversations, ConversationRepository $repository, MessageRepository $messages, VisitorRepository $visitors, MessageService $events, Availability $availability, AiClient $client, Knowledge $knowledge, ?AttachmentRepository $attachments = null ) {
 		$this->settings      = $settings;
 		$this->conversations = $conversations;
 		$this->repository    = $repository;
@@ -86,6 +90,7 @@ final class Assistant {
 		$this->availability  = $availability;
 		$this->client        = $client;
 		$this->knowledge     = $knowledge;
+		$this->attachments   = $attachments;
 	}
 
 	/**
@@ -243,6 +248,13 @@ final class Assistant {
 			return $result;
 		}
 
+		// The bot cannot listen to voice messages: a person answers them.
+		if ( $last->attachment_id > 0 && $this->is_voice( $last->attachment_id ) ) {
+			$this->hand_off( $conversation, __( 'The visitor sent a voice message, so the bot handed the conversation to the team.', 'chatchi' ) );
+			$result['handoff'] = true;
+			return $result;
+		}
+
 		$bot_replies = count(
 			array_filter(
 				$history,
@@ -302,6 +314,25 @@ final class Assistant {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Whether an attachment is a voice message.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 */
+	private function is_voice( int $attachment_id ): bool {
+		if ( ! $this->attachments ) {
+			return false;
+		}
+
+		try {
+			$attachment = $this->attachments->find( $attachment_id );
+		} catch ( \Throwable $e ) {
+			return false;
+		}
+
+		return $attachment instanceof \ChatChi\Models\Attachment && $attachment->is_audio();
 	}
 
 	/**

@@ -23,7 +23,7 @@ final class Schema {
 	/**
 	 * Bump whenever a table definition changes.
 	 */
-	public const VERSION = '8';
+	public const VERSION = '9';
 
 	public const VERSION_OPTION = 'chatchi_db_version';
 
@@ -37,7 +37,7 @@ final class Schema {
 		Table::AGENTS        => array( 'avatar_id', 'is_active', 'status', 'last_seen_at' ),
 		Table::VISITORS      => array( 'token_hash', 'user_id', 'phone', 'current_url', 'cart', 'context_at' ),
 		Table::RATE_LIMITS   => array( 'bucket', 'hits', 'expires_at' ),
-		Table::ATTACHMENTS   => array( 'conversation_id', 'message_id', 'path' ),
+		Table::ATTACHMENTS   => array( 'conversation_id', 'message_id', 'path', 'duration' ),
 		Table::TAGS          => array( 'conversation_id', 'tag' ),
 	);
 
@@ -376,6 +376,7 @@ mime varchar(100) NOT NULL DEFAULT '',
 size bigint(20) unsigned NOT NULL DEFAULT 0,
 width int(10) unsigned NOT NULL DEFAULT 0,
 height int(10) unsigned NOT NULL DEFAULT 0,
+duration int(10) unsigned NOT NULL DEFAULT 0,
 path varchar(255) NOT NULL DEFAULT '',
 created_at datetime NOT NULL,
 PRIMARY KEY  (id),

@@ -135,7 +135,7 @@ docs/                    Design and architecture documents
 | `{prefix}chatchi_agents` | Agents, one per WordPress user, with their chosen status (online / away) and when their panel last talked to the server | `UNIQUE user_id`, `is_active` |
 | `{prefix}chatchi_conversations` | Conversation state, latest activity, when each side last reported typing, the visitor's rating (1–5) and comment, and when the AI bot handed it to the team | `UNIQUE open_visitor_id` (one open conversation per visitor), `(visitor_id,status)`, `(status,last_message_at)`, `last_message_at`, `agent_id`, `created_at` |
 | `{prefix}chatchi_messages` | Messages and read state; `attachment_id` links a sent file; `internal` marks agent-only notes and events, never sent to visitors | `(conversation_id,id)`, `UNIQUE (conversation_id,client_id)` |
-| `{prefix}chatchi_attachments` | Files sent in conversations: original name, type, size, picture size, and the path of the stored file | `conversation_id`, `message_id` |
+| `{prefix}chatchi_attachments` | Files sent in conversations: original name, type, size, picture size, voice message length (`duration`, seconds), and the path of the stored file | `conversation_id`, `message_id` |
 | `{prefix}chatchi_conversation_tags` | Tags agents put on conversations | `(conversation_id,tag)` primary, `tag` |
 | `{prefix}chatchi_rate_limits` | Rate-limit counters; buckets are salted hashes, no IPs stored. Purged hourly | `bucket` (primary), `expires_at` |
 
@@ -151,14 +151,14 @@ Identified by the HttpOnly `chatchi_visitor` cookie (logged-in users: by account
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/widget/session` | Optional `url` and `title` of the current page (recorded, with the WooCommerce cart, only for visitors who already chatted). Visitor, open conversation, unread count, start-form config (and the leave-a-message fields), `form_token`, `availability` (`mode`: online / away / offline, `opens_at`, `offline_form`, `offline_message`) and `attachments` (`enabled`, `max_bytes`, `accept`). Never sets a cookie |
+| GET | `/widget/session` | Optional `url` and `title` of the current page (recorded, with the WooCommerce cart, only for visitors who already chatted). Visitor, open conversation, unread count, start-form config (and the leave-a-message fields), `form_token`, `availability` (`mode`: online / away / offline, `opens_at`, `offline_form`, `offline_message`) and `attachments` (`enabled`, `max_bytes`, `accept`, `voice`, `voice_max_seconds`). Never sets a cookie |
 | POST | `/widget/conversations` | Start: `name`, `email`, `phone`, `page_url`, `form_token`, `website` (honeypot, must be empty), `offline` (leave-a-message form: email required) → visitor + open conversation |
 | GET | `/widget/conversations/{id}/messages` | `after_id` (polling), `before_id` (history), `limit` 1–50. Also returns `typing`: whether the other side is typing |
 | POST | `/widget/conversations/{id}/messages` | `body`, optional `client_id` (UUID, makes retries idempotent) |
 | POST | `/widget/conversations/{id}/read` | Mark agent messages read, optional `up_to_id` |
 | POST | `/widget/conversations/{id}/typing` | `typing` (default `true`): the visitor is typing, or stopped. Lasts 6 seconds unless repeated; sending a message clears it. Ignored for closed conversations |
-| POST | `/widget/conversations/{id}/attachments` | Send a file: multipart field `file`, optional `client_id`. Pictures (JPG, PNG, GIF, WebP), PDF, Word, Excel, text, CSV and ZIP, checked by content; SVG, HTML and scripts are always refused. Returns the new message with `attachment` |
-| GET | `/widget/conversations/{id}/attachments/{attachment_id}` | The file, after an access check. Pictures inline, everything else as a download (`download=1` forces it); sandboxing CSP and `nosniff` always |
+| POST | `/widget/conversations/{id}/attachments` | Send a file: multipart field `file`, optional `client_id`. Pictures (JPG, PNG, GIF, WebP), PDF, Word, Excel, text, CSV and ZIP, checked by content; SVG, HTML and scripts are always refused. With `voice=1` and `duration` (seconds) it is a recorded voice message instead: WebM, Ogg, MP4/M4A, MP3 or WAV, checked by its audio signature and named by the server; refused with `403 chatchi_voice_disabled` when voice is off for visitors. Returns the new message with `attachment` (`is_audio`, `duration` for voice) |
+| GET | `/widget/conversations/{id}/attachments/{attachment_id}` | The file, after an access check. Pictures and voice messages inline, everything else as a download (`download=1` forces it); sandboxing CSP and `nosniff` always |
 | POST | `/widget/conversations/{id}/close` | Close own conversation |
 | POST | `/widget/conversations/{id}/bot` | The AI bot answers the visitor's latest message when it looks after the conversation → `{answered, handoff}`. Rate limited (12/min per visitor) |
 | POST | `/widget/conversations/{id}/handoff` | The visitor asks for a person; the bot stops for this conversation |
@@ -178,7 +178,7 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 | GET/POST | `/agent/conversations/{id}/messages` | Same as widget |
 | POST | `/agent/conversations/{id}/read` | Mark visitor messages read |
 | POST | `/agent/conversations/{id}/typing` | Same as widget: the agent is typing |
-| POST, GET | `/agent/conversations/{id}/attachments[/{attachment_id}]` | Same as widget; agents may send files even when visitors may not |
+| POST, GET | `/agent/conversations/{id}/attachments[/{attachment_id}]` | Same as widget; agents may send files and voice messages even when visitors may not |
 | POST | `/agent/conversations/{id}/notes` | Internal note (`body`, optional `client_id`): agents only; never in the visitor's messages, unread count or the inbox preview |
 | POST | `/agent/conversations/{id}/assign` | `agent_id` (0 unassigns): hand the conversation to an active agent; an internal event line records it |
 | PUT/PATCH/POST | `/agent/conversations/{id}/tags` | `tags`: replaces the tags (≤ 10; cleaned: one line, no `#`, ≤ 40 characters, Latin in lower case) |
@@ -243,7 +243,7 @@ Administrators also get a **Settings** screen with twelve sections in four group
 - **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, and the offline text.
 - **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), the notification sound for new replies, how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
 - **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
-- **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, the longest allowed message (100–10000 characters), and files: whether visitors may send them and the largest size (1–50 MB, capped by the server's upload limit).
+- **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, the longest allowed message (100–10000 characters), and files: whether visitors may send them and the largest size (1–50 MB, capped by the server's upload limit); and whether visitors may send voice messages.
 
 - **Appearance** (`#/settings/appearance`): light, dark or automatic (the visitor's device decides) widget theme, brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
 - **Welcome & display** (`#/settings/display`) and **IP & security** (`#/settings/security`), described below.
@@ -258,6 +258,7 @@ Administrators also get a **Settings** screen with twelve sections in four group
 - **What visitors see**: a green dot and the usual subtitle when someone is available; amber and "we'll reply as soon as we can" when not; gray, "back Saturday 09:00" and the leave-a-message form (or a notice, per settings) outside business hours.
 - **Offline email**: the first visitor message of a conversation sent while nobody is available is emailed, with the visitor's details, the page, a link to the conversation and `Reply-To` set to the visitor. Filter `chatchi_offline_email` to change or cancel it.
 - **Saved replies** (`#/canned`, administrators): in the composer, type `/` (e.g. `/ship`) or press ⚡ to pick one; arrows move, Enter or Tab inserts. `{name}` and `{agent}` are filled in.
+- **Voice messages**: the microphone button in the widget and the panel records up to 5 minutes (MediaRecorder, Opus at 32 kbps, about 240 KB a minute), with a timer, a delete button and send; Escape throws it away. Messages play inside the conversation with play/pause, a seekable progress bar and their length; one plays at a time, fetched once with the visitor's or agent's login and played from memory. Voice uses the file size limit and the file rate limit, is stored like other files, and shows as "Voice message" in the inbox, notifications and transcripts. Visitors can be kept from sending voice in Settings → Spam & limits; agents always can, except in internal notes. The AI bot cannot listen, so a voice message from a visitor hands the conversation to the team. Recording needs HTTPS (browsers only allow the microphone on secure pages) and, the first time, the visitor's permission; where it is not possible, the button is hidden.
 - **Files**: the 📎 button, pasting a screenshot, or dropping files on the chat send them (up to 5 at a time) with a progress bar; pictures show as thumbnails. Files are stored in `uploads/chatchi-files` under random names without an extension (the folder also refuses direct access on Apache) and are only served by the REST API to the conversation's visitor and to agents. Deleting the plugin with "delete all data" on removes them.
 
 ## Team tools

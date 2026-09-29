@@ -91,10 +91,14 @@
 		typing: function ( id, typing ) {
 			return request( 'POST', '/widget/conversations/' + id + '/typing', { body: { typing: typing } } );
 		},
-		upload: function ( id, file, clientId, onProgress ) {
+		upload: function ( id, file, clientId, onProgress, voice ) {
 			var form = new FormData();
 			form.append( 'file', file, file.name );
 			form.append( 'client_id', clientId );
+			if ( voice ) {
+				form.append( 'voice', '1' );
+				form.append( 'duration', String( voice.duration ) );
+			}
 			return client.upload( '/widget/conversations/' + id + '/attachments', form, onProgress );
 		}
 	};
@@ -204,6 +208,7 @@
 		};
 		this.lastReadMarked = 0;
 		this.newIds = {};
+		this.voice = this.createVoice();
 		this.pollTimer = null;
 		this.pollDelay = POLL_OPEN;
 		this.pollCount = 0;
@@ -739,6 +744,9 @@
 
 	Widget.prototype.close = function () {
 		this.signalTyping( false );
+		// Closing the chat throws an unsent recording away and frees the microphone.
+		this.voice.recorder.cancel();
+		this.voice.player.stop();
 		// Typing is only polled while open; do not show a stale indicator later.
 		this.set( { open: false, confirmingEnd: false, agentTyping: false } );
 		this.launcher.setAttribute( 'aria-expanded', 'false' );
@@ -890,7 +898,94 @@
 
 	Widget.prototype.attachmentSettings = function () {
 		var session = this.state.session || {};
-		return session.attachments || { enabled: false, max_bytes: 0, accept: '' };
+		return session.attachments || { enabled: false, max_bytes: 0, accept: '', voice: false, voice_max_seconds: 300 };
+	};
+
+	/**
+	 * The voice recorder and player, shared by every render of the chat.
+	 */
+	Widget.prototype.createVoice = function () {
+		var self = this;
+		var strings = {
+			record: S.voiceRecord,
+			recording: S.voiceRecording,
+			cancel: S.voiceCancel,
+			send: S.voiceSend,
+			micBlocked: S.micBlocked,
+			micFailed: S.micFailed,
+			play: S.voicePlay,
+			pause: S.voicePause,
+			voiceMessage: S.voiceMessage,
+			loadFailed: S.voiceLoadFailed
+		};
+
+		return {
+			recorder: Core.createVoiceRecorder( {
+				strings: strings,
+				maxSeconds: 300,
+				digits: formatNumber,
+				toolClass: 'chatchi-tool chatchi-tool--voice',
+				onRecorded: function ( result ) {
+					self.sendVoice( result );
+				},
+				onError: function ( message ) {
+					self.composerError( message );
+				}
+			} ),
+			player: Core.createVoicePlayer( {
+				strings: strings,
+				digits: formatNumber,
+				onError: function ( message ) {
+					self.composerError( message );
+				}
+			} )
+		};
+	};
+
+	/**
+	 * Sends a recorded voice message, like a file.
+	 */
+	Widget.prototype.sendVoice = function ( result ) {
+		var settings = this.attachmentSettings();
+		var pending = { clientId: uuid(), body: S.voiceMessage, file: result.file, voice: { duration: result.duration }, src: result.src, progress: 0, failed: false };
+
+		if ( ! settings.voice || this.state.closed ) {
+			return;
+		}
+
+		this.state.pending.push( pending );
+		this.scrollToBottom();
+
+		if ( settings.max_bytes && result.file.size > settings.max_bytes ) {
+			pending.failed = true;
+			pending.fatal = true;
+			pending.reason = String( S.fileTooLarge ).replace( '%s', Core.fileSize( settings.max_bytes, locale ) );
+			this.render();
+			return;
+		}
+
+		this.deliver( pending );
+	};
+
+	/**
+	 * A short error under the composer (e.g. the microphone is blocked).
+	 */
+	Widget.prototype.composerError = function ( message ) {
+		var footer = this.panel.querySelector( '.chatchi-footer' );
+		var old = this.panel.querySelector( '.chatchi-composer__error' );
+
+		if ( old ) {
+			old.remove();
+		}
+		if ( ! footer || ! message ) {
+			return;
+		}
+
+		var note = h( 'p', { className: 'chatchi-composer__error', role: 'alert', text: message } );
+		footer.insertBefore( note, footer.firstChild );
+		window.setTimeout( function () {
+			note.remove();
+		}, 7000 );
 	};
 
 	/**
@@ -925,7 +1020,7 @@
 				return api.upload( conversation.id, pending.file, pending.clientId, function ( progress ) {
 					pending.progress = progress;
 					self.showProgress( pending );
-				} );
+				}, pending.voice );
 			}
 			return api.send( conversation.id, pending.body, pending.clientId ).catch( function ( error ) {
 				// One quiet retry after a server error; client_id prevents duplicates.
@@ -947,7 +1042,8 @@
 			self.render();
 			self.scrollToBottom();
 			self.schedulePoll();
-			if ( ! pending.file ) {
+			// The bot cannot listen to a voice message: asking it hands the chat to a person.
+			if ( ! pending.file || pending.voice ) {
 				self.askBot();
 			}
 		} ).catch( function ( error ) {
@@ -968,7 +1064,7 @@
 				return;
 			}
 			pending.failed = true;
-			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large', 'chatchi_attachments_disabled' ].indexOf( error.code ) !== -1;
+			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large', 'chatchi_attachments_disabled', 'chatchi_voice_disabled' ].indexOf( error.code ) !== -1;
 			pending.limited = error.code === 'chatchi_rate_limited';
 			// Say why when the server refused the message itself (e.g. too long);
 			// connection problems keep the generic "tap to retry".
@@ -2193,6 +2289,15 @@
 	 * files as a card that downloads them.
 	 */
 	Widget.prototype.renderAttachment = function ( attachment ) {
+		if ( attachment.is_audio ) {
+			return this.voice.player.element( {
+				key: 'a' + attachment.id,
+				url: client.fileUrl( attachment.url ),
+				duration: attachment.duration,
+				className: 'chatchi-bubble chatchi-voice'
+			} );
+		}
+
 		if ( attachment.is_image ) {
 			return h( 'a', {
 				className: 'chatchi-bubble chatchi-bubble--image',
@@ -2233,6 +2338,16 @@
 		var bar = h( 'span', { className: 'chatchi-progress', role: 'progressbar', 'aria-label': S.uploading }, [
 			h( 'span', { style: 'width:' + Math.round( ( pending.progress || 0 ) * 100 ) + '%' } )
 		] );
+
+		if ( pending.voice ) {
+			return this.voice.player.element( {
+				key: 'p' + pending.clientId,
+				src: pending.src,
+				duration: pending.voice.duration,
+				className: 'chatchi-bubble chatchi-voice is-uploading',
+				extra: pending.failed ? null : bar
+			} );
+		}
 
 		if ( pending.preview ) {
 			return h( 'div', { className: 'chatchi-bubble chatchi-bubble--image is-uploading' }, [
@@ -2470,7 +2585,14 @@
 			} );
 		}
 
-		var box = h( 'div', { className: 'chatchi-composer__box' }, [ emojiButton, attachButton, fileInput, textarea, sendButton ] );
+		var box = h( 'div', { className: 'chatchi-composer__box' } );
+		var voice = attachments.voice && Core.canRecord() ? this.voice.recorder.mount( box ) : null;
+
+		[ emojiButton, attachButton, fileInput, voice && voice.button, textarea, sendButton, voice && voice.bar ].forEach( function ( child ) {
+			if ( child ) {
+				box.appendChild( child );
+			}
+		} );
 		var picker = h( 'div', { id: 'chatchi-emoji', className: 'chatchi-emoji', role: 'group', 'aria-label': S.emoji, hidden: true }, EMOJI.map( function ( emoji ) {
 			return h( 'button', {
 				type: 'button',

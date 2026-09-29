@@ -152,6 +152,7 @@ final class SettingsValidator {
 			// Empty means "the site admin email".
 			'notify_email'             => '',
 			'attachments_enabled'      => true,
+			'voice_enabled'            => true,
 			// Telegram and Bale bots (see Notifications\BotNotifier).
 			'telegram_enabled'         => false,
 			'telegram_token'           => '',
@@ -396,6 +397,7 @@ final class SettingsValidator {
 				case 'offline_no_agents':
 				case 'notify_email_enabled':
 				case 'attachments_enabled':
+				case 'voice_enabled':
 				case 'telegram_enabled':
 				case 'bale_enabled':
 				case 'transcript_enabled':
@@ -571,6 +573,7 @@ final class SettingsValidator {
 			case 'offline_no_agents':
 			case 'notify_email_enabled':
 			case 'attachments_enabled':
+			case 'voice_enabled':
 			case 'telegram_enabled':
 			case 'bale_enabled':
 			case 'transcript_enabled':

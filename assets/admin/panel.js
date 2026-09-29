@@ -139,10 +139,14 @@
 		deleteCanned: function ( id ) {
 			return request( 'DELETE', '/agent/canned/' + id );
 		},
-		upload: function ( id, file, clientId, onProgress ) {
+		upload: function ( id, file, clientId, onProgress, voice ) {
 			var form = new FormData();
 			form.append( 'file', file, file.name );
 			form.append( 'client_id', clientId );
+			if ( voice ) {
+				form.append( 'voice', '1' );
+				form.append( 'duration', String( voice.duration ) );
+			}
 			return client.upload( '/agent/conversations/' + id + '/attachments', form, onProgress );
 		},
 		note: function ( id, body, clientId ) {
@@ -464,6 +468,16 @@
 	 * Panel
 	 * ------------------------------------------------------------------ */
 
+	/**
+	 * 🎤 before a voice message and 📎 before a file, in previews.
+	 */
+	function attachmentMark( message ) {
+		if ( ! message.has_attachment ) {
+			return '';
+		}
+		return message.body === S.voiceMessage ? '🎤 ' : '📎 ';
+	}
+
 	function Panel() {
 		var wide = window.matchMedia( '(min-width: 1280px)' ).matches;
 
@@ -489,6 +503,7 @@
 		this.drafts = {};
 		this.newIds = {};
 		this.lastReadMarked = 0;
+		this.voice = this.createVoice();
 		this.listTimer = null;
 		this.convTimer = null;
 		this.convTicks = 0;
@@ -879,7 +894,7 @@
 		alerts.chime();
 		fresh.slice( 0, 3 ).forEach( function ( item ) {
 			var last = item.last_message;
-			alerts.desktop( visitorName( item.visitor ), ( last.has_attachment ? '📎 ' : '' ) + last.body.slice( 0, 140 ), 'chatchi-' + item.id, function () {
+			alerts.desktop( visitorName( item.visitor ), attachmentMark( last ) + last.body.slice( 0, 140 ), 'chatchi-' + item.id, function () {
 				window.location.hash = '#/conversations/' + item.id;
 			} );
 		} );
@@ -1190,7 +1205,7 @@
 	Panel.prototype.renderItem = function ( item ) {
 		var name = visitorName( item.visitor );
 		var last = item.last_message;
-		var preview = last ? ( last.is_mine ? S.you + ': ' : '' ) + ( last.has_attachment ? '📎 ' : '' ) + last.body.replace( /\s+/g, ' ' ) : S.noMessages;
+		var preview = last ? ( last.is_mine ? S.you + ': ' : '' ) + attachmentMark( last ) + last.body.replace( /\s+/g, ' ' ) : S.noMessages;
 		var classes = 'cc-item' + ( item.id === this.state.selectedId ? ' is-selected' : '' ) + ( item.unread_count > 0 ? ' is-unread' : '' );
 
 		return h( 'a', {
@@ -1569,7 +1584,7 @@
 			if ( bar ) {
 				bar.style.width = Math.round( progress * 100 ) + '%';
 			}
-		} ) : ( pending.note ? api.note( pending.convId, pending.body, pending.clientId ) : api.send( pending.convId, pending.body, pending.clientId ) );
+		}, pending.voice ) : ( pending.note ? api.note( pending.convId, pending.body, pending.clientId ) : api.send( pending.convId, pending.body, pending.clientId ) );
 
 		sending.then( function ( message ) {
 			if ( pending.preview ) {
@@ -1607,7 +1622,7 @@
 				return;
 			}
 			pending.failed = true;
-			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large' ].indexOf( error.code ) !== -1;
+			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large', 'chatchi_voice_disabled' ].indexOf( error.code ) !== -1;
 			pending.reason = pending.file && error.status >= 400 && error.status < 500 ? error.message : '';
 			self.renderLog();
 		} );
@@ -1639,7 +1654,87 @@
 		this.deliver( pending );
 	};
 
+	/**
+	 * The voice recorder and player, shared by every render of a conversation.
+	 */
+	Panel.prototype.createVoice = function () {
+		var self = this;
+		var strings = {
+			record: S.voiceRecord,
+			recording: S.voiceRecording,
+			cancel: S.voiceCancel,
+			send: S.voiceSend,
+			micBlocked: S.micBlocked,
+			micFailed: S.micFailed,
+			play: S.voicePlay,
+			pause: S.voicePause,
+			voiceMessage: S.voiceMessage,
+			loadFailed: S.voiceLoadFailed
+		};
+
+		return {
+			recorder: Core.createVoiceRecorder( {
+				strings: strings,
+				maxSeconds: 300,
+				digits: fmt.number,
+				toolClass: 'cc-tool cc-tool--voice',
+				// The conversation it was recorded in, even if the agent opens another one meanwhile.
+				context: function () {
+					return self.state.selectedId;
+				},
+				onRecorded: function ( result ) {
+					self.sendVoice( result );
+				},
+				onError: function ( message ) {
+					self.notify( message, true );
+				}
+			} ),
+			player: Core.createVoicePlayer( {
+				strings: strings,
+				digits: fmt.number,
+				onError: function ( message ) {
+					self.notify( message, true );
+				}
+			} )
+		};
+	};
+
+	/**
+	 * Sends a recorded voice message, like a file.
+	 */
+	Panel.prototype.sendVoice = function ( result ) {
+		var settings = ( this.state.agent && this.state.agent.attachments ) || { max_bytes: 0 };
+		var pending = { clientId: Core.uuid(), body: S.voiceMessage, file: result.file, voice: { duration: result.duration }, src: result.src, progress: 0, failed: false, convId: result.context || this.state.selectedId };
+
+		if ( ! pending.convId ) {
+			return;
+		}
+
+		this.state.pending.push( pending );
+
+		if ( settings.max_bytes && result.file.size > settings.max_bytes ) {
+			pending.failed = true;
+			pending.fatal = true;
+			pending.reason = S.fileTooLarge.replace( '%s', Core.fileSize( settings.max_bytes, config.locale ) );
+			this.renderLog();
+			this.scrollToBottom();
+			return;
+		}
+
+		this.scrollToBottom();
+		this.deliver( pending );
+	};
+
 	Panel.prototype.buildAttachment = function ( attachment ) {
+		if ( attachment.is_audio ) {
+			return this.voice.player.element( {
+				key: 'a' + attachment.id,
+				url: client.fileUrl( attachment.url ),
+				duration: attachment.duration,
+				className: 'cc-bubble cc-bubble--voice'
+			} );
+		}
+
 		if ( attachment.is_image ) {
 			return h( 'a', { className: 'cc-bubble cc-bubble--image', href: client.fileUrl( attachment.url ), target: '_blank', rel: 'noopener', title: attachment.name }, [
 				h( 'img', { src: client.fileUrl( attachment.url ), alt: attachment.name, loading: 'lazy', width: attachment.width ? String( attachment.width ) : null, height: attachment.height ? String( attachment.height ) : null } )
@@ -1660,6 +1755,16 @@
 		var bar = pending.failed ? null : h( 'span', { className: 'cc-progress', role: 'progressbar', 'aria-label': S.uploading }, [
 			h( 'span', { style: 'width:' + Math.round( ( pending.progress || 0 ) * 100 ) + '%' } )
 		] );
+
+		if ( pending.voice ) {
+			return this.voice.player.element( {
+				key: 'p' + pending.clientId,
+				src: pending.src,
+				duration: pending.voice.duration,
+				className: 'cc-bubble cc-bubble--voice is-uploading',
+				extra: bar
+			} );
+		}
 
 		if ( pending.preview ) {
 			return h( 'div', { className: 'cc-bubble cc-bubble--image is-uploading' }, [ h( 'img', { src: pending.preview, alt: pending.body } ), bar ] );
@@ -2580,6 +2685,9 @@
 			textarea.placeholder = note ? S.notePlaceholder : S.placeholder;
 			textarea.setAttribute( 'aria-label', textarea.placeholder );
 			attachButton.hidden = note;
+			if ( voice ) {
+				voice.button.hidden = note;
+			}
 			send.title = note ? S.addNote : S.send;
 			send.setAttribute( 'aria-label', send.title );
 			if ( ! keepFocus ) {
@@ -2607,15 +2715,24 @@
 			}
 		}, [ icon( 'lock' ), S.internalNote ] );
 
+		var composeForm = h( 'form', {
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				submit();
+			}
+		} );
+		var voice = Core.canRecord() ? this.voice.recorder.mount( composeForm ) : null;
+
+		[ cannedButton, suggestButton, attachButton, fileInput, voice && voice.button, textarea, send, voice && voice.bar ].forEach( function ( child ) {
+			if ( child ) {
+				composeForm.appendChild( child );
+			}
+		} );
+
 		var inner = h( 'div', { className: 'cc-composer__inner' }, [
 			h( 'div', { className: 'cc-compose-mode', role: 'tablist', 'aria-label': S.composeMode }, [ replyTab, noteTab ] ),
 			list,
-			h( 'form', {
-				onSubmit: function ( event ) {
-					event.preventDefault();
-					submit();
-				}
-			}, [ cannedButton, suggestButton, attachButton, fileInput, textarea, send ] )
+			composeForm
 		] );
 
 		if ( this.noteMode ) {
@@ -2720,7 +2837,7 @@
 						} );
 					}
 				}, [ icon( 'mail' ), S.sendTranscript ] )
-			] ) : null,
+			] ) : '', // replaceChildren() would print a null as "null".
 			this.buildCustomer( conv ),
 			this.buildTagEditor( conv )
 		);
@@ -4121,7 +4238,7 @@
 		{ id: 'notifications', icon: 'bell', keys: [ 'notify_email_enabled', 'notify_email', 'bot_notify', 'bale_enabled', 'bale_token', 'bale_chat_id', 'telegram_enabled', 'telegram_token', 'telegram_chat_id', 'telegram_api_url', 'transcript_enabled' ] },
 		{ id: 'sms', icon: 'phone', keys: [ 'sms_enabled', 'sms_provider', 'sms_api_key', 'sms_username', 'sms_password', 'sms_sender', 'sms_message', 'sms_delay' ] },
 		// Protection.
-		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb' ] },
+		{ id: 'limits', icon: 'gauge', keys: [ 'spam_protection', 'limit_messages_visitor', 'limit_messages_ip', 'limit_starts_visitor', 'limit_starts_ip', 'message_max_length', 'attachments_enabled', 'attachment_max_mb', 'voice_enabled' ] },
 		{ id: 'security', icon: 'shield', keys: [ 'proxy_mode', 'proxy_header', 'trusted_proxies' ] }
 	];
 
@@ -4147,7 +4264,7 @@
 		sales: [ 'invitesTitle', 'ratingTitle' ],
 		notifications: [ 'notifyTitle', 'notifyEmail', 'botWhenTitle', 'baleTitle', 'telegramTitle', 'telegramApiUrl', 'transcriptTitle' ],
 		sms: [ 'smsTitle', 'smsProvider', 'smsKavenegar', 'smsMelipayamak', 'smsSender', 'smsTextTitle', 'smsDelay', 'smsTestTitle' ],
-		limits: [ 'spamTitle', 'limitsTitle', 'limitMessagesVisitor', 'limitMessagesIp', 'limitStartsVisitor', 'limitStartsIp', 'messagesTitle', 'messageMaxLength', 'filesTitle', 'filesMaxSize' ],
+		limits: [ 'spamTitle', 'limitsTitle', 'limitMessagesVisitor', 'limitMessagesIp', 'limitStartsVisitor', 'limitStartsIp', 'messagesTitle', 'messageMaxLength', 'filesTitle', 'filesMaxSize', 'voiceTitle', 'voiceOn' ],
 		security: [ 'ipTitle', 'proxyHeader', 'trustedProxies' ]
 	};
 
@@ -5305,6 +5422,18 @@
 				] ),
 				filesBox,
 				this.fieldError( 'attachments_enabled' )
+			] ),
+			h( 'section', { className: 'cc-card cc-settings__section', 'aria-labelledby': 'cc-voice-title' }, [
+				h( 'div', { className: 'cc-settings__head' }, [
+					h( 'div', {}, [
+						h( 'h2', { id: 'cc-voice-title', text: S.voiceTitle } ),
+						h( 'p', { className: 'cc-hint', text: S.voiceIntro } )
+					] ),
+					this.buildSwitch( 'cc-voice-enabled', S.voiceOn, draft.voice_enabled, function ( on ) {
+						draft.voice_enabled = on;
+					} )
+				] ),
+				this.fieldError( 'voice_enabled' )
 			] )
 		] );
 	};

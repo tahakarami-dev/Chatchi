@@ -294,6 +294,8 @@ final class Presenter {
 			'mime'     => $attachment->mime,
 			'size'     => $attachment->size,
 			'is_image' => $attachment->is_image(),
+			'is_audio' => $attachment->is_audio(),
+			'duration' => $attachment->duration,
 			'width'    => $attachment->width,
 			'height'   => $attachment->height,
 			'url'      => rest_url( sprintf( 'chatchi/v1/%s/conversations/%d/attachments/%d', $base, $attachment->conversation_id, $attachment->id ) ),

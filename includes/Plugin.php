@@ -686,7 +686,8 @@ final class Plugin {
 					$c->get( MessageService::class ),
 					$c->get( Availability::class ),
 					$c->get( AiClient::class ),
-					$c->get( Knowledge::class )
+					$c->get( Knowledge::class ),
+					$c->get( AttachmentRepository::class )
 				);
 			}
 		);

@@ -223,7 +223,7 @@ final class Transcript implements Module {
 			$mine   = Message::SENDER_VISITOR === $message->sender_type;
 			$sender = $mine ? $you : ( isset( $agents[ $message->sender_id ] ) ? $agents[ $message->sender_id ]->display_name : __( 'Support', 'chatchi' ) );
 			$time   = wp_date( (string) get_option( 'time_format' ), (int) strtotime( $message->created_at . ' UTC' ) );
-			$body   = $message->attachment_id > 0 ? '📎 ' . $message->body : $message->body;
+			$body   = $message->attachment_id > 0 ? ( __( 'Voice message', 'chatchi' ) === $message->body ? '🎤 ' : '📎 ' ) . $message->body : $message->body;
 
 			$rows .= sprintf(
 				'<tr><td style="padding:10px 14px;border-bottom:1px solid #eeeef3;text-align:%1$s;"><div style="font-size:12px;color:%2$s;margin-bottom:4px;"><strong>%3$s</strong> · %4$s</div><div style="font-size:14px;line-height:1.8;color:#1a1a2e;unicode-bidi:plaintext;">%5$s</div></td></tr>',
