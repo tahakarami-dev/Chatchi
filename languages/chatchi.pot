@@ -3,13 +3,13 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: چت‌چی 1.0.0\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/nl-wt\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/Chatchi\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-29T12:13:14+00:00\n"
+"POT-Creation-Date: 2026-09-29T11:18:14+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: chatchi\n"
@@ -49,6 +49,10 @@ msgstr ""
 #: chatchi.php:85
 #, php-format
 msgid "ChatChi requires WordPress %1$s or higher. You are running WordPress %2$s."
+msgstr ""
+
+#: chatchi.php:136
+msgid "ChatChi needs the ionCube Loader PHP extension to check its license. Ask your host to enable it."
 msgstr ""
 
 #: includes/Admin/AdminModule.php:58
@@ -1593,7 +1597,6 @@ msgstr ""
 #: includes/Admin/PanelStrings.php:425
 #: includes/Attachments/AttachmentService.php:229
 #: includes/Frontend/WidgetStrings.php:81
-#: includes/Notifications/Transcript.php:226
 msgid "Voice message"
 msgstr ""
 
