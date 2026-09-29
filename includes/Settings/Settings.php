@@ -66,6 +66,14 @@ final class Settings {
 	}
 
 	/**
+	 * Puts every setting back to its default.
+	 */
+	public function reset(): void {
+		update_option( self::OPTION, array(), true );
+		$this->cache = null;
+	}
+
+	/**
 	 * Validates and saves changed settings; others keep their values.
 	 *
 	 * @param array<string, mixed> $changes Changed settings.

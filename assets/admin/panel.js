@@ -167,6 +167,12 @@
 		botTest: function ( data ) {
 			return request( 'POST', '/agent/settings/bot-test', { body: data } );
 		},
+		dataSummary: function () {
+			return request( 'GET', '/agent/settings/data' );
+		},
+		dataReset: function ( scope ) {
+			return request( 'POST', '/agent/settings/data/reset', { body: { scope: scope, confirm: 'reset' } } );
+		},
 		aiTest: function ( data ) {
 			return request( 'POST', '/agent/settings/ai-test', { body: data } );
 		},
@@ -4254,7 +4260,7 @@
 	 * section (the text shown on screen, so a result can be found and shown).
 	 */
 	var SETTINGS_INDEX = {
-		general: [ 'widgetOnTitle', 'widgetOn', 'soundTitle', 'visitorsTitle', 'visitorDays', 'dataTitle', 'deleteData' ],
+		general: [ 'widgetOnTitle', 'widgetOn', 'soundTitle', 'visitorsTitle', 'visitorDays', 'dataTitle', 'deleteData', 'resetTitle', 'resetSettingsTitle', 'resetChatsTitle', 'resetAllTitle' ],
 		appearance: [ 'appearanceTitle', 'brandColor', 'position', 'widgetTheme', 'widgetTitle', 'widgetSubtitle' ],
 		form: [ 'formTitle', 'formIntroTitle', 'phone', 'email' ],
 		display: [ 'welcomeTitle', 'welcomeText', 'displayTitle', 'shortcodeTitle' ],
@@ -4303,6 +4309,16 @@
 
 	SettingsView.prototype.load = function () {
 		var self = this;
+		var notice = null;
+
+		// Set before the panel reloaded itself after deleting data.
+		try {
+			notice = window.sessionStorage.getItem( 'chatchi_notice' );
+			window.sessionStorage.removeItem( 'chatchi_notice' );
+		} catch ( e ) {}
+		if ( notice ) {
+			this.panel.notify( notice );
+		}
 
 		this.state = { loading: true, error: '' };
 		this.render();
@@ -5296,8 +5312,156 @@
 				] ),
 				deleteWarning,
 				this.fieldError( 'delete_data_on_uninstall' )
-			] )
+			] ),
+			this.buildDataReset()
 		] );
+	};
+
+	/**
+	 * Reset settings, delete conversations, or delete everything. Each asks
+	 * the administrator to type a word first; one confirmation is open at a time.
+	 */
+	SettingsView.prototype.buildDataReset = function () {
+		var self = this;
+		var counts = h( 'p', { className: 'cc-hint cc-reset__counts', 'aria-live': 'polite' } );
+		var actions = [
+			{ scope: 'settings', title: S.resetSettingsTitle, text: S.resetSettingsText, button: S.resetSettingsButton, warn: S.resetSettingsWarn },
+			{ scope: 'conversations', title: S.resetChatsTitle, text: S.resetChatsText, button: S.resetChatsButton, warn: S.resetChatsWarn },
+			{ scope: 'all', title: S.resetAllTitle, text: S.resetAllText, button: S.resetAllButton, warn: S.resetAllWarn }
+		];
+		var openBox = null;
+
+		function norm( text ) {
+			return String( text ).trim().replace( /[يى]/g, 'ی' ).replace( /ك/g, 'ک' ).toLowerCase();
+		}
+
+		function showCounts( summary ) {
+			counts.textContent = S.resetCounts
+				.replace( '%1$s', fmt.number( summary.conversations ) )
+				.replace( '%2$s', fmt.number( summary.messages ) )
+				.replace( '%3$s', fmt.number( summary.files ) )
+				.replace( '%4$s', fmt.number( summary.agents ) )
+				.replace( '%5$s', fmt.number( summary.canned ) );
+		}
+
+		api.dataSummary().then( showCounts ).catch( function () {} );
+
+		var rows = actions.map( function ( action ) {
+			var input = h( 'input', {
+				type: 'text',
+				className: 'cc-input',
+				id: 'cc-reset-' + action.scope + '-word',
+				autocomplete: 'off',
+				spellcheck: 'false',
+				dir: 'auto'
+			} );
+			var confirm = h( 'button', {
+				type: 'button',
+				className: 'cc-button cc-button--danger',
+				disabled: true,
+				text: action.button,
+				onClick: function () {
+					confirm.disabled = true;
+					confirm.setAttribute( 'aria-busy', 'true' );
+					cancel.disabled = true;
+					api.dataReset( action.scope ).then( function () {
+						var done = { settings: S.resetSettingsDone, conversations: S.resetChatsDone, all: S.resetAllDone }[ action.scope ];
+
+						if ( action.scope === 'settings' ) {
+							self.panel.notify( done );
+							self.load();
+							return;
+						}
+
+						// Conversations and agents changed under the whole panel: start it again.
+						try {
+							window.sessionStorage.setItem( 'chatchi_notice', done );
+						} catch ( e ) {}
+						window.location.reload();
+					} ).catch( function ( error ) {
+						self.panel.notify( error.message, true );
+						confirm.removeAttribute( 'aria-busy' );
+						confirm.disabled = norm( input.value ) !== norm( S.resetWord );
+						cancel.disabled = false;
+					} );
+				}
+			} );
+			var cancel = h( 'button', {
+				type: 'button',
+				className: 'cc-button cc-button--secondary',
+				text: S.cancel,
+				onClick: function () {
+					close();
+					start.focus();
+				}
+			} );
+			var box = h( 'div', { className: 'cc-reset__confirm', hidden: true }, [
+				h( 'p', { className: 'cc-warning cc-reset__warn', text: action.warn } ),
+				h( 'label', { className: 'cc-label', for: input.id, text: S.resetTypeWord.replace( '%s', S.resetWord ) } ),
+				input,
+				h( 'div', { className: 'cc-reset__buttons' }, [ confirm, cancel ] )
+			] );
+			var start = h( 'button', {
+				type: 'button',
+				className: 'cc-button cc-button--secondary cc-button--sm' + ( action.scope === 'settings' ? '' : ' cc-reset__danger' ),
+				'aria-expanded': 'false',
+				text: action.button,
+				onClick: function () {
+					if ( openBox && openBox !== handle ) {
+						openBox.close();
+					}
+					box.hidden = false;
+					start.setAttribute( 'aria-expanded', 'true' );
+					openBox = handle;
+					// Clear of the save bar at the bottom of the screen.
+					box.scrollIntoView( { block: 'center', behavior: 'smooth' } );
+					input.focus( { preventScroll: true } );
+				}
+			} );
+			var handle = { close: close };
+
+			function close() {
+				box.hidden = true;
+				input.value = '';
+				confirm.disabled = true;
+				start.setAttribute( 'aria-expanded', 'false' );
+				if ( openBox === handle ) {
+					openBox = null;
+				}
+			}
+
+			input.addEventListener( 'input', function () {
+				confirm.disabled = norm( input.value ) !== norm( S.resetWord );
+			} );
+			input.addEventListener( 'keydown', function ( event ) {
+				if ( event.key === 'Enter' && ! confirm.disabled ) {
+					event.preventDefault();
+					confirm.click();
+				} else if ( event.key === 'Escape' ) {
+					event.preventDefault();
+					event.stopPropagation();
+					close();
+					start.focus();
+				}
+			} );
+
+			return h( 'div', { className: 'cc-reset__row cc-reset__row--' + action.scope }, [
+				h( 'div', { className: 'cc-reset__head' }, [
+					h( 'div', {}, [
+						h( 'h3', { text: action.title } ),
+						h( 'p', { className: 'cc-hint', text: action.text } )
+					] ),
+					start
+				] ),
+				box
+			] );
+		} );
+
+		return h( 'section', { className: 'cc-card cc-settings__section cc-reset', 'aria-labelledby': 'cc-reset-title' }, [
+			h( 'h2', { id: 'cc-reset-title', text: S.resetTitle } ),
+			h( 'p', { className: 'cc-hint', text: S.resetIntro } ),
+			counts
+		].concat( rows ) );
 	};
 
 	/* ----------------------------- start form -------------------------- */

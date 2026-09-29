@@ -170,6 +170,8 @@ Logged-in user with `X-WP-Nonce` and an active agent record.
 
 | Method | Route | Purpose |
 |---|---|---|
+| GET | `/agent/settings/data` | Administrators: how much is stored (`conversations`, `messages`, `visitors`, `files`, `agents`, `canned`) |
+| POST | `/agent/settings/data/reset` | Administrators: `scope` (`settings`, `conversations` or `all`) and `confirm: "reset"`; returns what was deleted. Fires `chatchi_data_reset` |
 | GET | `/agent/me` | Current agent, with `status` and the `attachments` limits |
 | POST/PATCH | `/agent/me` | `status`: `online` or `away`, `theme`: `light`, `dark` or `auto` (the panel's theme, saved per user), `display_name` (2–100 characters) and/or `avatar_id: 0` (removes the picture) |
 | POST | `/agent/me/avatar` | Multipart `file`: the agent's own picture (JPG, PNG, GIF or WebP); returns the agent |
@@ -243,6 +245,7 @@ Administrators also get a **Settings** screen with twelve sections in four group
 - **Hours & offline** (`#/settings/hours`): weekly business hours (Saturday first on Persian sites; in the site time zone), what offline visitors see (a leave-a-message form, or the normal chat with a notice), whether "no agent online" also counts as offline, and the offline text.
 - **General** (`#/settings/general`): master switch for the widget (off hides it everywhere, shortcodes included; the panel keeps working), the notification sound for new replies, how many days returning visitors are remembered (1–400), and whether deleting the plugin deletes all data. **By default data is kept** on delete; only temporary data (rate-limit counters, cron, locks) is removed.
 - **Start form** (`#/settings/form`): name / email / mobile each off, optional or required, and the text above the form. With every field off, visitors chat straight away.
+- **Reset and delete data** (bottom of `#/settings/general`): *Reset settings* puts every setting back to its default (conversations, agents and saved replies stay); *Delete all conversations* empties conversations, messages, visitors, files, tags and ratings (settings, agents and saved replies stay); *Delete everything* also removes agents, saved replies, AI usage and panel preferences, as on a fresh install (administrators become agents again when they open the panel). Tables are emptied, not dropped. Each action asks the administrator to type a word first («حذف» in Persian); the panel then reloads when conversations or agents changed.
 - **Spam & limits** (`#/settings/limits`): bot protection on/off, messages per minute and new chats per hour / per 10 minutes, per visitor and per IP address, the longest allowed message (100–10000 characters), and files: whether visitors may send them and the largest size (1–50 MB, capped by the server's upload limit); and whether visitors may send voice messages.
 
 - **Appearance** (`#/settings/appearance`): light, dark or automatic (the visitor's device decides) widget theme, brand color (presets, color picker or hex code, with a warning for colors that are hard to see on white), bottom-left or bottom-right corner, and the widget title and subtitle, with a live preview. The agent panel uses the same brand color.
