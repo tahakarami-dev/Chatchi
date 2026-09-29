@@ -110,6 +110,36 @@ final class FileStore {
 	}
 
 	/**
+	 * Deletes every stored file and its year/month folders, keeping the
+	 * folder's protection files.
+	 *
+	 * @return int Number of files deleted.
+	 */
+	public function clear(): int {
+		$base  = $this->base();
+		$count = 0;
+
+		if ( null === $base ) {
+			return 0;
+		}
+
+		foreach ( (array) glob( $base . '/[0-9][0-9][0-9][0-9]', GLOB_ONLYDIR ) as $year ) {
+			foreach ( (array) glob( $year . '/[0-9][0-9]', GLOB_ONLYDIR ) as $month ) {
+				foreach ( (array) glob( $month . '/*' ) as $file ) {
+					if ( is_file( $file ) && ! is_link( $file ) ) {
+						wp_delete_file( $file );
+						++$count;
+					}
+				}
+				@rmdir( $month ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Empty folder of the plugin's own storage.
+			}
+			@rmdir( $year ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Empty folder of the plugin's own storage.
+		}
+
+		return $count;
+	}
+
+	/**
 	 * Adds files that stop direct access and folder listings.
 	 *
 	 * @param string $base Storage folder.

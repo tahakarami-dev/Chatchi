@@ -50,6 +50,8 @@ use ChatChi\Reports\ReportService;
 use ChatChi\Rest\AgentController;
 use ChatChi\Rest\AgentManagementController;
 use ChatChi\Rest\AiTestController;
+use ChatChi\Rest\DataResetController;
+use ChatChi\Settings\DataReset;
 use ChatChi\Rest\BotTestController;
 use ChatChi\Notifications\BotNotifier;
 use ChatChi\Notifications\SmsGateway;
@@ -557,7 +559,8 @@ final class Plugin {
 					$c->get( BotTestController::class ),
 					$c->get( ReportsController::class ),
 					$c->get( SmsTestController::class ),
-					$c->get( AiTestController::class )
+					$c->get( AiTestController::class ),
+					$c->get( DataResetController::class )
 				);
 			}
 		);
@@ -689,6 +692,20 @@ final class Plugin {
 					$c->get( Knowledge::class ),
 					$c->get( AttachmentRepository::class )
 				);
+			}
+		);
+
+		$this->container->singleton(
+			DataReset::class,
+			static function ( Container $c ): DataReset {
+				return new DataReset( $c->get( \wpdb::class ), $c->get( Settings::class ), $c->get( FileStore::class ) );
+			}
+		);
+
+		$this->container->singleton(
+			DataResetController::class,
+			static function ( Container $c ): DataResetController {
+				return new DataResetController( $c->get( DataReset::class ) );
 			}
 		);
 
