@@ -2109,6 +2109,8 @@
 			'aria-haspopup': 'menu',
 			'aria-expanded': this.assignMenu ? 'true' : 'false',
 			title: S.transfer,
+			// The name is hidden on phones, where only the icon fits.
+			'aria-label': S.transfer + ': ' + ( conv.agent ? conv.agent.name : S.unassigned ),
 			onClick: function () {
 				self.assignMenu = ! self.assignMenu;
 				menu.hidden = ! self.assignMenu;

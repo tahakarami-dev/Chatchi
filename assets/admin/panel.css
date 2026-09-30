@@ -4901,3 +4901,42 @@ a.cc-order-head:hover strong {
 		align-items: stretch;
 	}
 }
+
+/* Conversation header on phones: everything fits in one row. */
+@media (max-width: 767px) {
+	.cc-conv-head {
+		gap: 8px;
+		padding: 0 10px;
+	}
+
+	.cc-conv-head > .cc-badge {
+		display: none;
+	}
+
+	.cc-conv-head .cc-assign {
+		padding-inline: 10px;
+	}
+
+	.cc-conv-head .cc-assign span {
+		display: none;
+	}
+
+	.cc-conv-head > .cc-button--secondary {
+		padding-inline: 12px;
+	}
+
+	/* Leave the text box room next to the tools. */
+	.cc-composer form {
+		gap: 2px;
+	}
+
+	.cc-composer .cc-tool {
+		width: 36px;
+		height: 44px;
+	}
+
+	.cc-composer textarea {
+		margin-inline-start: 4px;
+		padding-inline: 10px;
+	}
+}
