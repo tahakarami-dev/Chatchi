@@ -1,0 +1,990 @@
+/**
+ * ChatChi shared front-end core.
+ *
+ * Used by both the visitor widget and the agent panel: safe DOM building,
+ * icons, link detection, Persian-aware date and number formatting, and the
+ * REST client. Exposed as window.ChatChiCore.
+ *
+ * Security rule: user-provided text is only ever inserted with textContent
+ * or text nodes. innerHTML is used only for the constant SVG icons below.
+ *
+ * Icons: Lucide (https://lucide.dev), ISC License.
+ */
+( function () {
+	'use strict';
+
+	if ( window.ChatChiCore ) {
+		return;
+	}
+
+	var ICONS = {
+		chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+		sparkles: '<path d="M9.94 14.06 8 20l-1.94-5.94L0 12l6.06-1.94L8 4l1.94 6.06L16 12Z" transform="translate(2 -1) scale(.9)"/><path d="M19 3v4"/><path d="M21 5h-4"/>',
+		sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+		moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+		monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+		help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+		chevron: '<path d="m6 9 6 6 6-6"/>',
+		whatsapp: '<path class="cc-fill" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.86 9.86 0 0 0 4.73 1.2h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.1c-.24.68-1.42 1.3-1.95 1.34-.5.05-.97.23-3.27-.68-2.76-1.09-4.5-3.92-4.64-4.1-.13-.18-1.1-1.47-1.1-2.8 0-1.34.7-2 .95-2.27.25-.27.54-.34.72-.34h.52c.17 0 .4-.06.62.47.24.56.8 1.94.87 2.08.07.14.12.3.02.48-.09.18-.14.3-.27.46-.14.16-.29.36-.41.48-.14.13-.28.28-.12.55.16.27.7 1.16 1.51 1.88 1.04.93 1.92 1.21 2.19 1.35.27.14.43.12.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.23.6-.14.25.09 1.58.75 1.85.88.27.14.45.2.52.32.07.11.07.66-.17 1.34Z"/>',
+		telegram: '<path class="cc-fill" d="M21.94 4.3 18.9 18.63c-.23 1.01-.83 1.26-1.68.78l-4.63-3.41-2.23 2.15c-.25.25-.45.45-.93.45l.33-4.71 8.58-7.75c.37-.33-.08-.52-.58-.19L7.24 12.62l-4.57-1.43c-.99-.31-1.01-.99.21-1.47L20.74 2.84c.83-.31 1.55.19 1.2 1.46Z"/>',
+		bale: '<path class="cc-fill" d="M12 2C6.48 2 2 6.03 2 11c0 2.4 1.05 4.58 2.76 6.2L4 22l4.53-2.2c1.08.3 2.24.47 3.47.47 5.52 0 10-4.03 10-9S17.52 2 12 2Zm-3 10.2a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Zm6 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Z"/>',
+		// Solid speech bubble with three dots, for the chat launcher.
+		launcher: '<path class="cc-bubble" d="M12 2.5c-5.52 0-10 3.94-10 8.8 0 2.53 1.22 4.81 3.17 6.41-.2 1.38-.8 2.64-1.74 3.7a.6.6 0 0 0 .5 1c2.2-.14 4.17-.93 5.66-2.06.78.16 1.59.25 2.41.25 5.52 0 10-3.94 10-8.8S17.52 2.5 12 2.5Z"/><circle class="cc-dot" cx="7.6" cy="11.3" r="1.35"/><circle class="cc-dot" cx="12" cy="11.3" r="1.35"/><circle class="cc-dot" cx="16.4" cy="11.3" r="1.35"/>',
+		close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+		send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+		check: '<path d="M20 6 9 17l-5-5"/>',
+		checks: '<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>',
+		clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+		alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+		inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+		search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+		back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+		exit: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+		user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+		mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+		phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+		link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+		info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+		users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+		plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+		image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+		sliders: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>',
+		copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+		palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
+		eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+		power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
+		clipboard: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+		gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+		shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+		smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+		chevronDown: '<path d="m6 9 6 6 6-6"/>',
+		lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+		tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+		bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+		transfer: '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+		cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+		star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
+		chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+		message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>',
+		zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+		paperclip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+		file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+		download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+		edit: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+		trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+		headset: '<path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Zm0 0a9 9 0 1 1 18 0m0 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"/><path d="M21 16v2a4 4 0 0 1-4 4h-5"/>',
+		mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
+		play: '<path class="cc-fill" d="M7 4.5v15a1 1 0 0 0 1.52.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5Z"/>',
+		pause: '<rect class="cc-fill" x="6" y="4" width="4" height="16" rx="1.2"/><rect class="cc-fill" x="14" y="4" width="4" height="16" rx="1.2"/>'
+	};
+
+	/**
+	 * Returns an SVG icon element.
+	 */
+	function icon( name, extraClass ) {
+		var wrap = document.createElement( 'span' );
+		// Constant markup only; never user data.
+		wrap.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + ICONS[ name ] + '</svg>';
+		var svg = wrap.firstChild;
+		if ( extraClass ) {
+			svg.setAttribute( 'class', extraClass );
+		}
+		return svg;
+	}
+
+	/**
+	 * Creates an element. Children may be nodes or strings (added as text).
+	 * Props: className, text, value, on* listeners, DOM properties, attributes.
+	 */
+	function h( tag, props, children ) {
+		var el = document.createElement( tag );
+		Object.keys( props || {} ).forEach( function ( key ) {
+			var value = props[ key ];
+			if ( value === null || value === undefined || value === false ) {
+				return;
+			}
+			if ( key === 'className' ) {
+				el.className = value;
+			} else if ( key === 'text' ) {
+				el.textContent = value;
+			} else if ( key === 'value' ) {
+				el.value = value;
+			} else if ( key.indexOf( 'on' ) === 0 ) {
+				el.addEventListener( key.slice( 2 ).toLowerCase(), value );
+			} else if ( key in el && typeof value !== 'string' ) {
+				el[ key ] = value;
+			} else {
+				el.setAttribute( key, value === true ? '' : String( value ) );
+			}
+		} );
+		( children || [] ).forEach( function ( child ) {
+			if ( child === null || child === undefined || child === false ) {
+				return;
+			}
+			el.appendChild( typeof child === 'string' ? document.createTextNode( child ) : child );
+		} );
+		return el;
+	}
+
+	/**
+	 * Turns URLs in plain text into links, building DOM nodes only.
+	 */
+	function linkify( text ) {
+		var fragment = document.createDocumentFragment();
+		var pattern = /https?:\/\/[^\s<>"']+/g;
+		var last = 0;
+		var match;
+
+		while ( ( match = pattern.exec( text ) ) !== null ) {
+			var url = match[ 0 ].replace( /[.,!?;:)\]»،؛؟]+$/, '' );
+			if ( match.index > last ) {
+				fragment.appendChild( document.createTextNode( text.slice( last, match.index ) ) );
+			}
+			fragment.appendChild( h( 'a', { href: url, target: '_blank', rel: 'nofollow noopener noreferrer', dir: 'ltr', text: url } ) );
+			last = match.index + url.length;
+			pattern.lastIndex = last;
+		}
+
+		if ( last < text.length ) {
+			fragment.appendChild( document.createTextNode( text.slice( last ) ) );
+		}
+
+		return fragment;
+	}
+
+	function uuid() {
+		if ( window.crypto && window.crypto.randomUUID ) {
+			return window.crypto.randomUUID();
+		}
+		var bytes = new Uint8Array( 16 );
+		window.crypto.getRandomValues( bytes );
+		bytes[ 6 ] = ( bytes[ 6 ] & 0x0f ) | 0x40;
+		bytes[ 8 ] = ( bytes[ 8 ] & 0x3f ) | 0x80;
+		var hex = Array.prototype.map.call( bytes, function ( b ) {
+			return ( b + 0x100 ).toString( 16 ).slice( 1 );
+		} ).join( '' );
+		return hex.slice( 0, 8 ) + '-' + hex.slice( 8, 12 ) + '-' + hex.slice( 12, 16 ) + '-' + hex.slice( 16, 20 ) + '-' + hex.slice( 20 );
+	}
+
+	/**
+	 * First letter of the first and last word. Punctuation is skipped, and a
+	 * zero-width non-joiner keeps Persian letters from joining into a word.
+	 */
+	function initials( name ) {
+		var letters = String( name || '' ).trim().split( /\s+/ ).map( function ( word ) {
+			var match = word.match( /[\p{L}\p{N}]/u );
+			return match ? match[ 0 ] : '';
+		} ).filter( Boolean );
+
+		if ( ! letters.length ) {
+			return '';
+		}
+
+		var picked = letters.length > 1 ? [ letters[ 0 ], letters[ letters.length - 1 ] ] : [ letters[ 0 ] ];
+
+		return picked.join( '\u200C' ).toUpperCase();
+	}
+
+	/**
+	 * Date and number formatting. Persian locales get the Persian calendar
+	 * and Persian digits through Intl, with no extra library.
+	 */
+	function createFormatter( locale, strings ) {
+		var intlLocale = /^fa/i.test( locale || '' ) ? 'fa-IR-u-ca-persian' : ( locale || undefined );
+
+		function dateFormat( options ) {
+			try {
+				return new Intl.DateTimeFormat( intlLocale, options );
+			} catch ( e ) {
+				return new Intl.DateTimeFormat( undefined, options );
+			}
+		}
+
+		var time = dateFormat( { hour: '2-digit', minute: '2-digit' } );
+		var day = dateFormat( { day: 'numeric', month: 'long' } );
+		var fullDay = dateFormat( { day: 'numeric', month: 'long', year: 'numeric' } );
+		var dateTime = dateFormat( { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' } );
+		var numbers;
+		var relative = null;
+
+		try {
+			numbers = new Intl.NumberFormat( intlLocale );
+		} catch ( e ) {
+			numbers = new Intl.NumberFormat();
+		}
+
+		try {
+			relative = new Intl.RelativeTimeFormat( intlLocale, { numeric: 'auto', style: 'short' } );
+		} catch ( e ) {
+			relative = null;
+		}
+
+		function dayKey( date ) {
+			return date.getFullYear() + '-' + date.getMonth() + '-' + date.getDate();
+		}
+
+		function number( n ) {
+			return numbers.format( n );
+		}
+
+		return {
+			dayKey: dayKey,
+			number: number,
+			time: function ( date ) {
+				return time.format( date );
+			},
+			dateTime: function ( date ) {
+				return dateTime.format( date );
+			},
+			format: function ( template, n ) {
+				return String( template ).replace( '%d', number( n ) );
+			},
+			dayLabel: function ( date ) {
+				var now = new Date();
+				var yesterday = new Date( now.getTime() - 86400000 );
+				if ( dayKey( date ) === dayKey( now ) ) {
+					return strings.today;
+				}
+				if ( dayKey( date ) === dayKey( yesterday ) ) {
+					return strings.yesterday;
+				}
+				return ( date.getFullYear() === now.getFullYear() ? day : fullDay ).format( date );
+			},
+			/**
+			 * Short relative time for lists: "now", "5 min ago", "yesterday", then a date.
+			 */
+			ago: function ( date ) {
+				var seconds = Math.round( ( date.getTime() - Date.now() ) / 1000 );
+				var abs = Math.abs( seconds );
+				if ( ! relative || abs >= 7 * 86400 ) {
+					return day.format( date );
+				}
+				if ( abs < 60 ) {
+					return relative.format( 0, 'second' );
+				}
+				if ( abs < 3600 ) {
+					return relative.format( Math.round( seconds / 60 ), 'minute' );
+				}
+				if ( abs < 86400 ) {
+					return relative.format( Math.round( seconds / 3600 ), 'hour' );
+				}
+				return relative.format( Math.round( seconds / 86400 ), 'day' );
+			}
+		};
+	}
+
+	/**
+	 * Reads a JSON response body.
+	 *
+	 * Other plugins or themes may print PHP notices or stray characters
+	 * before the JSON (for example when display_errors is on). The JSON is
+	 * then found inside the text instead of failing the whole request.
+	 */
+	function parseJson( text ) {
+		if ( ! text ) {
+			return null;
+		}
+
+		try {
+			return JSON.parse( text );
+		} catch ( e ) {
+			// Fall through to the search below.
+		}
+
+		var end = Math.max( text.lastIndexOf( '}' ), text.lastIndexOf( ']' ) );
+		var pattern = /[{[]/g;
+		var match;
+		var tries = 0;
+
+		while ( end > 0 && ( match = pattern.exec( text ) ) !== null && match.index < end && tries++ < 100 ) {
+			try {
+				return JSON.parse( text.slice( match.index, end + 1 ) );
+			} catch ( e ) {
+				// Not the start of the JSON; try the next brace.
+			}
+		}
+
+		return null;
+	}
+
+	function ApiError( status, code, message, data ) {
+		this.status = status;
+		this.code = code;
+		this.message = message;
+		this.data = data || {};
+	}
+
+	var TRANSPORT_KEY = 'chatchi_transport';
+
+	/**
+	 * A site address on this page's own origin when it only differs by
+	 * "www." or http/https: sites often answer on both, and a request to the
+	 * other one would be cross-origin, without the visitor's cookie.
+	 */
+	function sameOrigin( address ) {
+		var url = new URL( address, window.location.href );
+		var bare = function ( host ) {
+			return host.toLowerCase().replace( /^www\./, '' );
+		};
+
+		if ( url.origin !== window.location.origin && bare( url.hostname ) === bare( window.location.hostname ) ) {
+			url.protocol = window.location.protocol;
+			url.host = window.location.host;
+		}
+
+		return url;
+	}
+
+	/**
+	 * REST client for chatchi/v1. Works with pretty permalinks (/wp-json/)
+	 * and plain ones (?rest_route=). Sends the WordPress nonce when given and
+	 * continues without it if it has expired.
+	 *
+	 * With options.ajaxUrl, requests the REST API refuses for reasons that are
+	 * not ChatChi's own (a security plugin or firewall closing it to guests)
+	 * are sent again through admin-ajax.php, which runs the same route; the
+	 * rest of the visit then uses that way.
+	 */
+	function createApi( options ) {
+		var state = { nonce: options.nonce || '', ajax: false };
+
+		if ( options.ajaxUrl ) {
+			try {
+				state.ajax = window.sessionStorage.getItem( TRANSPORT_KEY ) === 'ajax';
+			} catch ( e ) {}
+		}
+
+		function endpoint( path, query ) {
+			var url;
+
+			if ( state.ajax ) {
+				url = sameOrigin( options.ajaxUrl );
+				url.searchParams.set( 'action', options.ajaxAction || 'chatchi_widget' );
+				url.searchParams.set( 'route', path );
+			} else {
+				url = sameOrigin( options.restUrl );
+				var route = url.searchParams.get( 'rest_route' );
+
+				if ( route !== null ) {
+					url.searchParams.set( 'rest_route', route.replace( /\/$/, '' ) + path );
+				} else {
+					url.pathname = url.pathname.replace( /\/$/, '' ) + path;
+				}
+			}
+
+			Object.keys( query || {} ).forEach( function ( key ) {
+				if ( query[ key ] !== undefined && query[ key ] !== null && query[ key ] !== '' ) {
+					url.searchParams.set( key, query[ key ] );
+				}
+			} );
+
+			return url.toString();
+		}
+
+		/**
+		 * Whether a failed REST request was refused by something other than
+		 * ChatChi (its own errors all start with "chatchi_"), so trying
+		 * admin-ajax.php may help. Switches to it when so.
+		 */
+		function switchToAjax( status, code ) {
+			if ( ! options.ajaxUrl || state.ajax || /^chatchi_/.test( code ) || code === 'rest_cookie_invalid_nonce' ) {
+				return false;
+			}
+			if ( [ 401, 403, 404, 405, 406, 410, 501 ].indexOf( status ) === -1 ) {
+				return false;
+			}
+
+			state.ajax = true;
+			try {
+				window.sessionStorage.setItem( TRANSPORT_KEY, 'ajax' );
+			} catch ( e ) {}
+
+			return true;
+		}
+
+		function request( method, path, opts, isRetry ) {
+			opts = opts || {};
+			var headers = { Accept: 'application/json' };
+
+			if ( opts.body ) {
+				headers[ 'Content-Type' ] = 'application/json';
+			}
+			if ( state.nonce ) {
+				headers[ 'X-WP-Nonce' ] = state.nonce;
+			}
+
+			return fetch( endpoint( path, opts.query ), {
+				method: method,
+				headers: headers,
+				credentials: 'same-origin',
+				cache: 'no-store',
+				body: opts.body ? JSON.stringify( opts.body ) : undefined
+			} ).then( function ( response ) {
+				return response.text().catch( function () {
+					return '';
+				} ).then( function ( text ) {
+					var data = parseJson( text );
+					// A short, tag-free excerpt of an unreadable body (e.g. a PHP fatal
+					// error page), for administrators' diagnostics.
+					var raw = data === null ? String( text ).replace( /<[^>]*>/g, ' ' ).replace( /\s+/g, ' ' ).trim().slice( 0, 300 ) : '';
+
+					if ( response.ok ) {
+						if ( data === null && response.status !== 204 ) {
+							// Unreadable success: never pretend it worked; retries are safe (client_id).
+							throw new ApiError( response.status, 'invalid_response', options.networkError, { raw: raw } );
+						}
+						return data;
+					}
+
+					var code = data && data.code ? data.code : 'http_' + response.status;
+
+					if ( code === 'rest_cookie_invalid_nonce' && state.nonce && options.dropExpiredNonce && ! isRetry ) {
+						state.nonce = '';
+						return request( method, path, opts, true );
+					}
+
+					if ( switchToAjax( response.status, code ) ) {
+						return request( method, path, opts, isRetry );
+					}
+
+					throw new ApiError( response.status, code, data && data.message ? data.message : options.networkError, data ? data.data : { raw: raw } );
+				} );
+			}, function () {
+				throw new ApiError( 0, 'network', options.networkError );
+			} );
+		}
+
+		/**
+		 * Sends a multipart form (files) with upload progress, which fetch()
+		 * cannot report. Resolves and rejects like request().
+		 */
+		function upload( path, form, onProgress, isRetry ) {
+			return new Promise( function ( resolve, reject ) {
+				var xhr = new XMLHttpRequest();
+
+				xhr.open( 'POST', endpoint( path ) );
+				xhr.withCredentials = true;
+				xhr.setRequestHeader( 'Accept', 'application/json' );
+				if ( state.nonce ) {
+					xhr.setRequestHeader( 'X-WP-Nonce', state.nonce );
+				}
+				if ( onProgress && xhr.upload ) {
+					xhr.upload.addEventListener( 'progress', function ( event ) {
+						if ( event.lengthComputable ) {
+							onProgress( event.loaded / event.total );
+						}
+					} );
+				}
+
+				xhr.onload = function () {
+					var data = parseJson( xhr.responseText );
+
+					if ( xhr.status >= 200 && xhr.status < 300 && data !== null ) {
+						resolve( data );
+						return;
+					}
+
+					var code = data && data.code ? data.code : ( xhr.status >= 200 && xhr.status < 300 ? 'invalid_response' : 'http_' + xhr.status );
+
+					if ( ! isRetry && switchToAjax( xhr.status, code ) ) {
+						resolve( upload( path, form, onProgress, true ) );
+						return;
+					}
+
+					reject( new ApiError( xhr.status, code, data && data.message ? data.message : options.networkError, data ? data.data : {} ) );
+				};
+				xhr.onerror = function () {
+					reject( new ApiError( 0, 'network', options.networkError ) );
+				};
+
+				xhr.send( form );
+			} );
+		}
+
+		/**
+		 * The address of a file from the API, with the nonce for signed-in
+		 * users (images cannot send headers) and, optionally, as a download.
+		 */
+		function fileUrl( url, download ) {
+			var address = sameOrigin( url );
+			var namespace = '/chatchi/v1';
+			var route = address.searchParams.get( 'rest_route' ) || address.pathname;
+			var at = route.indexOf( namespace + '/' );
+
+			// Through admin-ajax.php when the REST API is closed to this visitor.
+			if ( state.ajax && at !== -1 ) {
+				address = new URL( endpoint( route.slice( at + namespace.length ) ) );
+			}
+
+			if ( state.nonce ) {
+				address.searchParams.set( '_wpnonce', state.nonce );
+			}
+			if ( download ) {
+				address.searchParams.set( 'download', '1' );
+			}
+
+			return address.toString();
+		}
+
+		return { request: request, endpoint: endpoint, parseJson: parseJson, upload: upload, fileUrl: fileUrl };
+	}
+
+	/**
+	 * "1.2 MB", "340 KB", with the locale's digits.
+	 */
+	function fileSize( bytes, locale ) {
+		var units = [ 'B', 'KB', 'MB', 'GB' ];
+		var value = bytes;
+		var unit = 0;
+
+		while ( value >= 1024 && unit < units.length - 1 ) {
+			value /= 1024;
+			unit++;
+		}
+
+		return new Intl.NumberFormat( locale || 'fa-IR', { maximumFractionDigits: value < 10 && unit > 0 ? 1 : 0 } ).format( value ) + ' ' + units[ unit ];
+	}
+
+	/* ------------------------------ voice ------------------------------ */
+
+	/**
+	 * "0:07", "12:30", with the formatter's digits.
+	 */
+	function clock( seconds, digits ) {
+		var total = Math.max( 0, Math.floor( seconds || 0 ) );
+		var sec = total % 60;
+		var text = Math.floor( total / 60 ) + ':' + ( sec < 10 ? '0' : '' ) + sec;
+
+		return digits ? text.replace( /\d/g, function ( d ) {
+			return digits( Number( d ) );
+		} ) : text;
+	}
+
+	/**
+	 * Whether this browser can record voice messages. Microphones need a
+	 * secure page (HTTPS).
+	 */
+	function canRecord() {
+		return !! ( window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder );
+	}
+
+	/**
+	 * Records voice messages from the microphone.
+	 *
+	 * The recording outlives re-renders: every composer calls mount() for a
+	 * fresh mic button and recording bar, and all mounted views show the
+	 * same recording. Options:
+	 * - strings: record, cancel, send, recording, micBlocked, micFailed
+	 * - maxSeconds: recording stops and is sent at this length
+	 * - digits: formats a digit for the locale
+	 * - toolClass: class of the mic button, like the other composer tools
+	 * - context(): remembered at the start and given back with the result
+	 * - onRecorded( { file, duration, src, context } )
+	 * - onError( message )
+	 */
+	function createVoiceRecorder( opts ) {
+		var S = opts.strings;
+		var rec = null;
+		var starting = false;
+		var views = [];
+
+		function elapsed() {
+			return rec ? ( Date.now() - rec.startedAt ) / 1000 : 0;
+		}
+
+		function update() {
+			views = views.filter( function ( view ) {
+				return view.host.isConnected;
+			} );
+			views.forEach( function ( view ) {
+				view.host.classList.toggle( 'is-recording', !! rec );
+				view.bar.hidden = ! rec;
+				view.time.textContent = clock( elapsed(), opts.digits );
+				view.button.disabled = starting;
+			} );
+		}
+
+		function pickType() {
+			var types = [ 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm' ];
+
+			if ( ! window.MediaRecorder.isTypeSupported ) {
+				return '';
+			}
+
+			for ( var i = 0; i < types.length; i++ ) {
+				if ( window.MediaRecorder.isTypeSupported( types[ i ] ) ) {
+					return types[ i ];
+				}
+			}
+
+			return '';
+		}
+
+		function release( current ) {
+			window.clearInterval( current.timer );
+			current.stream.getTracks().forEach( function ( track ) {
+				track.stop();
+			} );
+		}
+
+		function start() {
+			if ( rec || starting || ! canRecord() ) {
+				return;
+			}
+
+			starting = true;
+			update();
+
+			navigator.mediaDevices.getUserMedia( { audio: { echoCancellation: true, noiseSuppression: true } } ).then( function ( stream ) {
+				var type = pickType();
+				var media = type ? new window.MediaRecorder( stream, { mimeType: type, audioBitsPerSecond: 32000 } ) : new window.MediaRecorder( stream );
+				var current = { media: media, stream: stream, chunks: [], startedAt: Date.now(), context: opts.context ? opts.context() : null };
+
+				media.addEventListener( 'dataavailable', function ( event ) {
+					if ( event.data && event.data.size ) {
+						current.chunks.push( event.data );
+					}
+				} );
+				media.start( 1000 );
+
+				current.timer = window.setInterval( function () {
+					update();
+					if ( elapsed() >= opts.maxSeconds ) {
+						finish( true );
+					}
+				}, 250 );
+
+				starting = false;
+				rec = current;
+				update();
+			} ).catch( function ( error ) {
+				starting = false;
+				update();
+				opts.onError( error && ( error.name === 'NotAllowedError' || error.name === 'SecurityError' ) ? S.micBlocked : S.micFailed );
+			} );
+		}
+
+		/**
+		 * Stops recording; sends it, or throws it away.
+		 */
+		function finish( send ) {
+			var current = rec;
+
+			if ( ! current ) {
+				return;
+			}
+
+			rec = null;
+			update();
+
+			var duration = Math.min( opts.maxSeconds, Math.round( ( Date.now() - current.startedAt ) / 1000 ) );
+
+			current.media.addEventListener( 'stop', function () {
+				release( current );
+
+				// A tap by mistake is not a message.
+				if ( ! send || ! current.chunks.length || Date.now() - current.startedAt < 700 ) {
+					return;
+				}
+
+				var type = ( current.media.mimeType || current.chunks[ 0 ].type || 'audio/webm' ).split( ';' )[ 0 ];
+				var extension = { 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' }[ type ] || 'webm';
+				var blob = new Blob( current.chunks, { type: type } );
+				var file;
+
+				try {
+					file = new File( [ blob ], 'voice.' + extension, { type: type } );
+				} catch ( e ) {
+					// Old Safari: a Blob with a name works the same in FormData.
+					file = blob;
+					file.name = 'voice.' + extension;
+				}
+
+				opts.onRecorded( {
+					file: file,
+					duration: Math.max( 1, duration ),
+					src: window.URL && URL.createObjectURL ? URL.createObjectURL( blob ) : '',
+					context: current.context
+				} );
+			} );
+
+			try {
+				current.media.stop();
+			} catch ( e ) {
+				release( current );
+			}
+		}
+
+		function mount( host ) {
+			var view = { host: host };
+
+			view.button = h( 'button', {
+				type: 'button',
+				className: opts.toolClass + ' cc-rec-button',
+				title: S.record,
+				'aria-label': S.record,
+				onClick: start
+			}, [ icon( 'mic' ) ] );
+
+			view.time = h( 'span', { className: 'cc-rec__time', text: clock( elapsed(), opts.digits ) } );
+			view.bar = h( 'div', { className: 'cc-rec', role: 'group', 'aria-label': S.recording, hidden: ! rec }, [
+				h( 'button', {
+					type: 'button',
+					className: 'cc-rec__cancel',
+					title: S.cancel,
+					'aria-label': S.cancel,
+					onClick: function () {
+						finish( false );
+					}
+				}, [ icon( 'trash' ) ] ),
+				h( 'span', { className: 'cc-rec__status', role: 'status' }, [
+					h( 'span', { className: 'cc-rec__dot', 'aria-hidden': 'true' } ),
+					view.time,
+					h( 'span', { className: 'cc-rec__label', text: S.recording } )
+				] ),
+				h( 'button', {
+					type: 'button',
+					className: 'cc-rec__send',
+					title: S.send,
+					'aria-label': S.send,
+					onClick: function () {
+						finish( true );
+					}
+				}, [ icon( 'send' ) ] )
+			] );
+
+			// Escape throws the recording away.
+			view.bar.addEventListener( 'keydown', function ( event ) {
+				if ( event.key === 'Escape' ) {
+					event.preventDefault();
+					event.stopPropagation();
+					finish( false );
+				}
+			} );
+
+			views.push( view );
+			window.requestAnimationFrame( update );
+
+			return { button: view.button, bar: view.bar };
+		}
+
+		return {
+			supported: canRecord,
+			mount: mount,
+			isRecording: function () {
+				return !! rec;
+			},
+			cancel: function () {
+				finish( false );
+			}
+		};
+	}
+
+	/**
+	 * Plays voice messages in a conversation: one at a time, surviving
+	 * re-renders of the message list. Files are fetched once (with the
+	 * visitor's or agent's credentials) and played from memory.
+	 * Options:
+	 * - strings: play, pause, voiceMessage, loadFailed
+	 * - digits: formats a digit for the locale
+	 * - onError( message )
+	 */
+	function createVoicePlayer( opts ) {
+		var S = opts.strings;
+		var audio = null;
+		var currentKey = null;
+		var loadingKey = null;
+		var sources = {};
+		var bubbles = [];
+
+		function load( url ) {
+			if ( ! sources[ url ] ) {
+				sources[ url ] = window.fetch( url, { credentials: 'same-origin' } ).then( function ( response ) {
+					if ( ! response.ok ) {
+						throw new Error( 'http_' + response.status );
+					}
+					return response.blob();
+				} ).then( function ( blob ) {
+					return URL.createObjectURL( blob );
+				} );
+				sources[ url ].catch( function () {
+					delete sources[ url ];
+				} );
+			}
+
+			return sources[ url ];
+		}
+
+		function length( bubble ) {
+			var real = audio && currentKey === bubble.key && isFinite( audio.duration ) ? audio.duration : 0;
+			return real || bubble.duration || 0;
+		}
+
+		function update() {
+			bubbles = bubbles.filter( function ( bubble ) {
+				return bubble.el.isConnected;
+			} );
+			bubbles.forEach( function ( bubble ) {
+				var active = currentKey === bubble.key && audio;
+				var playing = !! ( active && ! audio.paused );
+				var total = length( bubble );
+				var now = active ? audio.currentTime : 0;
+				var progress = total ? Math.min( 1, now / total ) : 0;
+
+				bubble.el.classList.toggle( 'is-playing', playing );
+				bubble.el.classList.toggle( 'is-loading', loadingKey === bubble.key );
+				bubble.button.replaceChildren( icon( playing ? 'pause' : 'play' ) );
+				bubble.button.setAttribute( 'aria-label', playing ? S.pause : S.play );
+				bubble.fill.style.width = ( progress * 100 ) + '%';
+				bubble.track.setAttribute( 'aria-valuenow', String( Math.round( now ) ) );
+				bubble.track.setAttribute( 'aria-valuemax', String( Math.round( total ) ) );
+				bubble.track.setAttribute( 'aria-valuetext', clock( now, opts.digits ) + ' / ' + clock( total, opts.digits ) );
+				bubble.time.textContent = clock( active && ( playing || now > 0 ) ? now : total, opts.digits );
+			} );
+		}
+
+		function ensureAudio() {
+			if ( ! audio ) {
+				audio = new window.Audio();
+				audio.preload = 'auto';
+				[ 'play', 'pause', 'timeupdate', 'loadedmetadata', 'durationchange' ].forEach( function ( name ) {
+					audio.addEventListener( name, update );
+				} );
+				audio.addEventListener( 'ended', function () {
+					audio.currentTime = 0;
+					update();
+				} );
+			}
+			return audio;
+		}
+
+		function play( bubble, from ) {
+			if ( currentKey === bubble.key && audio && audio.src ) {
+				if ( typeof from === 'number' ) {
+					audio.currentTime = from;
+				}
+				if ( audio.paused ) {
+					audio.play().catch( function () {} );
+				} else if ( typeof from !== 'number' ) {
+					audio.pause();
+				}
+				update();
+				return;
+			}
+
+			if ( audio ) {
+				audio.pause();
+			}
+
+			currentKey = bubble.key;
+			loadingKey = bubble.key;
+			update();
+
+			( bubble.src ? Promise.resolve( bubble.src ) : load( bubble.url ) ).then( function ( src ) {
+				if ( currentKey !== bubble.key ) {
+					return;
+				}
+				loadingKey = null;
+				ensureAudio().src = src;
+				if ( from ) {
+					audio.currentTime = from;
+				}
+				return audio.play();
+			} ).catch( function () {
+				if ( loadingKey === bubble.key ) {
+					loadingKey = null;
+					currentKey = null;
+					opts.onError( S.loadFailed );
+				}
+			} ).then( update );
+		}
+
+		/**
+		 * A voice message bubble. item: key (unique), url (from the API) or
+		 * src (a local recording), duration in seconds; className for the
+		 * bubble; extra (a node shown under the player, e.g. upload progress).
+		 */
+		function element( item ) {
+			var bubble = { key: String( item.key ), url: item.url, src: item.src, duration: item.duration || 0 };
+
+			bubble.button = h( 'button', {
+				type: 'button',
+				className: 'cc-voice__play',
+				'aria-label': S.play,
+				onClick: function () {
+					play( bubble );
+				}
+			}, [ icon( 'play' ) ] );
+			bubble.fill = h( 'span', { className: 'cc-voice__fill' } );
+			bubble.track = h( 'span', {
+				className: 'cc-voice__track',
+				role: 'slider',
+				tabindex: '0',
+				'aria-label': S.voiceMessage,
+				'aria-valuemin': '0',
+				'aria-valuemax': String( bubble.duration ),
+				'aria-valuenow': '0',
+				onClick: function ( event ) {
+					var box = bubble.track.getBoundingClientRect();
+					var rtl = window.getComputedStyle( bubble.track ).direction === 'rtl';
+					var fraction = Math.min( 1, Math.max( 0, ( rtl ? box.right - event.clientX : event.clientX - box.left ) / box.width ) );
+					play( bubble, fraction * length( bubble ) );
+				},
+				onKeydown: function ( event ) {
+					var step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[ event.key ];
+					if ( ! step ) {
+						return;
+					}
+					event.preventDefault();
+					if ( window.getComputedStyle( bubble.track ).direction === 'rtl' && ( event.key === 'ArrowRight' || event.key === 'ArrowLeft' ) ) {
+						step = -step;
+					}
+					var now = currentKey === bubble.key && audio ? audio.currentTime : 0;
+					play( bubble, Math.min( length( bubble ), Math.max( 0, now + step ) ) );
+				}
+			}, [ bubble.fill ] );
+			bubble.time = h( 'span', { className: 'cc-voice__time', text: clock( bubble.duration, opts.digits ) } );
+
+			bubble.el = h( 'div', { className: ( item.className || '' ) + ' cc-voice' }, [
+				bubble.button,
+				h( 'span', { className: 'cc-voice__body' }, [
+					h( 'span', { className: 'cc-voice__row' }, [ icon( 'mic', 'cc-voice__mic' ), bubble.track ] ),
+					bubble.time,
+					item.extra || null
+				] )
+			] );
+
+			bubbles.push( bubble );
+			window.requestAnimationFrame( update );
+
+			return bubble.el;
+		}
+
+		return {
+			element: element,
+			stop: function () {
+				if ( audio ) {
+					audio.pause();
+				}
+				currentKey = null;
+				update();
+			}
+		};
+	}
+
+	window.ChatChiCore = {
+		fileSize: fileSize,
+		h: h,
+		icon: icon,
+		linkify: linkify,
+		uuid: uuid,
+		initials: initials,
+		createFormatter: createFormatter,
+		createApi: createApi,
+		ApiError: ApiError,
+		clock: clock,
+		canRecord: canRecord,
+		createVoiceRecorder: createVoiceRecorder,
+		createVoicePlayer: createVoicePlayer
+	};
+}() );

@@ -1,0 +1,115 @@
+/*
+ * ChatChi design tokens (docs/design-system.md), shared by the widget
+ * (inside its Shadow DOM, via :host) and the agent panel (via :root).
+ * Brand colors can be overridden per page from the primary color setting.
+ */
+
+:root,
+:host {
+	--chatchi-primary: #2563eb;
+	--chatchi-primary-hover: #2157cf;
+	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #e9effd);
+	--chatchi-primary-contrast: #fff;
+	--chatchi-accent: #ff7a59;
+
+	--chatchi-bg: #f7f7fa;
+	--chatchi-surface: #fff;
+	--chatchi-surface-muted: #eeeef3;
+	--chatchi-border: #e2e2ea;
+	--chatchi-border-strong: #cfcfda;
+	--chatchi-text: #1a1a2e;
+	--chatchi-text-muted: #6b6b80;
+	--chatchi-text-subtle: #8a8a9e;
+	--chatchi-error: #dc2626;
+	--chatchi-error-text: #b91c1c;
+	--chatchi-error-soft: #fef2f2;
+
+	--chatchi-font: "ChatChi Vazirmatn", Tahoma, "Segoe UI", system-ui, sans-serif;
+	--chatchi-radius-sm: 8px;
+	--chatchi-radius-md: 12px;
+	--chatchi-radius-lg: 18px;
+	--chatchi-shadow-sm: 0 1px 2px rgba(26, 26, 46, .06);
+	--chatchi-shadow-md: 0 4px 12px rgba(26, 26, 46, .08), 0 1px 3px rgba(26, 26, 46, .06);
+	--chatchi-shadow-lg: 0 16px 40px rgba(26, 26, 46, .14), 0 4px 12px rgba(26, 26, 46, .06);
+	--chatchi-focus-ring: 0 0 0 3px rgba(37, 99, 235, .35);
+	--chatchi-duration-fast: 150ms;
+	--chatchi-duration-base: 200ms;
+	--chatchi-duration-slow: 250ms;
+	--chatchi-ease-out: cubic-bezier(.16, 1, .3, 1);
+	--chatchi-success: #16a34a;
+	--chatchi-success-text: #15803d;
+	--chatchi-success-soft: #ecfdf3;
+	--chatchi-warning: #d97706;
+	--chatchi-warning-text: #b45309;
+	--chatchi-warning-soft: #fff7e6;
+	--chatchi-gray-700: #4a4a5e;
+}
+
+/*
+ * The brand's soft tint is set per site (--chatchi-primary-soft-light) on the
+ * widget root or the panel's :root; it is resolved here so the dark theme
+ * below can replace it with a tint of the brand color on a dark surface.
+ */
+.chatchi {
+	--chatchi-primary-soft: var(--chatchi-primary-soft-light, #e9effd);
+}
+
+/*
+ * Dark theme: the widget root gets .chatchi--dark (or .chatchi--auto, which
+ * follows the visitor's system); the panel sets data-theme on <html>.
+ */
+:root[data-theme="dark"],
+.chatchi--dark {
+	color-scheme: dark;
+	--chatchi-primary-soft: color-mix(in srgb, var(--chatchi-primary) 24%, #1e1e2d);
+	--chatchi-bg: #13131d;
+	--chatchi-surface: #1e1e2d;
+	--chatchi-surface-muted: #282839;
+	--chatchi-border: #313146;
+	--chatchi-border-strong: #43435c;
+	--chatchi-text: #ececf5;
+	--chatchi-text-muted: #a9a9bf;
+	--chatchi-text-subtle: #83839c;
+	--chatchi-error: #f87171;
+	--chatchi-error-text: #fca5a5;
+	--chatchi-error-soft: rgba(248, 113, 113, .14);
+	--chatchi-success: #22c55e;
+	--chatchi-success-text: #4ade80;
+	--chatchi-success-soft: rgba(34, 197, 94, .14);
+	--chatchi-warning: #f59e0b;
+	--chatchi-warning-text: #fbbf24;
+	--chatchi-warning-soft: rgba(245, 158, 11, .14);
+	--chatchi-gray-700: #c9c9d9;
+	--chatchi-shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+	--chatchi-shadow-md: 0 4px 14px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .3);
+	--chatchi-shadow-lg: 0 18px 44px rgba(0, 0, 0, .5), 0 4px 12px rgba(0, 0, 0, .35);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-theme="auto"],
+	.chatchi--auto {
+		color-scheme: dark;
+		--chatchi-primary-soft: color-mix(in srgb, var(--chatchi-primary) 24%, #1e1e2d);
+		--chatchi-bg: #13131d;
+		--chatchi-surface: #1e1e2d;
+		--chatchi-surface-muted: #282839;
+		--chatchi-border: #313146;
+		--chatchi-border-strong: #43435c;
+		--chatchi-text: #ececf5;
+		--chatchi-text-muted: #a9a9bf;
+		--chatchi-text-subtle: #83839c;
+		--chatchi-error: #f87171;
+		--chatchi-error-text: #fca5a5;
+		--chatchi-error-soft: rgba(248, 113, 113, .14);
+		--chatchi-success: #22c55e;
+		--chatchi-success-text: #4ade80;
+		--chatchi-success-soft: rgba(34, 197, 94, .14);
+		--chatchi-warning: #f59e0b;
+		--chatchi-warning-text: #fbbf24;
+		--chatchi-warning-soft: rgba(245, 158, 11, .14);
+		--chatchi-gray-700: #c9c9d9;
+		--chatchi-shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+		--chatchi-shadow-md: 0 4px 14px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .3);
+		--chatchi-shadow-lg: 0 18px 44px rgba(0, 0, 0, .5), 0 4px 12px rgba(0, 0, 0, .35);
+	}
+}

@@ -1,0 +1,2731 @@
+/**
+ * ChatChi chat widget.
+ *
+ * Build-free; uses the shared ChatChiCore (assets/shared/core.js). Renders
+ * inside a Shadow DOM so the host theme cannot affect it. Talks to the
+ * chatchi/v1 REST API.
+ *
+ * Security rule for this file: user-provided text (messages, names) is only
+ * ever inserted with textContent / createTextNode, never innerHTML.
+ */
+( function () {
+	'use strict';
+
+	var config = window.ChatChiWidget;
+
+	if ( ! config || ! window.ChatChiCore || ! window.fetch || ! Element.prototype.attachShadow || document.getElementById( 'chatchi-widget-host' ) ) {
+		return;
+	}
+
+	var S = config.strings;
+	var POLL_OPEN = 4000;
+	var POLL_CLOSED = 30000;
+	var POLL_HIDDEN = 60000;
+	var POLL_MAX = 60000;
+	var SESSION_EVERY = 5;
+	var GROUP_GAP_MS = 2 * 60 * 1000;
+	var TRAP_FIELD = 'website';
+	var MIN_FORM_MS = 2100;
+	var PAGE_SIZE = 30;
+	var TYPING_EVERY = 3000;
+	var MAX_TEXTAREA = 136;
+	var EMOJI = [ '😀', '😂', '🥲', '😊', '😍', '🥰', '😘', '😉', '😎', '🤔', '🙄', '😅', '😢', '😭', '😡', '😱', '👍', '👎', '👏', '🙏', '🤝', '👋', '💪', '👌', '✌️', '🤞', '❤️', '💙', '💚', '💯', '🔥', '✨', '🎉', '🌹', '🌸', '☀️', '⭐', '✅', '❌', '❓', '❗', '📦', '🛒', '💳', '📞', '📍', '🎁', '⏰' ];
+
+	var Core = window.ChatChiCore;
+	var h = Core.h;
+	var icon = Core.icon;
+	var linkify = Core.linkify;
+	var uuid = Core.uuid;
+	var initials = Core.initials;
+
+	var locale = config.locale || 'fa-IR';
+	var fmt = Core.createFormatter( locale, S );
+	var formatNumber = fmt.number;
+	var format = fmt.format;
+	var dayKey = fmt.dayKey;
+	var dayLabel = fmt.dayLabel;
+	var timeFormat = { format: fmt.time };
+
+	// An expired nonce on a long-open page: continue as a guest instead of failing.
+	var client = Core.createApi( {
+		restUrl: config.restUrl,
+		nonce: config.nonce,
+		networkError: S.networkError,
+		dropExpiredNonce: true,
+		// When the site closes the REST API to guests.
+		ajaxUrl: config.ajax && config.ajax.url,
+		ajaxAction: config.ajax && config.ajax.action
+	} );
+	var request = client.request;
+
+	var api = {
+		// withPage: tell the server which page this is (shown to agents).
+		session: function ( withPage ) {
+			return request( 'GET', '/widget/session', withPage ? { query: { url: window.location.href, title: document.title.slice( 0, 300 ) } } : undefined );
+		},
+		start: function ( profile ) {
+			var body = Object.assign( { page_url: window.location.href, page_title: document.title.slice( 0, 300 ) }, profile );
+			return request( 'POST', '/widget/conversations', { body: body } );
+		},
+		messages: function ( id, query ) {
+			return request( 'GET', '/widget/conversations/' + id + '/messages', { query: query } );
+		},
+		send: function ( id, text, clientId ) {
+			return request( 'POST', '/widget/conversations/' + id + '/messages', { body: { body: text, client_id: clientId } } );
+		},
+		read: function ( id, upTo ) {
+			return request( 'POST', '/widget/conversations/' + id + '/read', { body: { up_to_id: upTo } } );
+		},
+		close: function ( id ) {
+			return request( 'POST', '/widget/conversations/' + id + '/close' );
+		},
+		bot: function ( id ) {
+			return request( 'POST', '/widget/conversations/' + id + '/bot' );
+		},
+		handoff: function ( id ) {
+			return request( 'POST', '/widget/conversations/' + id + '/handoff' );
+		},
+		rate: function ( id, score, comment ) {
+			return request( 'POST', '/widget/conversations/' + id + '/rating', { body: { score: score, comment: comment } } );
+		},
+		typing: function ( id, typing ) {
+			return request( 'POST', '/widget/conversations/' + id + '/typing', { body: { typing: typing } } );
+		},
+		upload: function ( id, file, clientId, onProgress, voice ) {
+			var form = new FormData();
+			form.append( 'file', file, file.name );
+			form.append( 'client_id', clientId );
+			if ( voice ) {
+				form.append( 'voice', '1' );
+				form.append( 'duration', String( voice.duration ) );
+			}
+			return client.upload( '/widget/conversations/' + id + '/attachments', form, onProgress );
+		}
+	};
+
+	/**
+	 * Whether a message is only a few emoji, shown large without a bubble.
+	 */
+	var emojiOnly = ( function () {
+		var pattern;
+
+		try {
+			pattern = new RegExp( '^(?:\\p{Extended_Pictographic}|\\p{Emoji_Modifier}|\\p{Regional_Indicator}|\\u200d|\\ufe0f|\\s)+$', 'u' );
+		} catch ( e ) {
+			return function () {
+				return false;
+			};
+		}
+
+		return function ( text ) {
+			if ( ! text || text.length > 40 || ! pattern.test( text ) ) {
+				return false;
+			}
+			// Joined sequences (family, flags) count as one each, roughly.
+			var visible = Array.from( text.replace( /[\s\ufe0f]/g, '' ).split( '\u200d' ).join( '' ) );
+			return visible.length > 0 && visible.length <= 3;
+		};
+	}() );
+
+	/**
+	 * A short, soft two-note chime made with Web Audio, so no sound file is
+	 * downloaded. Browsers only allow sound after the visitor interacted with
+	 * the page, so the audio context is unlocked when the chat is opened.
+	 */
+	var chime = {
+		context: null,
+		unlock: function () {
+			var Context = window.AudioContext || window.webkitAudioContext;
+
+			if ( ! config.sound || ! Context ) {
+				return;
+			}
+
+			try {
+				this.context = this.context || new Context();
+				if ( this.context.state === 'suspended' ) {
+					this.context.resume();
+				}
+			} catch ( e ) {
+				this.context = null;
+			}
+		},
+		play: function () {
+			var context = this.context;
+
+			if ( ! config.sound || ! context || context.state !== 'running' ) {
+				return;
+			}
+
+			try {
+				var now = context.currentTime;
+				[ [ 880, 0 ], [ 1318.5, 0.13 ] ].forEach( function ( note ) {
+					var oscillator = context.createOscillator();
+					var gain = context.createGain();
+					var at = now + note[ 1 ];
+
+					oscillator.type = 'sine';
+					oscillator.frequency.value = note[ 0 ];
+					gain.gain.setValueAtTime( 0.0001, at );
+					gain.gain.exponentialRampToValueAtTime( 0.12, at + 0.02 );
+					gain.gain.exponentialRampToValueAtTime( 0.0001, at + 0.4 );
+					oscillator.connect( gain );
+					gain.connect( context.destination );
+					oscillator.start( at );
+					oscillator.stop( at + 0.45 );
+				} );
+			} catch ( e ) {
+				// Sound is a nicety; never let it break the chat.
+			}
+		}
+	};
+
+	/* ------------------------------------------------------------------ *
+	 * Widget
+	 * ------------------------------------------------------------------ */
+
+	function Widget() {
+		this.state = {
+			open: false,
+			view: 'loading', // loading | error | form | chat
+			errorMessage: '',
+			session: null,
+			visitor: null,
+			conversation: null,
+			closed: false,
+			confirmingEnd: false,
+			messages: [], // server messages, ascending by id
+			pending: [], // { clientId, body, failed }
+			hasMore: false,
+			loadingEarlier: false,
+			unread: 0,
+			formErrors: {},
+			formAlert: '',
+			submitting: false,
+			formValues: null,
+			draft: '',
+			agentTyping: false
+		};
+		this.lastReadMarked = 0;
+		this.newIds = {};
+		this.voice = this.createVoice();
+		this.pollTimer = null;
+		this.pollDelay = POLL_OPEN;
+		this.pollCount = 0;
+		this.booted = false;
+		this.shellKey = null;
+		this.typingSentAt = 0;
+		this.newBelow = false;
+		this.pageTitle = null;
+		this.titleCount = 0;
+	}
+
+	Widget.prototype.mount = function () {
+		var self = this;
+		var host = h( 'div', { id: 'chatchi-widget-host' } );
+		var shadow = host.attachShadow( { mode: 'open' } );
+
+		// Keep the widget hidden until its stylesheet has loaded.
+		shadow.appendChild( h( 'style', { text: ':host{all:initial}.chatchi:not(.is-ready){display:none}' } ) );
+
+		var pendingStyles = config.styleUrls.length;
+		config.styleUrls.forEach( function ( href ) {
+			var link = h( 'link', { rel: 'stylesheet', href: href } );
+			link.addEventListener( 'load', function () {
+				pendingStyles--;
+				if ( ! pendingStyles ) {
+					self.root.classList.add( 'is-ready' );
+				}
+			} );
+			shadow.appendChild( link );
+		} );
+
+		this.root = h( 'div', {
+			className: 'chatchi chatchi--' + ( config.position === 'right' ? 'right' : 'left' ) + ( config.theme === 'dark' || config.theme === 'auto' ? ' chatchi--' + config.theme : '' ),
+			dir: config.dir || 'rtl',
+			lang: locale.split( '-' )[ 0 ]
+		} );
+
+		var colors = config.colors || {};
+		this.root.style.setProperty( '--chatchi-primary', colors.primary );
+		this.root.style.setProperty( '--chatchi-primary-hover', colors.primaryHover );
+		this.root.style.setProperty( '--chatchi-primary-soft-light', colors.primarySoft );
+		this.root.style.setProperty( '--chatchi-primary-contrast', colors.primaryContrast );
+
+		this.badge = h( 'span', { className: 'chatchi-badge', hidden: true, 'aria-hidden': 'true' } );
+		this.launcher = h( 'button', {
+			type: 'button',
+			className: 'chatchi-launcher',
+			'aria-label': S.openChat,
+			'aria-expanded': 'false',
+			'aria-controls': 'chatchi-panel',
+			onClick: function () {
+				self.toggle();
+			}
+		}, [
+			h( 'span', { className: 'chatchi-launcher__icon chatchi-launcher__icon--chat' }, [ icon( 'launcher' ) ] ),
+			h( 'span', { className: 'chatchi-launcher__icon chatchi-launcher__icon--close' }, [ icon( 'close' ) ] ),
+			this.badge
+		] );
+
+		this.panel = h( 'div', {
+			id: 'chatchi-panel',
+			className: 'chatchi-panel',
+			role: 'dialog',
+			'aria-modal': 'false',
+			'aria-labelledby': 'chatchi-title'
+		} );
+
+		this.root.appendChild( this.panel );
+		this.root.appendChild( this.launcher );
+		shadow.appendChild( this.root );
+		document.body.appendChild( host );
+
+		this.buildMenu();
+
+		this.root.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Escape' && self.menuOpen ) {
+				event.stopPropagation();
+				self.closeMenu( true );
+				return;
+			}
+			if ( event.key !== 'Escape' || ! self.state.open ) {
+				return;
+			}
+			event.stopPropagation();
+			// Escape closes the emoji picker first, then the chat.
+			if ( self.emojiOpen() ) {
+				self.toggleEmoji( false );
+				return;
+			}
+			self.close();
+		} );
+
+		// Files dropped on the open chat are sent.
+		var dragDepth = 0;
+		var canDrop = function ( event ) {
+			var types = event.dataTransfer ? Array.from( event.dataTransfer.types || [] ) : [];
+			return self.state.view === 'chat' && ! self.state.closed && self.attachmentSettings().enabled && types.indexOf( 'Files' ) !== -1;
+		};
+
+		this.panel.setAttribute( 'data-drop-label', S.dropFiles );
+		this.panel.addEventListener( 'dragenter', function ( event ) {
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+				dragDepth++;
+				self.panel.classList.add( 'is-dropping' );
+			}
+		} );
+		this.panel.addEventListener( 'dragover', function ( event ) {
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+			}
+		} );
+		this.panel.addEventListener( 'dragleave', function () {
+			dragDepth = Math.max( 0, dragDepth - 1 );
+			if ( ! dragDepth ) {
+				self.panel.classList.remove( 'is-dropping' );
+			}
+		} );
+		this.panel.addEventListener( 'drop', function ( event ) {
+			dragDepth = 0;
+			self.panel.classList.remove( 'is-dropping' );
+			if ( canDrop( event ) ) {
+				event.preventDefault();
+				Array.from( event.dataTransfer.files || [] ).slice( 0, 5 ).forEach( function ( file ) {
+					self.sendFile( file );
+				} );
+			}
+		} );
+
+		// A click anywhere else in the widget closes the emoji picker.
+		this.root.addEventListener( 'click', function ( event ) {
+			var path = event.composedPath ? event.composedPath() : [];
+			var inside = path.some( function ( node ) {
+				return node.classList && ( node.classList.contains( 'chatchi-emoji' ) || node.classList.contains( 'chatchi-tool--emoji' ) );
+			} );
+			if ( ! inside && self.emojiOpen() ) {
+				self.toggleEmoji( false );
+			}
+		} );
+
+		// Escape also works when focus has fallen back to the page body,
+		// without stealing it from the site's own dialogs.
+		document.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Escape' && self.state.open && ( document.activeElement === document.body || document.activeElement === host ) ) {
+				self.close();
+			}
+		} );
+
+		document.addEventListener( 'visibilitychange', function () {
+			if ( ! document.hidden ) {
+				self.restoreTitle();
+				self.markRead();
+				self.schedulePoll( 0 );
+			}
+		} );
+
+		this.render();
+
+		// Visitors who never chatted have nothing to restore: skip the session
+		// request (a full WordPress load on the server) until they open the
+		// chat. The readable marker cookie is set with the visitor identity;
+		// logged-in users are identified by their account.
+		if ( config.nonce || /(?:^|;\s*)chatchi_active=1/.test( document.cookie ) ) {
+			this.boot();
+		}
+
+		this.scheduleInvitation();
+
+		// Links from SMS (and anywhere else) ending in #chatchi open the chat.
+		if ( window.location.hash === '#chatchi' ) {
+			this.open();
+		}
+	};
+
+	/* --------------------------- invitations --------------------------- */
+
+	/**
+	 * Picks the first chat invitation that fits this page and has not been
+	 * shown too recently, and shows it after its delay, unless the visitor
+	 * is already chatting.
+	 */
+	Widget.prototype.scheduleInvitation = function () {
+		var self = this;
+		var rules = config.proactive || [];
+		var here = '';
+
+		try {
+			here = decodeURIComponent( window.location.href ).toLowerCase();
+		} catch ( e ) {
+			here = window.location.href.toLowerCase();
+		}
+
+		var rule = rules.filter( function ( candidate ) {
+			if ( candidate.target === 'url' ) {
+				return here.indexOf( String( candidate.url ).toLowerCase() ) !== -1;
+			}
+			return candidate.target === 'all' || candidate.target === config.pageType;
+		} ).filter( function ( candidate ) {
+			return ! self.invitationSeen( candidate );
+		} )[ 0 ];
+
+		if ( ! rule ) {
+			return;
+		}
+
+		window.setTimeout( function () {
+			var chatting = self.state.conversation && ! self.state.closed;
+			// A visitor whose session is still loading may be chatting already.
+			if ( self.booting ) {
+				window.setTimeout( function () {
+					self.scheduleInvitationNow( rule );
+				}, 1000 );
+				return;
+			}
+			if ( ! chatting ) {
+				self.scheduleInvitationNow( rule );
+			}
+		}, Math.max( 0, rule.delay ) * 1000 );
+	};
+
+	Widget.prototype.scheduleInvitationNow = function ( rule ) {
+		if ( this.state.open || this.menuOpen || ( this.state.conversation && ! this.state.closed ) || this.teaser ) {
+			return;
+		}
+		this.markInvitationSeen( rule );
+		this.showTeaser( rule );
+	};
+
+	Widget.prototype.invitationStore = function ( rule ) {
+		try {
+			return rule.frequency === 'session' ? window.sessionStorage : window.localStorage;
+		} catch ( e ) {
+			return null;
+		}
+	};
+
+	Widget.prototype.invitationSeen = function ( rule ) {
+		if ( rule.frequency === 'always' ) {
+			return false;
+		}
+		try {
+			var store = this.invitationStore( rule );
+			var at = store ? parseInt( store.getItem( 'chatchi_invite_' + rule.id ) || '0', 10 ) : 0;
+			return rule.frequency === 'session' ? at > 0 : Date.now() - at < 24 * 60 * 60 * 1000;
+		} catch ( e ) {
+			return false;
+		}
+	};
+
+	Widget.prototype.markInvitationSeen = function ( rule ) {
+		try {
+			var store = this.invitationStore( rule );
+			if ( store ) {
+				store.setItem( 'chatchi_invite_' + rule.id, String( Date.now() ) );
+			}
+		} catch ( e ) {
+			// Storage may be blocked; the invitation may then show again.
+		}
+	};
+
+	/**
+	 * A speech bubble next to the launcher. Clicking it opens the chat
+	 * with the invitation as the first message from support.
+	 */
+	Widget.prototype.showTeaser = function ( rule ) {
+		var self = this;
+
+		this.teaser = h( 'div', { className: 'chatchi-teaser', role: 'status' }, [
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-teaser__close',
+				'aria-label': S.dismiss,
+				title: S.dismiss,
+				onClick: function () {
+					self.hideTeaser();
+				}
+			}, [ icon( 'close' ) ] ),
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-teaser__body',
+				onClick: function () {
+					self.acceptInvite();
+				}
+			}, [
+				h( 'span', { className: 'chatchi-avatar chatchi-avatar--sm', 'aria-hidden': 'true' }, [ icon( 'headset' ) ] ),
+				h( 'span', { className: 'chatchi-teaser__text' }, [
+					h( 'strong', { text: S.support } ),
+					h( 'span', { text: rule.message } )
+				] )
+			] )
+		] );
+
+		this.teaserMessage = rule.message;
+		this.root.classList.add( 'has-font' );
+		this.root.appendChild( this.teaser );
+		this.render();
+		chime.play();
+	};
+
+	Widget.prototype.hideTeaser = function () {
+		if ( this.teaser ) {
+			this.teaser.remove();
+			this.teaser = null;
+			this.render();
+		}
+	};
+
+	Widget.prototype.acceptInvite = function () {
+		this.invite = this.teaserMessage;
+		this.shellKey = null;
+		this.hideTeaser();
+		this.open();
+	};
+
+	/* ---------------------------- state flow --------------------------- */
+
+	Widget.prototype.set = function ( patch ) {
+		Object.assign( this.state, patch );
+		this.render();
+	};
+
+	Widget.prototype.boot = function () {
+		var self = this;
+
+		this.booting = true;
+
+		return api.session( true ).then( function ( session ) {
+			self.sessionAt = Date.now();
+			self.booted = true;
+			self.booting = false;
+			self.state.session = session;
+			self.state.visitor = session.visitor;
+			self.state.conversation = session.conversation;
+			self.state.unread = session.unread_count || 0;
+			self.state.closed = false;
+
+			if ( session.conversation ) {
+				return self.loadLatest().then( function () {
+					self.set( { view: 'chat' } );
+					self.schedulePoll();
+				} );
+			}
+
+			self.set( { view: self.needsForm() ? 'form' : 'chat' } );
+		} ).catch( function ( error ) {
+			self.booting = false;
+			self.set( { view: 'error', errorMessage: error.message || S.loadError } );
+		} );
+	};
+
+	Widget.prototype.needsForm = function () {
+		var session = this.state.session;
+		return this.offlineForm() || !! ( session && session.form && session.form.enabled && ! this.state.visitor );
+	};
+
+	/**
+	 * Whether to show the leave-a-message form: support is offline and the
+	 * visitor has no conversation going.
+	 */
+	Widget.prototype.offlineForm = function () {
+		var availability = this.availability();
+		return !! ( availability && availability.offline_form && ( ! this.state.conversation || this.state.closed ) );
+	};
+
+	Widget.prototype.availability = function () {
+		return this.state.session && this.state.session.availability;
+	};
+
+	/**
+	 * "We're back today at 09:00" / "…Saturday at 09:00", in the visitor's
+	 * own time zone; empty when unknown.
+	 */
+	Widget.prototype.backAt = function () {
+		var availability = this.availability();
+		var opens = availability && availability.opens_at ? new Date( availability.opens_at ) : null;
+
+		if ( ! opens || isNaN( opens ) ) {
+			return '';
+		}
+
+		var day = dayKey( opens ) === dayKey( new Date() ) ? S.today : new Intl.DateTimeFormat( locale, { weekday: 'long' } ).format( opens );
+
+		return String( S.backAt ).replace( '%s', day + ' ' + timeFormat.format( opens ) );
+	};
+
+	Widget.prototype.toggle = function () {
+		if ( ! this.state.open && this.teaser ) {
+			this.acceptInvite();
+			return;
+		}
+		if ( this.menuOpen ) {
+			this.closeMenu( false );
+			return;
+		}
+		if ( this.state.open ) {
+			this.close();
+			return;
+		}
+		// With other contact channels, the launcher first offers a choice,
+		// unless the visitor has replies waiting in the chat.
+		if ( this.menu && ! this.state.unread ) {
+			this.openMenu();
+			return;
+		}
+		this.open();
+	};
+
+	/* ------------------------- contact channels ------------------------ */
+
+	var CHANNEL_ICONS = { whatsapp: 'whatsapp', telegram: 'telegram', bale: 'bale', phone: 'phone' };
+
+	/**
+	 * The menu of ways to reach the site: the chat, then WhatsApp,
+	 * Telegram, Bale or a phone call, as set in the settings.
+	 */
+	Widget.prototype.buildMenu = function () {
+		var self = this;
+		var channels = config.channels || [];
+
+		if ( ! channels.length ) {
+			return;
+		}
+
+		var defaults = { whatsapp: S.channelWhatsapp, telegram: S.channelTelegram, bale: S.channelBale, phone: S.channelPhone };
+
+		var items = [ h( 'button', {
+			type: 'button',
+			className: 'chatchi-menu__item chatchi-menu__item--chat',
+			role: 'menuitem',
+			onClick: function () {
+				self.closeMenu( false );
+				self.open();
+			}
+		}, [
+			h( 'span', { className: 'chatchi-menu__label', text: S.channelChat } ),
+			h( 'span', { className: 'chatchi-menu__icon' }, [ icon( 'chat' ) ] )
+		] ) ].concat( channels.map( function ( channel ) {
+			var external = channel.type !== 'phone';
+			return h( 'a', {
+				className: 'chatchi-menu__item chatchi-menu__item--' + channel.type,
+				role: 'menuitem',
+				href: channel.url,
+				target: external ? '_blank' : null,
+				rel: external ? 'noopener noreferrer' : null,
+				onClick: function () {
+					self.closeMenu( false );
+				}
+			}, [
+				h( 'span', { className: 'chatchi-menu__label', text: channel.label || defaults[ channel.type ] || channel.type } ),
+				h( 'span', { className: 'chatchi-menu__icon' }, [ icon( CHANNEL_ICONS[ channel.type ] || 'phone' ) ] )
+			] );
+		} ) );
+
+		this.menu = h( 'div', { id: 'chatchi-menu', className: 'chatchi-menu', role: 'menu', 'aria-label': S.channelsTitle, hidden: true }, items );
+		this.root.insertBefore( this.menu, this.launcher );
+		this.launcher.setAttribute( 'aria-haspopup', 'menu' );
+
+		// Arrow keys move between the choices.
+		this.menu.addEventListener( 'keydown', function ( event ) {
+			if ( event.key !== 'ArrowDown' && event.key !== 'ArrowUp' ) {
+				return;
+			}
+			event.preventDefault();
+			var list = Array.from( self.menu.querySelectorAll( '.chatchi-menu__item' ) );
+			var index = list.indexOf( self.root.getRootNode().activeElement );
+			var next = event.key === 'ArrowDown' ? index + 1 : index - 1;
+			list[ ( next + list.length ) % list.length ].focus();
+		} );
+
+		// A click anywhere else closes the menu.
+		document.addEventListener( 'pointerdown', function ( event ) {
+			if ( self.menuOpen && event.composedPath().indexOf( self.root ) === -1 ) {
+				self.closeMenu( false );
+			}
+		} );
+	};
+
+	Widget.prototype.openMenu = function () {
+		this.menuOpen = true;
+		this.hideTeaser();
+		this.root.classList.add( 'has-font', 'is-menu' );
+		this.menu.hidden = false;
+		this.launcher.setAttribute( 'aria-expanded', 'true' );
+		this.launcher.setAttribute( 'aria-controls', 'chatchi-menu' );
+		this.launcher.setAttribute( 'aria-label', S.closeMenu );
+		var first = this.menu.querySelector( '.chatchi-menu__item' );
+		if ( first ) {
+			first.focus();
+		}
+	};
+
+	/**
+	 * @param {boolean} refocus Move focus back to the launcher (keyboard use).
+	 */
+	Widget.prototype.closeMenu = function ( refocus ) {
+		if ( ! this.menuOpen ) {
+			return;
+		}
+		this.menuOpen = false;
+		this.root.classList.remove( 'is-menu' );
+		this.menu.hidden = true;
+		this.launcher.setAttribute( 'aria-expanded', 'false' );
+		this.launcher.setAttribute( 'aria-controls', 'chatchi-panel' );
+		this.launcher.setAttribute( 'aria-label', S.openChat );
+		if ( refocus ) {
+			this.launcher.focus();
+		}
+	};
+
+	Widget.prototype.open = function () {
+		// The bundled font is applied (and so downloaded) only once the chat
+		// is used, not on every page view.
+		this.root.classList.add( 'has-font' );
+		chime.unlock();
+		this.restoreTitle();
+		this.set( { open: true } );
+		this.launcher.setAttribute( 'aria-expanded', 'true' );
+		this.launcher.setAttribute( 'aria-label', S.closeChat );
+		this.lockScroll( true );
+
+		if ( this.state.view === 'error' ) {
+			this.set( { view: 'loading' } );
+			this.boot();
+		} else if ( ! this.booted && ! this.booting ) {
+			this.boot();
+		}
+
+		this.scrollToBottom();
+		this.markRead();
+		this.focusDefault();
+		this.schedulePoll( 0 );
+	};
+
+	Widget.prototype.close = function () {
+		this.signalTyping( false );
+		// Closing the chat throws an unsent recording away and frees the microphone.
+		this.voice.recorder.cancel();
+		this.voice.player.stop();
+		// Typing is only polled while open; do not show a stale indicator later.
+		this.set( { open: false, confirmingEnd: false, agentTyping: false } );
+		this.launcher.setAttribute( 'aria-expanded', 'false' );
+		this.launcher.setAttribute( 'aria-label', S.openChat );
+		this.lockScroll( false );
+		this.launcher.focus();
+		this.schedulePoll();
+	};
+
+	Widget.prototype.lockScroll = function ( lock ) {
+		var isMobile = window.matchMedia && window.matchMedia( '(max-width: 639px)' ).matches;
+		document.documentElement.style.overflow = lock && isMobile ? 'hidden' : '';
+	};
+
+	Widget.prototype.focusDefault = function () {
+		var self = this;
+		window.setTimeout( function () {
+			var target = self.panel.querySelector( 'input, textarea' );
+			if ( target && self.state.open ) {
+				target.focus( { preventScroll: true } );
+			}
+		}, 50 );
+	};
+
+	/* ---------------------------- messages ----------------------------- */
+
+	Widget.prototype.loadLatest = function () {
+		var self = this;
+		var id = this.state.conversation.id;
+
+		return api.messages( id, { limit: PAGE_SIZE } ).then( function ( page ) {
+			self.state.messages = page.items;
+			self.state.hasMore = page.has_more;
+		} );
+	};
+
+	Widget.prototype.loadEarlier = function () {
+		var self = this;
+		var first = this.state.messages[ 0 ];
+
+		if ( ! first || this.state.loadingEarlier ) {
+			return;
+		}
+
+		var log = this.panel.querySelector( '.chatchi-log' );
+		var fromBottom = log ? log.scrollHeight - log.scrollTop : 0;
+
+		this.set( { loadingEarlier: true } );
+
+		api.messages( this.state.conversation.id, { before_id: first.id, limit: PAGE_SIZE } ).then( function ( page ) {
+			self.state.messages = page.items.concat( self.state.messages );
+			self.set( { hasMore: page.has_more, loadingEarlier: false } );
+			var newLog = self.panel.querySelector( '.chatchi-log' );
+			if ( newLog ) {
+				newLog.scrollTop = newLog.scrollHeight - fromBottom;
+			}
+		} ).catch( function () {
+			self.set( { loadingEarlier: false } );
+		} );
+	};
+
+	Widget.prototype.lastId = function () {
+		var messages = this.state.messages;
+		return messages.length ? messages[ messages.length - 1 ].id : 0;
+	};
+
+	/**
+	 * Adds server messages, dropping duplicates and settling pending ones.
+	 */
+	Widget.prototype.merge = function ( items ) {
+		var self = this;
+		var known = {};
+		var arrived = 0;
+
+		this.state.messages.forEach( function ( m ) {
+			known[ m.id ] = true;
+		} );
+
+		items.forEach( function ( m ) {
+			// Show who is answering right away, before the next session check.
+			var conversation = self.state.conversation;
+			if ( conversation && ! conversation.agent && m.sender.type === 'agent' && m.sender.name && ! m.sender.bot ) {
+				conversation.agent = { id: null, name: m.sender.name, avatar_url: m.sender.avatar_url };
+			}
+
+			if ( ! known[ m.id ] ) {
+				self.state.messages.push( m );
+				self.newIds[ m.id ] = true;
+				known[ m.id ] = true;
+				if ( ! m.is_mine ) {
+					arrived++;
+				}
+			}
+			if ( m.client_id ) {
+				self.state.pending = self.state.pending.filter( function ( p ) {
+					return p.clientId !== m.client_id;
+				} );
+			}
+		} );
+
+		this.state.messages.sort( function ( a, b ) {
+			return a.id - b.id;
+		} );
+
+		return arrived;
+	};
+
+	Widget.prototype.send = function ( text ) {
+		var pending = { clientId: uuid(), body: text, failed: false };
+
+		this.state.pending.push( pending );
+		// Sending ends the typing signal on the server as well.
+		this.typingSentAt = 0;
+		this.set( { draft: '' } );
+		this.scrollToBottom();
+		this.deliver( pending );
+	};
+
+	/**
+	 * Sends a file the visitor picked, pasted or dropped. Too large or
+	 * unsupported files are refused right away, without uploading.
+	 */
+	Widget.prototype.sendFile = function ( file ) {
+		var settings = this.attachmentSettings();
+		var pending = { clientId: uuid(), body: file.name, file: file, progress: 0, failed: false };
+
+		if ( ! settings.enabled ) {
+			return;
+		}
+
+		pending.isImage = /^image\/(jpeg|png|gif|webp)$/.test( file.type );
+		if ( pending.isImage && window.URL && URL.createObjectURL ) {
+			pending.preview = URL.createObjectURL( file );
+		}
+
+		this.state.pending.push( pending );
+		this.scrollToBottom();
+
+		if ( file.size > settings.max_bytes ) {
+			pending.failed = true;
+			pending.fatal = true;
+			pending.reason = String( S.fileTooLarge ).replace( '%s', Core.fileSize( settings.max_bytes, locale ) );
+			this.render();
+			return;
+		}
+
+		this.deliver( pending );
+	};
+
+	Widget.prototype.attachmentSettings = function () {
+		var session = this.state.session || {};
+		return session.attachments || { enabled: false, max_bytes: 0, accept: '', voice: false, voice_max_seconds: 300 };
+	};
+
+	/**
+	 * The voice recorder and player, shared by every render of the chat.
+	 */
+	Widget.prototype.createVoice = function () {
+		var self = this;
+		var strings = {
+			record: S.voiceRecord,
+			recording: S.voiceRecording,
+			cancel: S.voiceCancel,
+			send: S.voiceSend,
+			micBlocked: S.micBlocked,
+			micFailed: S.micFailed,
+			play: S.voicePlay,
+			pause: S.voicePause,
+			voiceMessage: S.voiceMessage,
+			loadFailed: S.voiceLoadFailed
+		};
+
+		return {
+			recorder: Core.createVoiceRecorder( {
+				strings: strings,
+				maxSeconds: 300,
+				digits: formatNumber,
+				toolClass: 'chatchi-tool chatchi-tool--voice',
+				onRecorded: function ( result ) {
+					self.sendVoice( result );
+				},
+				onError: function ( message ) {
+					self.composerError( message );
+				}
+			} ),
+			player: Core.createVoicePlayer( {
+				strings: strings,
+				digits: formatNumber,
+				onError: function ( message ) {
+					self.composerError( message );
+				}
+			} )
+		};
+	};
+
+	/**
+	 * Sends a recorded voice message, like a file.
+	 */
+	Widget.prototype.sendVoice = function ( result ) {
+		var settings = this.attachmentSettings();
+		var pending = { clientId: uuid(), body: S.voiceMessage, file: result.file, voice: { duration: result.duration }, src: result.src, progress: 0, failed: false };
+
+		if ( ! settings.voice || this.state.closed ) {
+			return;
+		}
+
+		this.state.pending.push( pending );
+		this.scrollToBottom();
+
+		if ( settings.max_bytes && result.file.size > settings.max_bytes ) {
+			pending.failed = true;
+			pending.fatal = true;
+			pending.reason = String( S.fileTooLarge ).replace( '%s', Core.fileSize( settings.max_bytes, locale ) );
+			this.render();
+			return;
+		}
+
+		this.deliver( pending );
+	};
+
+	/**
+	 * A short error under the composer (e.g. the microphone is blocked).
+	 */
+	Widget.prototype.composerError = function ( message ) {
+		var footer = this.panel.querySelector( '.chatchi-footer' );
+		var old = this.panel.querySelector( '.chatchi-composer__error' );
+
+		if ( old ) {
+			old.remove();
+		}
+		if ( ! footer || ! message ) {
+			return;
+		}
+
+		var note = h( 'p', { className: 'chatchi-composer__error', role: 'alert', text: message } );
+		footer.insertBefore( note, footer.firstChild );
+		window.setTimeout( function () {
+			note.remove();
+		}, 7000 );
+	};
+
+	/**
+	 * Updates an upload's progress bar in place.
+	 */
+	Widget.prototype.showProgress = function ( pending ) {
+		var bar = this.panel.querySelector( '[data-key="' + pending.clientId + '"] .chatchi-progress span' );
+
+		if ( bar ) {
+			bar.style.width = Math.round( pending.progress * 100 ) + '%';
+		}
+	};
+
+	Widget.prototype.deliver = function ( pending ) {
+		var self = this;
+
+		// A file that can never be sent (too large, wrong type): tapping the
+		// error removes it.
+		if ( pending.fatal ) {
+			this.state.pending = this.state.pending.filter( function ( p ) {
+				return p !== pending;
+			} );
+			this.render();
+			return;
+		}
+
+		pending.failed = false;
+		this.render();
+
+		this.ensureConversation().then( function ( conversation ) {
+			if ( pending.file ) {
+				return api.upload( conversation.id, pending.file, pending.clientId, function ( progress ) {
+					pending.progress = progress;
+					self.showProgress( pending );
+				}, pending.voice );
+			}
+			return api.send( conversation.id, pending.body, pending.clientId ).catch( function ( error ) {
+				// One quiet retry after a server error; client_id prevents duplicates.
+				if ( error.status >= 500 ) {
+					return new Promise( function ( resolve ) {
+						window.setTimeout( resolve, 400 );
+					} ).then( function () {
+						return api.send( conversation.id, pending.body, pending.clientId );
+					} );
+				}
+				throw error;
+			} );
+		} ).then( function ( message ) {
+			if ( pending.preview ) {
+				// The server's copy replaces the local preview.
+				URL.revokeObjectURL( pending.preview );
+			}
+			self.merge( [ message ] );
+			self.render();
+			self.scrollToBottom();
+			self.schedulePoll();
+			// The bot cannot listen to a voice message: asking it hands the chat to a person.
+			if ( ! pending.file || pending.voice ) {
+				self.askBot();
+			}
+		} ).catch( function ( error ) {
+			if ( error.code === 'chatchi_conversation_closed' ) {
+				self.state.pending = self.state.pending.filter( function ( p ) {
+					return p !== pending;
+				} );
+				self.set( { closed: true, draft: pending.body } );
+				return;
+			}
+			if ( error.code === 'chatchi_no_visitor' || error.code === 'chatchi_invalid_profile' ) {
+				self.state.pending = self.state.pending.filter( function ( p ) {
+					return p !== pending;
+				} );
+				self.state.visitor = null;
+				self.state.conversation = null;
+				self.set( { view: 'form', draft: pending.body, formErrors: ( error.data && error.data.fields ) || {} } );
+				return;
+			}
+			pending.failed = true;
+			pending.fatal = [ 'chatchi_attachment_type', 'chatchi_attachment_too_large', 'chatchi_attachments_disabled', 'chatchi_voice_disabled' ].indexOf( error.code ) !== -1;
+			pending.limited = error.code === 'chatchi_rate_limited';
+			// Say why when the server refused the message itself (e.g. too long);
+			// connection problems keep the generic "tap to retry".
+			pending.reason = pending.limited ? self.waitMessage( error ) : ( error.status >= 400 && error.status < 500 && error.message ? error.message : '' );
+			pending.debug = self.debugDetails( error );
+			self.render();
+		} );
+	};
+
+	/**
+	 * Returns the open conversation, starting one first if needed.
+	 */
+	Widget.prototype.ensureConversation = function () {
+		var self = this;
+
+		if ( this.state.conversation && ! this.state.closed ) {
+			return Promise.resolve( this.state.conversation );
+		}
+
+		if ( ! this.startPromise ) {
+			var visitor = this.state.visitor || {};
+			this.startPromise = this.startConversation( { name: visitor.name, email: visitor.email, phone: visitor.phone } ).then( function ( result ) {
+				self.state.visitor = result.visitor;
+				self.state.conversation = result.conversation;
+				self.state.closed = false;
+				self.state.messages = [];
+				self.state.hasMore = false;
+				self.startPromise = null;
+				return result.conversation;
+			}, function ( error ) {
+				self.startPromise = null;
+				throw error;
+			} );
+		}
+
+		return this.startPromise;
+	};
+
+	/**
+	 * Starts (or resumes) a conversation, with the bot checks' form token.
+	 *
+	 * A start sent sooner than a person could fill in the form, or with a
+	 * token from a page left open for a day, is refused by the server; both
+	 * are retried here, so real visitors never see those errors. A renewed
+	 * token is itself brand new, so an expired token can need two retries:
+	 * renew, then wait.
+	 */
+	Widget.prototype.startConversation = function ( profile, trap, attempt ) {
+		var self = this;
+		var session = this.state.session || {};
+		var body = Object.assign( { form_token: session.form_token || '' }, profile );
+
+		body[ TRAP_FIELD ] = trap || '';
+
+		attempt = attempt || 0;
+
+		// The form token must be a couple of seconds old (bot check). Rather
+		// than being refused, wait out the rest when the form was very quick.
+		var early = attempt ? 0 : Math.max( 0, ( this.sessionAt || 0 ) + MIN_FORM_MS - Date.now() );
+		var ready = early ? new Promise( function ( resolve ) {
+			window.setTimeout( resolve, early );
+		} ) : Promise.resolve();
+
+		return ready.then( function () {
+			return api.start( body );
+		} ).catch( function ( error ) {
+			if ( attempt >= 2 ) {
+				throw error;
+			}
+			if ( error.status >= 500 ) {
+				// The server may have just repaired itself (see Support\Failure);
+				// starting again returns the same conversation if one was made.
+				return new Promise( function ( resolve ) {
+					window.setTimeout( resolve, 400 );
+				} ).then( function () {
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			if ( error.code === 'chatchi_too_fast' ) {
+				var wait = Math.max( 1, ( error.data && error.data.retry_after ) || 1 ) * 1000;
+				return new Promise( function ( resolve ) {
+					window.setTimeout( resolve, wait );
+				} ).then( function () {
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			if ( error.code === 'chatchi_form_expired' ) {
+				return api.session().then( function ( fresh ) {
+					if ( self.state.session ) {
+						self.state.session.form_token = fresh.form_token;
+					}
+					return self.startConversation( profile, trap, attempt + 1 );
+				} );
+			}
+			throw error;
+		} );
+	};
+
+	/**
+	 * Technical details of a failed request, for administrators only: the
+	 * HTTP status, the error code and the server's own explanation.
+	 */
+	Widget.prototype.debugDetails = function ( error ) {
+		if ( ! config.debug || ! error ) {
+			return '';
+		}
+
+		var data = error.data || {};
+		var parts = [ error.status ? 'HTTP ' + error.status : 'HTTP —', error.code || '' ];
+
+		if ( data.details ) {
+			parts.push( data.details );
+		} else if ( data.raw ) {
+			parts.push( data.raw );
+		}
+
+		return parts.filter( Boolean ).join( ' · ' );
+	};
+
+	/**
+	 * Turns a rate-limit error into "try again in N seconds/minutes".
+	 */
+	Widget.prototype.waitMessage = function ( error ) {
+		var seconds = Math.max( 1, Math.ceil( ( error.data && error.data.retry_after ) || 1 ) );
+
+		if ( seconds >= 90 ) {
+			return fmt.format( S.waitMinutes, Math.ceil( seconds / 60 ) );
+		}
+
+		return fmt.format( S.waitSeconds, seconds );
+	};
+
+	Widget.prototype.submitForm = function ( form ) {
+		var self = this;
+		var data = {};
+		var offline = this.offlineForm();
+		var message = offline && form.elements.message ? form.elements.message.value.trim() : '';
+
+		[ 'name', 'email', 'phone' ].forEach( function ( field ) {
+			if ( form.elements[ field ] ) {
+				data[ field ] = form.elements[ field ].value;
+			}
+		} );
+
+		this.state.formValues = Object.assign( { message: offline && form.elements.message ? form.elements.message.value : '' }, data );
+
+		if ( offline && ! message ) {
+			this.set( { formErrors: { message: S.messageRequired }, formAlert: '' } );
+			form.elements.message.focus();
+			return;
+		}
+
+		this.set( { submitting: true, formErrors: {}, formAlert: '' } );
+
+		var trap = form.elements[ TRAP_FIELD ] ? form.elements[ TRAP_FIELD ].value : '';
+
+		this.startConversation( Object.assign( { offline: offline }, data ), trap ).then( function ( result ) {
+			self.state.visitor = result.visitor;
+			self.state.conversation = result.conversation;
+			self.state.closed = false;
+			if ( offline ) {
+				// The message is part of the form; send it before showing the chat.
+				return api.send( result.conversation.id, message, uuid() ).then( function () {
+					self.state.offlineSent = true;
+					self.state.formValues = null;
+				} );
+			}
+		} ).then( function () {
+			return self.loadLatest();
+		} ).then( function () {
+			self.set( { view: 'chat', submitting: false } );
+			self.scrollToBottom();
+			self.focusDefault();
+			self.schedulePoll();
+		} ).catch( function ( error ) {
+			var fields = ( error.data && error.data.fields ) || {};
+			var alert = error.code === 'chatchi_rate_limited' ? self.waitMessage( error ) : error.message;
+
+			// Keep what was typed while the form was being sent: the form on
+			// screen (rebuilt when sending started) is rebuilt again below.
+			var current = self.panel.querySelector( '.chatchi-form' );
+			[ 'name', 'email', 'phone', 'message' ].forEach( function ( field ) {
+				if ( current && current.elements[ field ] ) {
+					self.state.formValues[ field ] = current.elements[ field ].value;
+				}
+			} );
+
+			self.set( { submitting: false, formErrors: fields, formAlert: Object.keys( fields ).length ? '' : alert, formDebug: self.debugDetails( error ) } );
+			var invalid = self.panel.querySelector( '[aria-invalid="true"]' );
+			if ( invalid ) {
+				invalid.focus();
+			}
+		} );
+	};
+
+	Widget.prototype.markRead = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+		var lastId = this.lastId();
+
+		if ( ! conversation || ! this.state.open || document.hidden || lastId <= this.lastReadMarked ) {
+			return;
+		}
+
+		var hasUnread = this.state.messages.some( function ( m ) {
+			return ! m.is_mine && ! m.read_at && m.id > self.lastReadMarked;
+		} );
+
+		this.lastReadMarked = lastId;
+
+		if ( this.state.unread ) {
+			this.set( { unread: 0 } );
+		}
+
+		if ( hasUnread ) {
+			api.read( conversation.id, lastId ).catch( function () {
+				self.lastReadMarked = 0;
+			} );
+		}
+	};
+
+	Widget.prototype.endConversation = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! conversation ) {
+			return;
+		}
+
+		api.close( conversation.id ).then( function ( updated ) {
+			self.state.conversation = updated;
+			self.set( { closed: true, confirmingEnd: false } );
+		} ).catch( function ( error ) {
+			self.set( { confirmingEnd: false } );
+			window.alert( error.message );
+		} );
+	};
+
+	Widget.prototype.startNew = function () {
+		this.state.conversation = null;
+		this.state.messages = [];
+		this.state.pending = [];
+		this.state.hasMore = false;
+		this.lastReadMarked = 0;
+		this.state.offlineSent = false;
+		this.set( { closed: false, view: this.needsForm() ? 'form' : 'chat' } );
+		this.focusDefault();
+	};
+
+	/* ------------------------------ polling ---------------------------- */
+
+	Widget.prototype.schedulePoll = function ( delay ) {
+		var self = this;
+
+		window.clearTimeout( this.pollTimer );
+
+		if ( ! this.state.conversation || this.state.closed ) {
+			return;
+		}
+
+		if ( delay === undefined ) {
+			delay = document.hidden ? POLL_HIDDEN : ( this.state.open ? POLL_OPEN : POLL_CLOSED );
+		}
+
+		this.pollTimer = window.setTimeout( function () {
+			self.poll();
+		}, delay );
+	};
+
+	Widget.prototype.poll = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! conversation || this.state.closed ) {
+			return;
+		}
+
+		this.pollCount++;
+
+		// While the panel is closed only the unread count matters; every few ticks
+		// while open, the session also tells whether an agent closed the chat.
+		var checkSession = ! this.state.open || this.pollCount % SESSION_EVERY === 0;
+		var work = this.state.open ? this.pollMessages() : Promise.resolve();
+
+		work.then( function () {
+			return checkSession ? api.session() : null;
+		} ).then( function ( session ) {
+			if ( session ) {
+				self.applySession( session );
+			}
+			self.pollDelay = POLL_OPEN;
+			self.schedulePoll();
+		} ).catch( function ( error ) {
+			if ( error.status === 401 ) {
+				self.boot();
+				return;
+			}
+			self.pollDelay = Math.min( POLL_MAX, self.pollDelay * 2 );
+			self.schedulePoll( self.pollDelay );
+		} );
+	};
+
+	Widget.prototype.pollMessages = function () {
+		var self = this;
+		var id = this.state.conversation.id;
+
+		return api.messages( id, { after_id: this.lastId(), limit: 50 } ).then( function ( page ) {
+			var typing = !! page.typing && ! page.items.length;
+
+			if ( page.items.length ) {
+				var atBottom = self.isAtBottom();
+				var arrived = self.merge( page.items );
+				self.state.agentTyping = typing;
+				self.render();
+				if ( atBottom ) {
+					self.scrollToBottom();
+				} else if ( arrived ) {
+					self.newBelow = true;
+					self.updateJump();
+				}
+				if ( arrived ) {
+					self.notify( arrived );
+				}
+				self.markRead();
+			} else if ( typing !== self.state.agentTyping ) {
+				var wasAtBottom = self.isAtBottom();
+				self.set( { agentTyping: typing } );
+				if ( wasAtBottom ) {
+					self.scrollToBottom();
+				}
+			}
+			if ( page.has_more ) {
+				return self.pollMessages();
+			}
+		} );
+	};
+
+	Widget.prototype.applySession = function ( session ) {
+		var current = this.state.conversation;
+
+		if ( this.state.session && session.availability && JSON.stringify( session.availability ) !== JSON.stringify( this.state.session.availability ) ) {
+			this.state.session.availability = session.availability;
+			this.shellKey = null;
+			this.render();
+		}
+
+		if ( ! session.conversation || ( current && session.conversation.id !== current.id ) ) {
+			if ( current ) {
+				this.set( { closed: true } );
+			}
+			return;
+		}
+
+		var unread = this.state.open ? 0 : session.unread_count;
+		var changed = JSON.stringify( session.conversation ) !== JSON.stringify( current ) || unread !== this.state.unread;
+
+		if ( unread > this.state.unread ) {
+			this.notify( unread - this.state.unread );
+		}
+
+		if ( changed ) {
+			this.state.conversation = session.conversation;
+			this.set( { unread: unread } );
+		}
+	};
+
+	/**
+	 * Tells the visitor about new replies they are not looking at: a soft
+	 * chime, and the count in the page title while the tab is in the
+	 * background.
+	 */
+	Widget.prototype.notify = function ( count ) {
+		if ( this.state.open && ! document.hidden ) {
+			return;
+		}
+
+		chime.play();
+
+		if ( document.hidden ) {
+			if ( this.pageTitle === null ) {
+				this.pageTitle = document.title;
+			}
+			this.titleCount += count;
+			document.title = '(' + formatNumber( this.titleCount ) + ') ' + S.newMessage + ' — ' + this.pageTitle;
+		}
+	};
+
+	Widget.prototype.restoreTitle = function () {
+		if ( this.pageTitle !== null ) {
+			document.title = this.pageTitle;
+			this.pageTitle = null;
+		}
+		this.titleCount = 0;
+	};
+
+	/**
+	 * Lets the agent see that the visitor is typing. Sent at most every few
+	 * seconds while typing, and once when the text is cleared.
+	 */
+	Widget.prototype.signalTyping = function ( typing ) {
+		var conversation = this.state.conversation;
+		var now = Date.now();
+
+		if ( ! conversation || this.state.closed ) {
+			return;
+		}
+
+		if ( typing ) {
+			if ( now - this.typingSentAt < TYPING_EVERY ) {
+				return;
+			}
+			this.typingSentAt = now;
+		} else {
+			if ( ! this.typingSentAt ) {
+				return;
+			}
+			this.typingSentAt = 0;
+		}
+
+		api.typing( conversation.id, typing ).catch( function () {
+			// A lost typing signal only hides an indicator; nothing to retry.
+		} );
+	};
+
+	/* ------------------------------ render ----------------------------- */
+
+	Widget.prototype.isAtBottom = function () {
+		var log = this.panel.querySelector( '.chatchi-log' );
+		return ! log || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+	};
+
+	Widget.prototype.scrollToBottom = function ( smooth ) {
+		var self = this;
+		window.requestAnimationFrame( function () {
+			var log = self.panel.querySelector( '.chatchi-log' );
+			if ( log ) {
+				if ( smooth && log.scrollTo ) {
+					log.scrollTo( { top: log.scrollHeight, behavior: 'smooth' } );
+				} else {
+					log.scrollTop = log.scrollHeight;
+				}
+			}
+			self.newBelow = false;
+			self.updateJump();
+		} );
+	};
+
+	/**
+	 * Shows the "latest message" button while the visitor reads older
+	 * messages, with a dot when new ones arrived below.
+	 */
+	Widget.prototype.updateJump = function () {
+		var jump = this.panel.querySelector( '.chatchi-jump' );
+		var log = this.panel.querySelector( '.chatchi-log' );
+
+		if ( ! jump || ! log ) {
+			return;
+		}
+
+		var away = log.scrollHeight - log.scrollTop - log.clientHeight > 160;
+
+		if ( ! away ) {
+			this.newBelow = false;
+		}
+
+		jump.classList.toggle( 'is-visible', away );
+		jump.classList.toggle( 'has-new', away && this.newBelow );
+		jump.tabIndex = away ? 0 : -1;
+	};
+
+	/**
+	 * Updates the DOM from state.
+	 *
+	 * The panel is only rebuilt when its structure changes (view, closed state,
+	 * confirmation, agent, form state). Otherwise only the message list is
+	 * replaced, so typing — including IME composition for Persian keyboards —
+	 * is never interrupted by incoming messages.
+	 */
+	Widget.prototype.render = function () {
+		var state = this.state;
+
+		this.root.classList.toggle( 'is-open', state.open );
+
+		// An invitation on screen counts as one message waiting.
+		var waiting = state.unread > 0 ? state.unread : ( this.teaser ? 1 : 0 );
+		var showBadge = ! state.open && waiting > 0;
+		this.badge.hidden = ! showBadge;
+		this.badge.textContent = showBadge ? formatNumber( Math.min( waiting, 99 ) ) : '';
+		this.launcher.setAttribute( 'aria-label', ( state.open ? S.closeChat : ( this.menuOpen ? S.closeMenu : S.openChat ) ) + ( showBadge ? ' — ' + format( S.unread, waiting ) : '' ) );
+
+		var agent = state.conversation && state.conversation.agent;
+		var shellKey = JSON.stringify( [
+			state.view,
+			state.closed,
+			state.confirmingEnd,
+			agent ? [ agent.id, agent.name, agent.avatar_url ] : null,
+			!! state.conversation,
+			state.view === 'form' ? [ state.formErrors, state.formAlert, state.submitting ] : null,
+			state.view === 'error' ? state.errorMessage : null,
+			this.availability() ? [ this.availability().mode, this.availability().offline_form, this.availability().opens_at ] : null,
+			!! state.offlineSent,
+			state.closed ? state.rated : null
+		] );
+
+		if ( shellKey !== this.shellKey ) {
+			this.shellKey = shellKey;
+			this.renderShell();
+		} else if ( state.view === 'chat' ) {
+			this.renderLogOnly();
+		}
+
+		this.renderSubtitle();
+		this.newIds = {};
+	};
+
+	/**
+	 * The header subtitle doubles as the typing status, updated in place so
+	 * the composer is never rebuilt while the visitor types.
+	 */
+	Widget.prototype.renderSubtitle = function () {
+		var subtitle = this.panel.querySelector( '.chatchi-subtitle' );
+		var state = this.state;
+		var agent = state.conversation && state.conversation.agent;
+		var typing = state.view === 'chat' && state.agentTyping && ! state.closed;
+
+		if ( ! subtitle ) {
+			return;
+		}
+
+		subtitle.textContent = typing ? S.typing : this.statusText( agent );
+		subtitle.classList.toggle( 'is-typing', typing );
+	};
+
+	/**
+	 * The header subtitle for the current availability.
+	 */
+	Widget.prototype.statusText = function ( agent ) {
+		var availability = this.availability();
+		var mode = availability ? availability.mode : 'online';
+
+		if ( mode === 'offline' ) {
+			return this.backAt() || S.statusOffline;
+		}
+		if ( mode === 'away' ) {
+			return S.statusAway;
+		}
+
+		return agent ? S.support : S.subtitle;
+	};
+
+	/**
+	 * A dot on the header avatar: green online, amber away, gray offline.
+	 */
+	Widget.prototype.renderPresence = function () {
+		var availability = this.availability();
+
+		if ( ! availability ) {
+			return null;
+		}
+
+		var labels = { online: S.statusOnlineLabel, away: S.statusAway, offline: S.statusOffline };
+
+		return h( 'span', { className: 'chatchi-presence chatchi-presence--' + availability.mode, role: 'img', 'aria-label': labels[ availability.mode ] || '' } );
+	};
+
+	/**
+	 * A notice above the composer while no agent can answer right away.
+	 */
+	Widget.prototype.renderBanner = function () {
+		var availability = this.availability();
+
+		if ( ! availability || availability.mode === 'online' || this.state.closed ) {
+			return null;
+		}
+
+		var text = availability.mode === 'offline' ? S.offlineBanner : S.awayBanner;
+		var back = availability.mode === 'offline' ? this.backAt() : '';
+
+		return h( 'div', { className: 'chatchi-banner chatchi-banner--' + availability.mode, role: 'status' }, [
+			icon( availability.mode === 'offline' ? 'clock' : 'info' ),
+			h( 'p', {}, [ text, back ? h( 'strong', { text: ' ' + back } ) : null ] )
+		] );
+	};
+
+	Widget.prototype.renderShell = function () {
+		// The draft lives in state (kept current by the textarea's input event).
+		var textarea = this.panel.querySelector( '.chatchi-textarea' );
+		var hadFocus = textarea && this.root.getRootNode().activeElement === textarea;
+
+		var log = this.panel.querySelector( '.chatchi-log' );
+		var scrollTop = log ? log.scrollTop : null;
+
+		this.panel.replaceChildren( this.renderHeader(), this.renderBody() );
+
+		var newLog = this.panel.querySelector( '.chatchi-log' );
+		if ( newLog && scrollTop !== null ) {
+			newLog.scrollTop = scrollTop;
+		}
+
+		var newTextarea = this.panel.querySelector( '.chatchi-textarea' );
+		if ( hadFocus && newTextarea ) {
+			newTextarea.focus( { preventScroll: true } );
+			newTextarea.setSelectionRange( newTextarea.value.length, newTextarea.value.length );
+		}
+	};
+
+	Widget.prototype.renderLogOnly = function () {
+		var log = this.panel.querySelector( '.chatchi-log' );
+
+		if ( ! log ) {
+			this.renderShell();
+			return;
+		}
+
+		var scrollTop = log.scrollTop;
+		var fresh = this.renderLog();
+
+		log.replaceWith( fresh );
+		fresh.scrollTop = scrollTop;
+	};
+
+	Widget.prototype.renderHeader = function () {
+		var self = this;
+		var state = this.state;
+		var agent = state.conversation && state.conversation.agent;
+		var title = agent ? agent.name : S.title;
+		var canEnd = state.view === 'chat' && state.conversation && ! state.closed;
+
+		return h( 'div', { className: 'chatchi-header' }, [
+			h( 'span', { className: 'chatchi-header__avatar' }, [
+				agent ? this.renderAvatar( agent ) : h( 'span', { className: 'chatchi-avatar', 'aria-hidden': 'true' }, [ icon( 'headset' ) ] ),
+				this.renderPresence()
+			] ),
+			h( 'div', { className: 'chatchi-header__text' }, [
+				h( 'h2', { id: 'chatchi-title', className: 'chatchi-title', text: title } ),
+				h( 'p', { className: 'chatchi-subtitle', 'aria-live': 'polite', text: this.statusText( agent ) } )
+			] ),
+			h( 'div', { className: 'chatchi-header__actions' }, [
+				canEnd ? h( 'button', {
+					type: 'button',
+					className: 'chatchi-text-button',
+					text: S.endChat,
+					onClick: function () {
+						self.set( { confirmingEnd: true } );
+					}
+				} ) : null,
+				h( 'button', {
+					type: 'button',
+					className: 'chatchi-icon-button',
+					'aria-label': S.closeChat,
+					onClick: function () {
+						self.close();
+					}
+				}, [ icon( 'close' ) ] )
+			] )
+		] );
+	};
+
+	Widget.prototype.renderAvatar = function ( agent, small ) {
+		var className = 'chatchi-avatar' + ( small ? ' chatchi-avatar--sm' : '' );
+
+		if ( agent && agent.bot ) {
+			return h( 'span', { className: className + ' chatchi-avatar--bot', 'aria-hidden': 'true' }, [ icon( 'sparkles' ) ] );
+		}
+
+		if ( agent && agent.avatar_url ) {
+			return h( 'span', { className: className }, [ h( 'img', { src: agent.avatar_url, alt: '' } ) ] );
+		}
+
+		return h( 'span', { className: className, 'aria-hidden': 'true', text: initials( agent ? agent.name : S.support ) } );
+	};
+
+	Widget.prototype.renderBody = function () {
+		var state = this.state;
+		var body = h( 'div', { className: 'chatchi-body' } );
+
+		if ( state.view === 'loading' ) {
+			body.appendChild( h( 'div', { className: 'chatchi-skeleton', 'aria-busy': 'true', 'aria-label': S.loading }, [ h( 'span' ), h( 'span' ), h( 'span' ) ] ) );
+		} else if ( state.view === 'error' ) {
+			body.appendChild( this.renderError() );
+		} else if ( state.view === 'form' ) {
+			body.appendChild( this.renderForm() );
+		} else {
+			var self = this;
+			body.appendChild( h( 'div', { className: 'chatchi-log-wrap' }, [
+				this.renderLog(),
+				h( 'button', {
+					type: 'button',
+					className: 'chatchi-jump',
+					tabindex: '-1',
+					'aria-label': S.jumpLatest,
+					title: S.jumpLatest,
+					onClick: function () {
+						self.scrollToBottom( true );
+					}
+				}, [ icon( 'chevronDown' ) ] )
+			] ) );
+			if ( state.confirmingEnd ) {
+				body.appendChild( this.renderConfirm() );
+			} else {
+				var banner = this.renderBanner();
+				if ( banner ) {
+					body.appendChild( banner );
+				}
+			}
+			body.appendChild( this.renderFooter() );
+		}
+
+		return body;
+	};
+
+	Widget.prototype.renderError = function () {
+		var self = this;
+
+		return h( 'div', { className: 'chatchi-state', role: 'alert' }, [
+			icon( 'alert' ),
+			h( 'p', { text: this.state.errorMessage || S.loadError } ),
+			h( 'button', {
+				type: 'button',
+				className: 'chatchi-button chatchi-button--secondary',
+				text: S.retry,
+				onClick: function () {
+					self.set( { view: 'loading' } );
+					self.boot();
+				}
+			} )
+		] );
+	};
+
+	Widget.prototype.renderForm = function () {
+		var self = this;
+		var state = this.state;
+		var offline = this.offlineForm();
+		var form_config = ( state.session && state.session.form ) || {};
+		var fields = ( offline ? form_config.offline_fields : form_config.fields ) || {};
+		var values = Object.assign( {}, state.visitor || {}, state.formValues || {} );
+		var availability = this.availability();
+		var specs = {
+			name: { type: 'text', autocomplete: 'name', label: S.name },
+			email: { type: 'email', autocomplete: 'email', label: S.email, dir: 'ltr', inputmode: 'email' },
+			phone: { type: 'tel', autocomplete: 'tel', label: S.phone, dir: 'ltr', inputmode: 'tel' }
+		};
+
+		var form = h( 'form', {
+			className: 'chatchi-form',
+			noValidate: true,
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				self.submitForm( form );
+			}
+		}, offline ? [
+			this.renderMessage( { key: 'offline', mine: false, type: 'welcome', sender: { name: S.support, avatar_url: null }, body: availability.offline_message, date: new Date() }, true, true ),
+			this.backAt() ? h( 'p', { className: 'chatchi-form__intro chatchi-form__back' }, [ icon( 'clock' ), this.backAt() ] ) : null
+		] : [
+			this.welcomeText() ? this.renderMessage( this.welcomeEntry( new Date() ), true, true ) : null,
+			this.faqElement(),
+			h( 'p', { className: 'chatchi-form__intro', text: S.formIntro } )
+		] );
+
+		var card = h( 'div', { className: 'chatchi-form__card' } );
+		form.appendChild( card );
+
+		Object.keys( specs ).forEach( function ( name ) {
+			var field = fields[ name ];
+			if ( ! field || ! field.enabled ) {
+				return;
+			}
+			var spec = specs[ name ];
+			var error = state.formErrors[ name ];
+			var inputId = 'chatchi-field-' + name;
+
+			card.appendChild( h( 'div', { className: 'chatchi-field' }, [
+				h( 'label', { className: 'chatchi-label', for: inputId }, [
+					spec.label,
+					field.required ? null : h( 'small', { text: ' (' + S.optional + ')' } )
+				] ),
+				h( 'input', {
+					id: inputId,
+					name: name,
+					className: 'chatchi-input',
+					type: spec.type,
+					autocomplete: spec.autocomplete,
+					inputmode: spec.inputmode,
+					dir: spec.dir,
+					required: field.required,
+					value: values[ name ] || '',
+					'aria-invalid': error ? 'true' : null,
+					'aria-describedby': error ? inputId + '-error' : null
+				} ),
+				error ? h( 'p', { id: inputId + '-error', className: 'chatchi-field-error', text: error } ) : null
+			] ) );
+		} );
+
+		if ( offline ) {
+			var messageError = state.formErrors.message;
+			card.appendChild( h( 'div', { className: 'chatchi-field' }, [
+				h( 'label', { className: 'chatchi-label', for: 'chatchi-field-message', text: S.yourMessage } ),
+				h( 'textarea', {
+					id: 'chatchi-field-message',
+					name: 'message',
+					className: 'chatchi-input chatchi-input--message',
+					rows: '4',
+					required: true,
+					value: values.message || state.draft || '',
+					'aria-invalid': messageError ? 'true' : null,
+					'aria-describedby': messageError ? 'chatchi-field-message-error' : null
+				} ),
+				messageError ? h( 'p', { id: 'chatchi-field-message-error', className: 'chatchi-field-error', text: messageError } ) : null
+			] ) );
+		}
+
+		// Honeypot: invisible to people and screen readers; bots fill it in.
+		card.appendChild( h( 'div', { className: 'chatchi-trap', 'aria-hidden': 'true' }, [
+			h( 'label', { for: 'chatchi-field-' + TRAP_FIELD, text: 'Website' } ),
+			h( 'input', { id: 'chatchi-field-' + TRAP_FIELD, name: TRAP_FIELD, type: 'text', tabindex: '-1', autocomplete: 'off' } )
+		] ) );
+
+		if ( state.formAlert ) {
+			card.appendChild( h( 'p', { className: 'chatchi-alert', role: 'alert', text: state.formAlert } ) );
+			if ( state.formDebug ) {
+				card.appendChild( h( 'p', { className: 'chatchi-debug', dir: 'ltr', text: state.formDebug } ) );
+			}
+		}
+
+		card.appendChild( h( 'button', { type: 'submit', className: 'chatchi-button', disabled: state.submitting, text: state.submitting ? S.loading : ( offline ? S.sendMessage : S.start ) } ) );
+
+		return form;
+	};
+
+	Widget.prototype.renderLog = function () {
+		var self = this;
+		var state = this.state;
+		var log = h( 'div', { className: 'chatchi-log', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', tabindex: '0' } );
+
+		log.addEventListener( 'scroll', function () {
+			self.updateJump();
+		}, { passive: true } );
+
+		if ( state.hasMore ) {
+			log.appendChild( h( 'button', {
+				type: 'button',
+				className: 'chatchi-earlier',
+				disabled: state.loadingEarlier,
+				text: state.loadingEarlier ? S.loading : S.earlier,
+				onClick: function () {
+					self.loadEarlier();
+				}
+			} ) );
+		}
+
+		var entries = state.messages.map( function ( m ) {
+			return {
+				key: m.id,
+				mine: m.is_mine,
+				type: m.sender.type,
+				sender: m.sender,
+				body: m.body,
+				attachment: m.attachment,
+				date: new Date( m.created_at ),
+				read: !! m.read_at,
+				isNew: !! self.newIds[ m.id ]
+			};
+		} ).concat( state.pending.map( function ( p ) {
+			return { key: p.clientId, mine: true, type: 'visitor', body: p.body, upload: p.file ? p : null, date: new Date(), pending: ! p.failed, failed: p.failed, ref: p, isNew: ! p.shown };
+		} ) );
+
+		// The welcome message opens the conversation once its start is loaded.
+		if ( this.welcomeText() && ! state.hasMore ) {
+			var started = state.conversation && state.conversation.created_at ? new Date( state.conversation.created_at ) : null;
+			entries.unshift( this.welcomeEntry( started || ( entries[ 0 ] ? entries[ 0 ].date : new Date() ) ) );
+		}
+
+		// Before the first message, the common questions are offered.
+		var faq = ! state.conversation && ! state.pending.length ? this.faqElement() : null;
+
+		if ( ! entries.length ) {
+			if ( faq ) {
+				log.appendChild( faq );
+			}
+			log.appendChild( h( 'div', { className: 'chatchi-state' }, [ h( 'p', { text: S.empty } ) ] ) );
+			return log;
+		}
+
+		var lastDay = null;
+
+		entries.forEach( function ( entry, i ) {
+			var prev = entries[ i - 1 ];
+			var next = entries[ i + 1 ];
+			var day = dayKey( entry.date );
+
+			if ( day !== lastDay ) {
+				log.appendChild( h( 'div', { className: 'chatchi-day', text: dayLabel( entry.date ) } ) );
+				lastDay = day;
+			}
+
+			var groupStart = ! prev || ! self.sameGroup( prev, entry );
+			var groupEnd = ! next || ! self.sameGroup( entry, next );
+
+			log.appendChild( self.renderMessage( entry, groupStart, groupEnd ) );
+		} );
+
+		if ( faq ) {
+			log.appendChild( faq );
+		}
+
+		if ( state.offlineSent ) {
+			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.offlineSent } ) ] ) );
+		}
+
+		var botActive = config.ai && config.ai.bot && state.conversation && state.conversation.bot && ! state.closed;
+
+		if ( botActive && state.messages.some( function ( m ) {
+			return m.sender && m.sender.bot;
+		} ) ) {
+			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-handoff' }, [
+				h( 'button', {
+					type: 'button',
+					className: 'chatchi-handoff__button',
+					onClick: function () {
+						self.requestPerson();
+					}
+				}, [ icon( 'user' ), h( 'span', { text: S.talkToPerson } ) ] )
+			] ) );
+		}
+
+		if ( state.handedOff && ! state.closed ) {
+			log.appendChild( h( 'div', { className: 'chatchi-row chatchi-row--system chatchi-row--sent', role: 'status' }, [ icon( 'check' ), h( 'span', { text: S.personComing } ) ] ) );
+		}
+
+		if ( ( state.agentTyping || state.botTyping ) && ! state.closed ) {
+			log.appendChild( this.renderTyping() );
+		}
+
+		return log;
+	};
+
+	/* ------------------------------ AI bot ------------------------------ */
+
+	/**
+	 * Asks the AI bot to answer the visitor's latest message. The server
+	 * decides whether it should (bot on, nobody has taken the chat, ...).
+	 * Messages sent while it thinks are answered in one go afterwards.
+	 */
+	Widget.prototype.askBot = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! config.ai || ! config.ai.bot || ! conversation || conversation.bot === false ) {
+			return;
+		}
+		if ( this.botBusy ) {
+			this.botAgain = true;
+			return;
+		}
+
+		this.botBusy = true;
+		this.botAgain = false;
+		this.set( { botTyping: true } );
+		this.scrollToBottom();
+
+		api.bot( conversation.id ).then( function ( result ) {
+			if ( result.handoff && self.state.conversation ) {
+				self.state.conversation.bot = false;
+			}
+			return self.pollMessages();
+		} ).catch( function () {
+			// Humans still see the message; nothing to show the visitor.
+		} ).then( function () {
+			self.botBusy = false;
+			self.set( { botTyping: false } );
+			self.scrollToBottom();
+			if ( self.botAgain ) {
+				self.askBot();
+			}
+		} );
+	};
+
+	Widget.prototype.requestPerson = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! conversation ) {
+			return;
+		}
+
+		api.handoff( conversation.id ).then( function ( updated ) {
+			self.state.conversation = Object.assign( {}, self.state.conversation, updated, { bot: false } );
+			self.set( { handedOff: true } );
+			self.scrollToBottom();
+		} ).catch( function ( error ) {
+			window.alert( error.message );
+		} );
+	};
+
+	/* ------------------------------- FAQ -------------------------------- */
+
+	var FAQ_PREVIEW = 5;
+
+	/**
+	 * The common questions, built once and moved between the start form
+	 * and the empty chat, so open answers and the search survive re-renders.
+	 * Null when there are none.
+	 */
+	Widget.prototype.faqElement = function () {
+		var items = config.faq || [];
+
+		if ( ! items.length ) {
+			return null;
+		}
+		if ( this.faq ) {
+			return this.faq;
+		}
+
+		var showAll = false;
+		var list = h( 'div', { className: 'chatchi-faq__list' } );
+		var none = h( 'p', { className: 'chatchi-faq__none', hidden: true, text: S.faqNone } );
+		var more = h( 'button', {
+			type: 'button',
+			className: 'chatchi-faq__more',
+			onClick: function () {
+				showAll = true;
+				filter();
+			}
+		} );
+		var search = items.length > FAQ_PREVIEW ? h( 'input', {
+			type: 'search',
+			className: 'chatchi-faq__search',
+			placeholder: S.faqSearch,
+			'aria-label': S.faqSearch,
+			enterkeyhint: 'search'
+		} ) : null;
+
+		var rows = items.map( function ( item ) {
+			var details = h( 'details', { className: 'chatchi-faq__item' }, [
+				h( 'summary', {}, [ h( 'span', { text: item.question } ), icon( 'chevron' ) ] ),
+				h( 'div', { className: 'chatchi-faq__answer' }, [ linkify( item.answer ) ] )
+			] );
+			// One answer open at a time keeps the list short.
+			details.addEventListener( 'toggle', function () {
+				if ( details.open ) {
+					rows.forEach( function ( row ) {
+						if ( row.el !== details ) {
+							row.el.open = false;
+						}
+					} );
+				}
+			} );
+			list.appendChild( details );
+			return { el: details, text: ( item.question + ' ' + item.answer ).toLowerCase() };
+		} );
+
+		function normalize( text ) {
+			// Persian and Arabic forms of ye and kaf match each other.
+			return String( text ).toLowerCase().replace( /ي/g, 'ی' ).replace( /ك/g, 'ک' ).trim();
+		}
+
+		function filter() {
+			var term = search ? normalize( search.value ) : '';
+			var shown = 0;
+			var matches = 0;
+
+			rows.forEach( function ( row ) {
+				var match = ! term || normalize( row.text ).indexOf( term ) !== -1;
+				matches += match ? 1 : 0;
+				var visible = match && ( term || showAll || shown < FAQ_PREVIEW );
+				row.el.hidden = ! visible;
+				shown += visible ? 1 : 0;
+			} );
+
+			none.hidden = matches > 0;
+			more.hidden = !! term || showAll || rows.length <= FAQ_PREVIEW;
+			more.textContent = format( S.faqAll, rows.length );
+		}
+
+		if ( search ) {
+			search.addEventListener( 'input', filter );
+		}
+		filter();
+
+		this.faq = h( 'section', { className: 'chatchi-faq', 'aria-labelledby': 'chatchi-faq-title' }, [
+			h( 'p', { id: 'chatchi-faq-title', className: 'chatchi-faq__title' }, [ icon( 'help' ), S.faqTitle ] ),
+			search,
+			list,
+			none,
+			more,
+			h( 'p', { className: 'chatchi-faq__hint', text: S.faqHint } )
+		] );
+
+		return this.faq;
+	};
+
+	/**
+	 * Three bouncing dots from the agent while they write a reply.
+	 */
+	Widget.prototype.renderTyping = function () {
+		var agent = this.state.botTyping ? { bot: true, name: config.ai.name } : this.state.conversation && this.state.conversation.agent;
+		var label = agent && agent.name ? String( S.typingNamed ).replace( '%s', agent.name ) : S.typing;
+
+		return h( 'div', { className: 'chatchi-row chatchi-row--theirs chatchi-row--typing is-group-start is-group-end is-new' }, [
+			this.renderAvatar( agent || null, true ),
+			h( 'div', { className: 'chatchi-stack' }, [
+				h( 'div', { className: 'chatchi-bubble', role: 'status', 'aria-label': label }, [
+					h( 'span', { className: 'chatchi-dot' } ),
+					h( 'span', { className: 'chatchi-dot' } ),
+					h( 'span', { className: 'chatchi-dot' } )
+				] )
+			] )
+		] );
+	};
+
+	/**
+	 * The configured welcome message, shown as the first bubble from support.
+	 * It exists only in the widget and is never stored as a message.
+	 */
+	Widget.prototype.welcomeEntry = function ( date ) {
+		return {
+			key: 'welcome',
+			mine: false,
+			type: 'welcome',
+			sender: { name: S.support, avatar_url: null },
+			body: this.welcomeText(),
+			date: date
+		};
+	};
+
+	/**
+	 * The first bubble from support: the invitation the visitor accepted,
+	 * or the welcome message.
+	 */
+	Widget.prototype.welcomeText = function () {
+		return this.invite || config.welcome || '';
+	};
+
+	Widget.prototype.sameGroup = function ( a, b ) {
+		return a.mine === b.mine &&
+			a.type === b.type &&
+			( a.sender && b.sender ? a.sender.name === b.sender.name : true ) &&
+			dayKey( a.date ) === dayKey( b.date ) &&
+			Math.abs( b.date - a.date ) < GROUP_GAP_MS;
+	};
+
+	Widget.prototype.renderMessage = function ( entry, groupStart, groupEnd ) {
+		var self = this;
+
+		if ( entry.type === 'system' ) {
+			return h( 'div', { className: 'chatchi-row chatchi-row--system' }, [ entry.body ] );
+		}
+
+		var classes = [ 'chatchi-row', entry.mine ? 'chatchi-row--mine' : 'chatchi-row--theirs' ];
+		if ( entry.type === 'welcome' ) {
+			classes.push( 'chatchi-row--welcome' );
+		}
+		if ( groupStart ) {
+			classes.push( 'is-group-start' );
+		}
+		if ( groupEnd ) {
+			classes.push( 'is-group-end' );
+		}
+		if ( entry.isNew ) {
+			classes.push( 'is-new' );
+		}
+		if ( entry.pending ) {
+			classes.push( 'is-pending' );
+		}
+		if ( entry.failed ) {
+			classes.push( 'is-failed' );
+		}
+
+		var stack = h( 'div', { className: 'chatchi-stack' } );
+
+		if ( ! entry.mine && groupStart && entry.sender && entry.sender.name ) {
+			stack.appendChild( h( 'span', { className: 'chatchi-sender', text: entry.sender.name } ) );
+		}
+
+		var bubble;
+
+		if ( entry.attachment ) {
+			bubble = this.renderAttachment( entry.attachment );
+		} else if ( entry.upload ) {
+			bubble = this.renderUpload( entry.upload );
+			entry.upload.shown = true;
+		} else {
+			bubble = h( 'div', { className: 'chatchi-bubble' + ( emojiOnly( entry.body ) ? ' is-emoji' : '' ) } );
+			bubble.appendChild( linkify( entry.body ) );
+		}
+		stack.appendChild( bubble );
+
+		if ( entry.failed ) {
+			stack.appendChild( h( 'button', {
+				type: 'button',
+				className: 'chatchi-retry',
+				text: entry.ref.reason || S.sendFailed,
+				onClick: function () {
+					self.deliver( entry.ref );
+					self.focusDefault();
+				}
+			} ) );
+			if ( entry.ref.debug ) {
+				stack.appendChild( h( 'p', { className: 'chatchi-debug', dir: 'ltr', text: entry.ref.debug } ) );
+			}
+		} else if ( groupEnd && entry.type !== 'welcome' ) {
+			stack.appendChild( this.renderMeta( entry ) );
+		}
+
+		var row = h( 'div', { className: classes.join( ' ' ), 'data-key': String( entry.key ) } );
+
+		if ( ! entry.mine ) {
+			var avatar = this.renderAvatar( entry.sender, true );
+			if ( ! groupEnd ) {
+				avatar.classList.add( 'chatchi-avatar--spacer' );
+			}
+			row.appendChild( avatar );
+		}
+
+		row.appendChild( stack );
+
+		return row;
+	};
+
+	/**
+	 * A sent file: pictures as a thumbnail that opens full size, other
+	 * files as a card that downloads them.
+	 */
+	Widget.prototype.renderAttachment = function ( attachment ) {
+		if ( attachment.is_audio ) {
+			return this.voice.player.element( {
+				key: 'a' + attachment.id,
+				url: client.fileUrl( attachment.url ),
+				duration: attachment.duration,
+				className: 'chatchi-bubble chatchi-voice'
+			} );
+		}
+
+		if ( attachment.is_image ) {
+			return h( 'a', {
+				className: 'chatchi-bubble chatchi-bubble--image',
+				href: client.fileUrl( attachment.url ),
+				target: '_blank',
+				rel: 'noopener',
+				title: attachment.name
+			}, [
+				h( 'img', {
+					src: client.fileUrl( attachment.url ),
+					alt: attachment.name,
+					loading: 'lazy',
+					width: attachment.width ? String( attachment.width ) : null,
+					height: attachment.height ? String( attachment.height ) : null
+				} )
+			] );
+		}
+
+		return h( 'a', {
+			className: 'chatchi-bubble chatchi-file',
+			href: client.fileUrl( attachment.url, true ),
+			download: attachment.name,
+			title: S.download + ': ' + attachment.name
+		}, [
+			h( 'span', { className: 'chatchi-file__icon' }, [ icon( 'file' ) ] ),
+			h( 'span', { className: 'chatchi-file__text' }, [
+				h( 'span', { className: 'chatchi-file__name', text: attachment.name } ),
+				h( 'small', { text: Core.fileSize( attachment.size, locale ) } )
+			] ),
+			icon( 'download' )
+		] );
+	};
+
+	/**
+	 * A file still uploading, with its progress.
+	 */
+	Widget.prototype.renderUpload = function ( pending ) {
+		var bar = h( 'span', { className: 'chatchi-progress', role: 'progressbar', 'aria-label': S.uploading }, [
+			h( 'span', { style: 'width:' + Math.round( ( pending.progress || 0 ) * 100 ) + '%' } )
+		] );
+
+		if ( pending.voice ) {
+			return this.voice.player.element( {
+				key: 'p' + pending.clientId,
+				src: pending.src,
+				duration: pending.voice.duration,
+				className: 'chatchi-bubble chatchi-voice is-uploading',
+				extra: pending.failed ? null : bar
+			} );
+		}
+
+		if ( pending.preview ) {
+			return h( 'div', { className: 'chatchi-bubble chatchi-bubble--image is-uploading' }, [
+				h( 'img', { src: pending.preview, alt: pending.body } ),
+				pending.failed ? null : bar
+			] );
+		}
+
+		return h( 'div', { className: 'chatchi-bubble chatchi-file is-uploading' }, [
+			h( 'span', { className: 'chatchi-file__icon' }, [ icon( 'file' ) ] ),
+			h( 'span', { className: 'chatchi-file__text' }, [
+				h( 'span', { className: 'chatchi-file__name', text: pending.body } ),
+				h( 'small', { text: Core.fileSize( pending.file.size, locale ) } ),
+				pending.failed ? null : bar
+			] )
+		] );
+	};
+
+	Widget.prototype.renderMeta = function ( entry ) {
+		var children = [ h( 'time', { text: timeFormat.format( entry.date ) } ) ];
+		var className = 'chatchi-meta';
+
+		if ( entry.mine ) {
+			if ( entry.pending ) {
+				children.push( icon( 'clock' ), h( 'span', { className: 'chatchi-sr', text: S.sending } ) );
+			} else if ( entry.read ) {
+				className += ' is-read';
+				children.push( icon( 'checks' ), h( 'span', { className: 'chatchi-sr', text: S.read } ) );
+			} else {
+				children.push( icon( 'check' ), h( 'span', { className: 'chatchi-sr', text: S.sent } ) );
+			}
+		}
+
+		return h( 'div', { className: className }, children );
+	};
+
+	Widget.prototype.renderConfirm = function () {
+		var self = this;
+
+		return h( 'div', { className: 'chatchi-confirm', role: 'alertdialog', 'aria-label': S.endConfirm }, [
+			h( 'span', { text: S.endConfirm } ),
+			h( 'div', {}, [
+				h( 'button', {
+					type: 'button',
+					className: 'chatchi-text-button',
+					text: S.endNo,
+					onClick: function () {
+						self.set( { confirmingEnd: false } );
+					}
+				} ),
+				h( 'button', {
+					type: 'button',
+					className: 'chatchi-text-button chatchi-text-button--danger',
+					text: S.endYes,
+					onClick: function () {
+						self.endConversation();
+					}
+				} )
+			] )
+		] );
+	};
+
+	/**
+	 * "How was your chat?" with five stars and an optional comment, shown
+	 * once the conversation has ended (when rating is turned on).
+	 */
+	Widget.prototype.renderRating = function () {
+		var self = this;
+		var conversation = this.state.conversation;
+
+		if ( ! config.rating || ! conversation ) {
+			return null;
+		}
+
+		if ( this.state.rated === conversation.id ) {
+			return h( 'div', { className: 'chatchi-rating chatchi-rating--done', role: 'status' }, [
+				icon( 'check' ),
+				h( 'p', { text: S.ratingThanks } )
+			] );
+		}
+
+		var score = 0;
+		var stars = [];
+		var error = h( 'p', { className: 'chatchi-rating__error', role: 'alert', hidden: true } );
+		var comment = h( 'textarea', { className: 'chatchi-rating__comment', rows: '2', placeholder: S.ratingComment, 'aria-label': S.ratingComment } );
+		var send = h( 'button', { type: 'submit', className: 'chatchi-button', text: S.ratingSend } );
+		var more = h( 'div', { className: 'chatchi-rating__more', hidden: true }, [ comment, send ] );
+		var label = h( 'p', { className: 'chatchi-rating__label', 'aria-live': 'polite', text: '' } );
+		var labels = [ S.rating1, S.rating2, S.rating3, S.rating4, S.rating5 ];
+
+		function paint( upTo ) {
+			stars.forEach( function ( star, index ) {
+				star.classList.toggle( 'is-on', index < upTo );
+			} );
+			label.textContent = upTo ? labels[ upTo - 1 ] : '';
+		}
+
+		for ( var i = 1; i <= 5; i++ ) {
+			( function ( value ) {
+				var star = h( 'button', {
+					type: 'button',
+					className: 'chatchi-star',
+					role: 'radio',
+					'aria-checked': 'false',
+					'aria-label': format( S.ratingStars, value ),
+					title: labels[ value - 1 ],
+					onClick: function () {
+						score = value;
+						stars.forEach( function ( other, index ) {
+							other.setAttribute( 'aria-checked', index === value - 1 ? 'true' : 'false' );
+						} );
+						paint( value );
+						more.hidden = false;
+						error.hidden = true;
+					},
+					onMouseenter: function () {
+						paint( value );
+					},
+					onMouseleave: function () {
+						paint( score );
+					}
+				}, [ icon( 'star' ) ] );
+				stars.push( star );
+			}( i ) );
+		}
+
+		return h( 'form', {
+			className: 'chatchi-rating',
+			noValidate: true,
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				if ( ! score ) {
+					return;
+				}
+				send.disabled = true;
+				api.rate( conversation.id, score, comment.value.trim() ).then( function () {
+					self.set( { rated: conversation.id } );
+				} ).catch( function ( failure ) {
+					send.disabled = false;
+					error.textContent = failure.message || S.loadError;
+					error.hidden = false;
+				} );
+			}
+		}, [
+			h( 'p', { className: 'chatchi-rating__title', text: S.ratingTitle } ),
+			h( 'div', { className: 'chatchi-rating__stars', role: 'radiogroup', 'aria-label': S.ratingTitle }, stars ),
+			label,
+			more,
+			error
+		] );
+	};
+
+	Widget.prototype.renderFooter = function () {
+		var self = this;
+		var state = this.state;
+		var max = ( state.session && state.session.max_message_length ) || 2000;
+
+		if ( state.closed ) {
+			return h( 'div', { className: 'chatchi-footer' }, [
+				this.renderRating(),
+				h( 'div', { className: 'chatchi-notice', role: 'status' }, [
+					h( 'p', { text: S.closed } ),
+					h( 'button', {
+						type: 'button',
+						className: 'chatchi-button',
+						text: S.newChat,
+						onClick: function () {
+							self.startNew();
+						}
+					} )
+				] )
+			] );
+		}
+
+		var counter = h( 'p', { className: 'chatchi-counter', 'aria-live': 'polite', hidden: true } );
+		var sendButton = h( 'button', { type: 'submit', className: 'chatchi-send', 'aria-label': S.send, title: S.send, disabled: ! state.draft.trim() }, [ icon( 'send', 'chatchi-flip' ) ] );
+		// No maxlength: it counts UTF-16 units, so emoji would use up two
+		// characters each. The limit is shown and enforced in code points,
+		// as the server counts them.
+		var textarea = h( 'textarea', {
+			className: 'chatchi-textarea',
+			rows: '1',
+			placeholder: S.placeholder,
+			'aria-label': S.placeholder,
+			enterkeyhint: 'send',
+			value: state.draft
+		} );
+		var emojiButton = h( 'button', {
+			type: 'button',
+			className: 'chatchi-tool chatchi-tool--emoji',
+			'aria-label': S.emoji,
+			title: S.emoji,
+			'aria-expanded': 'false',
+			'aria-controls': 'chatchi-emoji',
+			onClick: function () {
+				self.toggleEmoji();
+			}
+		}, [ icon( 'smile' ) ] );
+		var attachments = this.attachmentSettings();
+		var fileInput = attachments.enabled ? h( 'input', {
+			type: 'file',
+			className: 'chatchi-sr',
+			tabindex: '-1',
+			'aria-hidden': 'true',
+			accept: attachments.accept,
+			multiple: true
+		} ) : null;
+		var attachButton = attachments.enabled ? h( 'button', {
+			type: 'button',
+			className: 'chatchi-tool chatchi-tool--attach',
+			'aria-label': S.attach,
+			title: S.attach,
+			onClick: function () {
+				fileInput.click();
+			}
+		}, [ icon( 'paperclip' ) ] ) : null;
+
+		if ( fileInput ) {
+			fileInput.addEventListener( 'change', function () {
+				Array.from( fileInput.files || [] ).slice( 0, 5 ).forEach( function ( file ) {
+					self.sendFile( file );
+				} );
+				fileInput.value = '';
+			} );
+
+			// Pasting a screenshot sends it.
+			textarea.addEventListener( 'paste', function ( event ) {
+				var files = event.clipboardData ? Array.from( event.clipboardData.files || [] ) : [];
+				if ( files.length ) {
+					event.preventDefault();
+					files.slice( 0, 5 ).forEach( function ( file ) {
+						self.sendFile( file );
+					} );
+				}
+			} );
+		}
+
+		var box = h( 'div', { className: 'chatchi-composer__box' } );
+		var voice = attachments.voice && Core.canRecord() ? this.voice.recorder.mount( box ) : null;
+
+		[ emojiButton, attachButton, fileInput, voice && voice.button, textarea, sendButton, voice && voice.bar ].forEach( function ( child ) {
+			if ( child ) {
+				box.appendChild( child );
+			}
+		} );
+		var picker = h( 'div', { id: 'chatchi-emoji', className: 'chatchi-emoji', role: 'group', 'aria-label': S.emoji, hidden: true }, EMOJI.map( function ( emoji ) {
+			return h( 'button', {
+				type: 'button',
+				text: emoji,
+				'aria-label': emoji,
+				onClick: function () {
+					self.insertText( textarea, emoji );
+				}
+			} );
+		} ) );
+
+		function refresh() {
+			var used = Array.from( textarea.value ).length;
+			var left = max - used;
+			var over = left < 0;
+
+			sendButton.disabled = ! textarea.value.trim() || over;
+			box.classList.toggle( 'is-over', over );
+			counter.hidden = left > 200;
+			counter.classList.toggle( 'is-warning', left <= 50 && ! over );
+			counter.classList.toggle( 'is-over', over );
+			counter.textContent = format( S.charactersLeft, Math.max( 0, left ) );
+			textarea.style.height = 'auto';
+			textarea.style.height = Math.min( textarea.scrollHeight, MAX_TEXTAREA ) + 'px';
+			textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA ? 'auto' : 'hidden';
+		}
+
+		function submit() {
+			var text = textarea.value.trim();
+			if ( ! text || Array.from( text ).length > max ) {
+				return;
+			}
+			textarea.value = '';
+			self.state.draft = '';
+			self.toggleEmoji( false );
+			refresh();
+			self.send( text );
+			textarea.focus( { preventScroll: true } );
+		}
+
+		textarea.addEventListener( 'input', function () {
+			self.state.draft = textarea.value;
+			refresh();
+			self.signalTyping( !! textarea.value.trim() );
+		} );
+
+		textarea.addEventListener( 'keydown', function ( event ) {
+			if ( event.key === 'Enter' && ! event.shiftKey && ! event.isComposing ) {
+				event.preventDefault();
+				submit();
+			}
+		} );
+
+		var form = h( 'form', {
+			className: 'chatchi-composer',
+			onSubmit: function ( event ) {
+				event.preventDefault();
+				submit();
+			}
+		}, [ box ] );
+
+		window.requestAnimationFrame( refresh );
+
+		return h( 'div', { className: 'chatchi-footer' }, [
+			picker,
+			form,
+			h( 'div', { className: 'chatchi-composer__meta' }, [
+				h( 'span', { className: 'chatchi-hint', 'aria-hidden': 'true', text: S.sendHint } ),
+				counter
+			] )
+		] );
+	};
+
+	Widget.prototype.emojiOpen = function () {
+		var picker = this.panel.querySelector( '.chatchi-emoji' );
+		return !! picker && ! picker.hidden;
+	};
+
+	/**
+	 * Opens or closes the emoji picker; toggles when no state is given.
+	 */
+	Widget.prototype.toggleEmoji = function ( open ) {
+		var picker = this.panel.querySelector( '.chatchi-emoji' );
+		var button = this.panel.querySelector( '.chatchi-tool--emoji' );
+
+		if ( ! picker || ! button ) {
+			return;
+		}
+
+		open = open === undefined ? picker.hidden : open;
+		picker.hidden = ! open;
+		button.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+
+		if ( ! open ) {
+			return;
+		}
+
+		var first = picker.querySelector( 'button' );
+		if ( first && ! ( window.matchMedia && window.matchMedia( '(hover: none)' ).matches ) ) {
+			first.focus( { preventScroll: true } );
+		}
+	};
+
+	/**
+	 * Inserts text at the cursor, as if typed, keeping the picker open for
+	 * more. On touch screens the keyboard is not opened for it.
+	 */
+	Widget.prototype.insertText = function ( textarea, text ) {
+		var start = textarea.selectionStart === null ? textarea.value.length : textarea.selectionStart;
+		var end = textarea.selectionEnd === null ? start : textarea.selectionEnd;
+
+		if ( textarea.setRangeText ) {
+			textarea.setRangeText( text, start, end, 'end' );
+		} else {
+			textarea.value = textarea.value.slice( 0, start ) + text + textarea.value.slice( end );
+		}
+
+		textarea.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+
+		if ( ! ( window.matchMedia && window.matchMedia( '(hover: none)' ).matches ) ) {
+			textarea.focus( { preventScroll: true } );
+		}
+	};
+
+	/* ------------------------------ start ------------------------------ */
+
+	function start() {
+		new Widget().mount();
+	}
+
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', start );
+	} else {
+		start();
+	}
+}() );
