@@ -117,34 +117,12 @@ if ( ! function_exists( 'chatchi' ) ) {
 	}
 }
 
-if ( ! function_exists( 'chatchi_ioncube_notice' ) ) {
-	/**
-	 * Tells administrators that the server lacks the ionCube Loader, which the
-	 * RTL-Theme license check needs.
-	 *
-	 * @return void
-	 */
-	function chatchi_ioncube_notice() {
-		if ( ! current_user_can( 'activate_plugins' ) ) {
-			return;
-		}
-
-		load_plugin_textdomain( 'chatchi', false, dirname( CHATCHI_BASENAME ) . '/languages' );
-
-		printf(
-			'<div class="notice notice-error"><p>%s</p></div>',
-			esc_html__( 'ChatChi needs the ionCube Loader PHP extension to check its license. Ask your host to enable it.', 'chatchi' )
-		);
-	}
-}
-
-// The license check starts the plugin when the purchase is active. Without
-// the ionCube Loader the encoded check would stop the whole site, so it is
-// only loaded when the loader is there.
+// The license check starts the plugin when the purchase is active; license
+// notices come only from RTL-Theme's own manager plugin. Without the ionCube
+// Loader the encoded check would stop the whole site, so it is only loaded
+// when the loader is there (and ChatChi stays off without it).
 if ( extension_loaded( 'ionCube Loader' ) ) {
 	require_once CHATCHI_PATH . 'license/license.php';
-} else {
-	add_action( 'admin_notices', 'chatchi_ioncube_notice' );
 }
 
 // Orders are read only through the WooCommerce API, so both order storages

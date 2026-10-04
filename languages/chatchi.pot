@@ -51,10 +51,6 @@ msgstr ""
 msgid "ChatChi requires WordPress %1$s or higher. You are running WordPress %2$s."
 msgstr ""
 
-#: chatchi.php:136
-msgid "ChatChi needs the ionCube Loader PHP extension to check its license. Ask your host to enable it."
-msgstr ""
-
 #: includes/Admin/AdminModule.php:58
 #: includes/Admin/AdminModule.php:59
 #: includes/Admin/PanelStrings.php:22
