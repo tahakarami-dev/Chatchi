@@ -117,12 +117,45 @@ if ( ! function_exists( 'chatchi' ) ) {
 	}
 }
 
-// The license check starts the plugin when the purchase is active; license
-// notices come only from RTL-Theme's own manager plugin. Without the ionCube
-// Loader the encoded check would stop the whole site, so it is only loaded
-// when the loader is there (and ChatChi stays off without it).
+if ( ! function_exists( 'chatchi_admin_notice_ids' ) ) {
+	/**
+	 * Lists the callbacks hooked to admin_notices, as "priority|id" keys.
+	 *
+	 * @return string[]
+	 */
+	function chatchi_admin_notice_ids() {
+		global $wp_filter;
+
+		$ids = array();
+
+		if ( isset( $wp_filter['admin_notices'] ) && $wp_filter['admin_notices'] instanceof WP_Hook ) {
+			foreach ( $wp_filter['admin_notices']->callbacks as $priority => $callbacks ) {
+				foreach ( array_keys( $callbacks ) as $id ) {
+					$ids[] = $priority . '|' . $id;
+				}
+			}
+		}
+
+		return $ids;
+	}
+}
+
+// The license check starts the plugin when the purchase is active. License
+// notices come only from RTL-Theme's own manager plugin, so any notice the
+// (encoded) check registers is taken off again right away. Without the
+// ionCube Loader the encoded check would stop the whole site, so it is only
+// loaded when the loader is there (and ChatChi stays off without it).
 if ( extension_loaded( 'ionCube Loader' ) ) {
+	$chatchi_notices_before = chatchi_admin_notice_ids();
+
 	require_once CHATCHI_PATH . 'license/license.php';
+
+	foreach ( array_diff( chatchi_admin_notice_ids(), $chatchi_notices_before ) as $chatchi_notice ) {
+		list( $chatchi_priority, $chatchi_id ) = explode( '|', $chatchi_notice, 2 );
+		remove_action( 'admin_notices', $GLOBALS['wp_filter']['admin_notices']->callbacks[ $chatchi_priority ][ $chatchi_id ]['function'], (int) $chatchi_priority );
+	}
+
+	unset( $chatchi_notices_before, $chatchi_notice, $chatchi_priority, $chatchi_id );
 }
 
 // Orders are read only through the WooCommerce API, so both order storages
