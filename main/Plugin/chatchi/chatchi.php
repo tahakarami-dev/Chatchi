@@ -117,93 +117,9 @@ if ( ! function_exists( 'chatchi' ) ) {
 	}
 }
 
-if ( ! function_exists( 'chatchi_own_license_notices' ) ) {
-	/**
-	 * Lists ChatChi's own license notices: closures hooked to admin_notices
-	 * that are not in the list taken before the license check ran and were
-	 * not written in RTL-Theme's license class file. RTL-Theme's own notices
-	 * (its class methods and anything defined in its file) are left alone.
-	 *
-	 * @param string[] $before "priority|id" keys hooked before the check.
-	 * @return array<int, array{0: callable, 1: int}> Callback and priority pairs.
-	 */
-	function chatchi_own_license_notices( array $before ) {
-		global $wp_filter;
-
-		$own = array();
-
-		if ( ! isset( $wp_filter['admin_notices'] ) || ! $wp_filter['admin_notices'] instanceof WP_Hook ) {
-			return $own;
-		}
-
-		foreach ( $wp_filter['admin_notices']->callbacks as $priority => $callbacks ) {
-			foreach ( $callbacks as $id => $callback ) {
-				$function = $callback['function'];
-
-				if ( in_array( $priority . '|' . $id, $before, true ) || ! $function instanceof Closure ) {
-					continue;
-				}
-
-				try {
-					$file = ( new ReflectionFunction( $function ) )->getFileName();
-				} catch ( ReflectionException $e ) {
-					continue;
-				}
-
-				// Encoded files may report decorated paths; any closure from
-				// RTL-Theme's class file (or of unknown origin) is kept.
-				if ( false === $file || false !== strpos( $file, 'RTL_License_' ) ) {
-					continue;
-				}
-
-				$own[] = array( $function, (int) $priority );
-			}
-		}
-
-		return $own;
-	}
-}
-
-if ( ! function_exists( 'chatchi_admin_notice_ids' ) ) {
-	/**
-	 * Lists the callbacks hooked to admin_notices, as "priority|id" keys.
-	 *
-	 * @return string[]
-	 */
-	function chatchi_admin_notice_ids() {
-		global $wp_filter;
-
-		$ids = array();
-
-		if ( isset( $wp_filter['admin_notices'] ) && $wp_filter['admin_notices'] instanceof WP_Hook ) {
-			foreach ( $wp_filter['admin_notices']->callbacks as $priority => $callbacks ) {
-				foreach ( array_keys( $callbacks ) as $id ) {
-					$ids[] = $priority . '|' . $id;
-				}
-			}
-		}
-
-		return $ids;
-	}
-}
-
-// The license check starts the plugin when the purchase is active. When it
-// is not, the "license inactive" notice must come only from RTL-Theme's
-// license class; the older encoded check also added a ChatChi notice of its
-// own (a closure), which is taken off again here. RTL-Theme's notices are
-// kept. Without the ionCube Loader the encoded check would stop the whole
-// site, so it is only loaded when the loader is there.
-if ( extension_loaded( 'ionCube Loader' ) ) {
-	$chatchi_notices_before = chatchi_admin_notice_ids();
-
-	require_once CHATCHI_PATH . 'license/license.php';
-
-	foreach ( chatchi_own_license_notices( $chatchi_notices_before ) as $chatchi_notice ) {
-		remove_action( 'admin_notices', $chatchi_notice[0], $chatchi_notice[1] );
-	}
-
-	unset( $chatchi_notices_before, $chatchi_notice );
-}
+// RTL-Theme license check (license.php, encoded for release). ChatChi starts
+// only when the purchase is active; the license notices are RTL-Theme's own.
+require_once CHATCHI_PATH . 'license.php';
 
 // Orders are read only through the WooCommerce API, so both order storages
 // (posts and HPOS tables) work; the chat does not touch the checkout.
