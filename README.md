@@ -9,7 +9,7 @@ A lightweight, secure live chat plugin for WordPress with a standalone, SaaS-sty
 
 ## License check (RTL-Theme)
 
-The plugin starts only when its RTL-Theme purchase is active. `chatchi.php` loads `license/license.php`, which verifies RTL-Theme's license class (`license/RTL_License_d4a7d3cf49c760e7.php`, ionCube-encoded, checked by its SHA-1) and hooks `chatchi()->boot()` only when `isActive()` returns true. ChatChi shows no license notices of its own: telling the site owner to activate the license is left to RTL-Theme's manager plugin, and any admin notice the encoded check registers is removed right after it loads.
+The plugin starts only when its RTL-Theme purchase is active. `chatchi.php` loads `license/license.php`, which verifies RTL-Theme's license class (`license/RTL_License_d4a7d3cf49c760e7.php`, ionCube-encoded, checked by its SHA-1) and hooks `chatchi()->boot()` only when `isActive()` returns true. ChatChi shows no license notices of its own: telling the site owner to activate the license is left to RTL-Theme's manager plugin, and the older encoded check's own notice (a closure) is removed right after it loads, while RTL-Theme's license-class notices are kept.
 
 - **Release build**: replace `license/license.php` with the copy encoded by RTL-Theme's tool. Never change `RTL_License_d4a7d3cf49c760e7.php`: its hash is checked.
 - **ionCube Loader** is required on the server. Without it, the encoded files would stop the whole site, so `chatchi.php` does not load them and the plugin stays off.
