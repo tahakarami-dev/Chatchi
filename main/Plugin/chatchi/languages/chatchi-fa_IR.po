@@ -3472,3 +3472,7 @@ msgstr "شماره موبایلت را وارد کن."
 #: includes/Visitors/ProfileValidator.php:216
 msgid "This field is required."
 msgstr "پر کردن این فیلد الزامی است."
+
+#. translators: %s: technical error message.
+msgid "ChatChi could not run its license check because of a server setting (%s). Please ask your host to make the PHP temporary folder writable for your site."
+msgstr "چت‌چی به دلیل یکی از تنظیمات سرور نتوانست بررسی لایسنس را اجرا کند (%s). لطفاً از پشتیبانی هاست بخواهید پوشه‌ی موقت PHP را برای سایت شما قابل نوشتن کند."

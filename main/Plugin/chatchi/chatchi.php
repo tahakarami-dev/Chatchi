@@ -161,7 +161,39 @@ if ( ! function_exists( 'chatchi' ) ) {
 
 // RTL-Theme license check (license.php, encoded for release). ChatChi starts
 // only when the purchase is active; the license notices are RTL-Theme's own.
-require_once CHATCHI_PATH . 'license.php';
+// The encoded file unpacks itself through the system temp folder; on a host
+// that blocks it (open_basedir) it throws, so catch that instead of letting it
+// stop the whole site, and tell the administrator what to ask the host for.
+try {
+	require_once CHATCHI_PATH . 'license.php';
+} catch ( \Throwable $chatchi_license_error ) {
+	error_log( 'ChatChi: license check could not run: ' . $chatchi_license_error->getMessage() );
+	$GLOBALS['chatchi_license_error'] = $chatchi_license_error->getMessage();
+	add_action( 'admin_notices', 'chatchi_license_error_notice' );
+}
+
+/**
+ * Explains why ChatChi could not load its license check (server configuration).
+ *
+ * @return void
+ */
+function chatchi_license_error_notice() {
+	if ( ! current_user_can( 'activate_plugins' ) || empty( $GLOBALS['chatchi_license_error'] ) ) {
+		return;
+	}
+
+	load_plugin_textdomain( 'chatchi', false, dirname( CHATCHI_BASENAME ) . '/languages' );
+	printf(
+		'<div class="notice notice-error"><p>%s</p></div>',
+		esc_html(
+			sprintf(
+				/* translators: %s: technical error message. */
+				__( 'ChatChi could not run its license check because of a server setting (%s). Please ask your host to make the PHP temporary folder writable for your site.', 'chatchi' ),
+				$GLOBALS['chatchi_license_error']
+			)
+		)
+	);
+}
 
 // Orders are read only through the WooCommerce API, so both order storages
 // (posts and HPOS tables) work; the chat does not touch the checkout.

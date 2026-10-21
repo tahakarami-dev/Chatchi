@@ -3464,3 +3464,7 @@ msgstr ""
 #: includes/Visitors/ProfileValidator.php:216
 msgid "This field is required."
 msgstr ""
+
+#. translators: %s: technical error message.
+msgid "ChatChi could not run its license check because of a server setting (%s). Please ask your host to make the PHP temporary folder writable for your site."
+msgstr ""
