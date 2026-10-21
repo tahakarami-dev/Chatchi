@@ -5,7 +5,7 @@
  * Description:       گفتگوی زنده‌ی سریع و امن برای وردپرس و ووکامرس، با پنل اپراتور مستقل و حرفه‌ای. ربات هوش مصنوعی با GapGPT و AvalAI، پیشنهاد پاسخ به اپراتور، نمایش سبد خرید و سفارش‌های مشتری، دعوت خودکار به گفتگو، امتیازدهی و گزارش‌های فروش، اعلان در تلگرام و بله، پیامک با کاوه‌نگار و ملی‌پیامک، منوی واتساپ و تلگرام، سؤالات متداول و حالت تیره؛ کاملاً فارسی و راست‌چین.
  * Version:           1.0.0
  * Requires at least: 6.0
- * Requires PHP:      8.1
+ * Requires PHP:      7.4
  * Author:            طاها کرمی
  * Author URI:        https://www.rtl-theme.com/author/taha-karami
  * License:           GPL-2.0-or-later
@@ -31,11 +31,42 @@ define( 'CHATCHI_FILE', __FILE__ );
 define( 'CHATCHI_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CHATCHI_URL', plugin_dir_url( __FILE__ ) );
 define( 'CHATCHI_BASENAME', plugin_basename( __FILE__ ) );
-define( 'CHATCHI_MIN_PHP', '8.1' );
-// RTL-Theme's license file is ionCube-encoded for PHP 8.1 and 8.2 only; on any
-// other PHP version (or without the ionCube Loader) loading it stops the whole site.
-define( 'CHATCHI_MAX_PHP', '8.2' );
+define( 'CHATCHI_MIN_PHP', '7.4' );
 define( 'CHATCHI_MIN_WP', '6.0' );
+
+/**
+ * Returns the PHP versions (major.minor) the license files can run on.
+ *
+ * RTL_License_*.php and the encoded license.php are ionCube files, and each
+ * one runs only on the PHP versions it was encoded for; loading it anywhere
+ * else (or without the ionCube Loader) stops the whole site. The versions are
+ * read from each file's ionCube header ("//ICB0 81:0 82:4fe2" = PHP 8.1 and
+ * 8.2), so the check follows whichever files RTL-Theme supplied. Files without
+ * that header (license.php before encoding) do not narrow the list; if no file
+ * has one, RTL-Theme's documented versions apply.
+ *
+ * @return string[] Supported versions, e.g. array( '8.1', '8.2' ).
+ */
+function chatchi_supported_php_versions() {
+	$versions = null;
+
+	foreach ( array( 'RTL_License_d4a7d3cf49c760e7.php', 'license.php' ) as $name ) {
+		$head = @file_get_contents( CHATCHI_PATH . $name, false, null, 0, 160 );
+		if ( ! is_string( $head ) || ! preg_match( '#//ICB0((?:\s+\d{2}:[0-9a-f]+)+)#i', $head, $match ) ) {
+			continue;
+		}
+
+		preg_match_all( '#\b(\d)(\d):#', $match[1], $found, PREG_SET_ORDER );
+		$file_versions = array();
+		foreach ( $found as $version ) {
+			$file_versions[] = $version[1] . '.' . $version[2];
+		}
+
+		$versions = null === $versions ? $file_versions : array_values( array_intersect( $versions, $file_versions ) );
+	}
+
+	return null === $versions ? array( '7.4', '8.1', '8.2' ) : $versions;
+}
 
 /**
  * Returns the unmet environment requirements, keyed by requirement name.
@@ -45,7 +76,7 @@ define( 'CHATCHI_MIN_WP', '6.0' );
 function chatchi_unmet_requirements() {
 	$unmet = array();
 
-	if ( version_compare( PHP_VERSION, CHATCHI_MIN_PHP, '<' ) || version_compare( PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION, CHATCHI_MAX_PHP, '>' ) ) {
+	if ( version_compare( PHP_VERSION, CHATCHI_MIN_PHP, '<' ) || ! in_array( PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION, chatchi_supported_php_versions(), true ) ) {
 		$unmet['php'] = PHP_VERSION;
 	}
 
@@ -79,10 +110,9 @@ function chatchi_requirements_notice() {
 
 	if ( isset( $unmet['php'] ) ) {
 		$messages[] = sprintf(
-			/* translators: 1: lowest supported PHP version, 2: highest supported PHP version, 3: current PHP version. */
-			__( 'ChatChi runs on PHP %1$s or %2$s. Your server is running PHP %3$s; please switch PHP version in your hosting panel.', 'chatchi' ),
-			CHATCHI_MIN_PHP,
-			CHATCHI_MAX_PHP,
+			/* translators: 1: supported PHP versions, e.g. "7.4 / 8.1 / 8.2", 2: current PHP version. */
+			__( 'ChatChi runs on PHP %1$s. Your server is running PHP %2$s; please switch PHP version in your hosting panel.', 'chatchi' ),
+			implode( ' / ', chatchi_supported_php_versions() ),
 			$unmet['php']
 		);
 	}

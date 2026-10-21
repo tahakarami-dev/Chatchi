@@ -41,11 +41,11 @@ msgstr ""
 msgid "https://www.rtl-theme.com/author/taha-karami"
 msgstr ""
 
-#. translators: 1: lowest supported PHP version, 2: highest supported PHP version, 3: current PHP version.
+#. translators: 1: supported PHP versions, e.g. "7.4 / 8.1 / 8.2", 2: current PHP version.
 #: chatchi.php:76
 #, php-format
-msgid "ChatChi runs on PHP %1$s or %2$s. Your server is running PHP %3$s; please switch PHP version in your hosting panel."
-msgstr "چت‌چی روی PHP نسخه‌ی %1$s یا %2$s اجرا می‌شود. نسخه‌ی PHP سرور شما %3$s است؛ لطفاً از پنل هاست، نسخه‌ی PHP را تغییر دهید."
+msgid "ChatChi runs on PHP %1$s. Your server is running PHP %2$s; please switch PHP version in your hosting panel."
+msgstr "چت‌چی روی PHP نسخه‌ی %1$s اجرا می‌شود. نسخه‌ی PHP سرور شما %2$s است؛ لطفاً از پنل هاست، نسخه‌ی PHP را تغییر دهید."
 
 msgid "ChatChi needs the ionCube Loader. Please ask your host to enable it."
 msgstr "چت‌چی به ionCube Loader نیاز دارد. لطفاً از پشتیبانی هاست بخواهید آن را فعال کند."
