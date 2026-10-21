@@ -13,6 +13,13 @@ Set up exactly as RTL-Theme's guide describes. `RTL_License_d4a7d3cf49c760e7.php
 
 - **Release build**: replace `license.php` with the copy encoded by RTL-Theme's encoder. Never change `RTL_License_d4a7d3cf49c760e7.php`: its name and hash are checked.
 - **Server**: PHP 7.4, 8.1 or 8.2 with the ionCube Loader, as RTL-Theme documents. Each ionCube file runs only on the PHP versions it was encoded for: RTL-Theme's default license file is encoded for 8.1 and 8.2 (header `ICB0 81 82`), and its "PHP 7.4 encoder" option is needed for 7.4. Loading a file on any other version, or without the loader, stops the whole site, so `chatchi_supported_php_versions()` reads the versions from the ionCube headers of `RTL_License_*.php` and the encoded `license.php`, and ChatChi shows an admin notice instead of loading them when the server doesn't match.
+
+### Two release packages
+
+- `main/Plugin/chatchi` — RTL-Theme's default license file, encoded for PHP 8.1 and 8.2 (header `ICB0 81 82`, hash `3157c38b…`).
+- `main/Plugin-PHP7.4/chatchi` — the license file downloaded with RTL-Theme's "PHP 7.4 encoder" option, encoded for PHP 7.4, 8.1 and 8.2 (header `ICB0 74 81 82`, hash `c1693a5f…`), sent to RTL-Theme as a separate package as they asked. Its `license.php` differs only in that hash and must be encoded with the PHP 7.4 encoder option.
+
+Every other file is identical in both packages.
 - **Development**: without the loader (or an active license) the plugin does not boot.
 
 ## Development
